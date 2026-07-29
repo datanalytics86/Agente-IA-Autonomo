@@ -1,0 +1,34 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-surface: #0a0c0f;
+  --color-elevated: #12151a;
+  --color-accent: #2dd4bf;
+  --color-accent-soft: #5eead4;
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --font-sans: 'Segoe UI', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--color-surface);
+  color: #f4f4f5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Avoid horizontal overflow on ~390px */
+html {
+  overflow-x: hidden;
+}

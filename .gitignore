@@ -1,0 +1,43 @@
+# Entorno
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Vite
+node_modules/
+dist/
+build/
+apps/web/dist/
+*.local
+.vite/
+
+# Estado runtime y salidas generadas (engine)
+engine/state/leads.json
+engine/state/logs.json
+engine/state/queue.json
+engine/output/*.html
+engine/output/*.md
+engine/output/*.txt
+!engine/state/.gitkeep
+!engine/output/.gitkeep
+
+# Compat rutas legacy
+state/leads.json
+state/logs.json
+state/queue.json
+output/*.html
+output/*.md
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
