@@ -1,0 +1,88 @@
+# Override de producción. No uses infra/.env.ci aquí.
+#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml --env-file .env up -d
+# Hace falta ../.env (SECRET_KEY, identidad, APP_MODE=prod). La db no publica
+# puertos. POSTGRES_PASSWORD, POSTGRES_USER, POSTGRES_DB y SITE_DOMAIN no
+# tienen default: si faltan, Compose aborta.
+
+services:
+  db:
+    ports: !reset []
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER es obligatorio en prod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio en prod}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB es obligatorio en prod}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  migrate:
+    env_file: !override
+      - path: ../.env
+        required: true
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER es obligatorio en prod}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio en prod}@db:5432/${POSTGRES_DB:?POSTGRES_DB es obligatorio en prod}
+      CLIENT_SITES_DIR: /data/client_sites
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  api:
+    env_file: !override
+      - path: ../.env
+        required: true
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER es obligatorio en prod}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio en prod}@db:5432/${POSTGRES_DB:?POSTGRES_DB es obligatorio en prod}
+      CLIENT_SITES_DIR: /data/client_sites
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  worker:
+    env_file: !override
+      - path: ../.env
+        required: true
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER es obligatorio en prod}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio en prod}@db:5432/${POSTGRES_DB:?POSTGRES_DB es obligatorio en prod}
+      CLIENT_SITES_DIR: /data/client_sites
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+
+  caddy:
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?SITE_DOMAIN es obligatorio en prod}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:-admin.invalid}
+    ports:
+      - "443:443"
+    volumes:
+      - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  backup:
+    environment:
+      PGUSER: ${POSTGRES_USER:?POSTGRES_USER es obligatorio en prod}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio en prod}
+      PGDATABASE: ${POSTGRES_DB:?POSTGRES_DB es obligatorio en prod}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M

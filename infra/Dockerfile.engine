@@ -1,44 +1,53 @@
-# Esqueleto multi-stage del motor. Contexto de build: la raíz del repo
-# (`docker compose -f infra/docker-compose.yml`). No copia secretos:
-# `.dockerignore` deja fuera `.env`, y esta imagen borra cualquier `.env`
-# que hubiera colado en `engine/`.
+# Motor. Contexto de build: la raíz del repo
+# (`docker compose -f infra/docker-compose.yml`).
+# No copia secretos: `.dockerignore` deja fuera `.env` y este stage lo borra
+# si igual colara en `engine/`.
 #
-# CMD documentado (servicio api):
+# CMD del servicio api (no cambiarlo):
 #   python main.py --mode api
-# El servicio worker lo sustituye por:
-#   python main.py --mode worker
-# Esos modos pueden salir con código 2 mientras no exista el paquete.
-# Defaults de demo, sin envíos: APP_MODE=demo, DRY_RUN=true, OUTREACH_ENABLED=false.
+# El worker usa `python worker_entry.py`. migrate usa `python migrate_entry.py`.
 
 FROM python:3.12-slim AS deps
 
 WORKDIR /src
-COPY engine/ /src/engine/
-RUN mkdir -p /opt/py \
-    && if [ -f /src/engine/requirements.txt ]; then \
-         pip install --no-cache-dir --prefix=/opt/py -r /src/engine/requirements.txt; \
-       else \
-         echo "engine/requirements.txt no existe; imagen sin deps de terceros."; \
-       fi
+COPY engine/requirements.txt /src/requirements.txt
+RUN pip install --no-cache-dir --prefix=/opt/py -r /src/requirements.txt
 
 FROM python:3.12-slim AS runtime
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     APP_MODE=demo \
     DRY_RUN=true \
     OUTREACH_ENABLED=false
 
-WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates ffmpeg tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=deps /opt/py /usr/local
-COPY --from=deps /src/engine/ /app/
+RUN pip install --no-cache-dir playwright==1.55.0 \
+    && mkdir -p /ms-playwright \
+    && python -m playwright install --with-deps chromium \
+    && chmod -R a+rX /ms-playwright
+
+WORKDIR /app
+COPY engine/ /app/
+COPY infra/scripts/worker_entry.py infra/scripts/migrate_entry.py infra/scripts/seed_demo.py /app/
 RUN rm -f /app/.env /app/.env.local /app/.env.production \
     && useradd --create-home --uid 10001 app \
-    && chown -R app:app /app
+    && mkdir -p /app/output /app/state /data/client_sites \
+    && chown -R app:app /app /data/client_sites
+
 USER app
 
 EXPOSE 8000
 
-# Servicio api. El worker no usa este CMD.
+# JSON de la API, no un HTML. El worker y migrate pisan este check.
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=8 \
+    CMD ["python", "-c", "import json,sys,urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4); body=r.read(); data=json.loads(body); sys.exit(0 if r.status==200 and data.get('status')=='ok' and b'<' not in body else 1)"]
+
 CMD ["python", "main.py", "--mode", "api"]

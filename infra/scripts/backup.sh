@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# Restauración se prueba en F7. Este script no restaura.
-# No lo ejecutes contra una base real antes de esa prueba.
-# pg_dump (formato custom) y rotación de 14 archivos.
-# DATABASE_URL tiene que ser un URI de libpq (postgresql://...), no el de SQLAlchemy.
-# Si no hay DATABASE_URL, usa PGHOST, PGPORT, PGUSER y PGDATABASE.
+# pg_dump (formato custom) y rotación de 14 días.
+# DATABASE_URL puede ser el URI de SQLAlchemy (postgresql+psycopg://).
+# La restauración está en restore.sh. El smoke lo invoca dentro del compose.
 
 set -euo pipefail
 
@@ -12,8 +10,14 @@ mkdir -p "$dest"
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 out="${dest}/agencia-${stamp}.dump"
 
+normalize_url() {
+  printf '%s' "$1" \
+    | sed -e 's|^postgresql+psycopg://|postgresql://|' \
+         -e 's|^postgresql+psycopg2://|postgresql://|'
+}
+
 if [[ -n "${DATABASE_URL:-}" ]]; then
-  pg_dump --format=custom --file="$out" --dbname="$DATABASE_URL"
+  pg_dump --format=custom --file="$out" --dbname="$(normalize_url "$DATABASE_URL")"
 else
   pg_dump --format=custom --file="$out" \
     --host="${PGHOST:-localhost}" \
@@ -22,11 +26,14 @@ else
     --dbname="${PGDATABASE:-agencia}"
 fi
 
+find "$dest" -maxdepth 1 -type f -name 'agencia-*.dump' -mtime +14 -delete
+
 shopt -s nullglob
-dumps=("${dest}"/agencia-*.dump)
-if ((${#dumps[@]} > 14)); then
-  mapfile -t sorted < <(ls -1t "${dest}"/agencia-*.dump)
+mapfile -t sorted < <(ls -1t "${dest}"/agencia-*.dump)
+if ((${#sorted[@]} > 14)); then
   for old in "${sorted[@]:14}"; do
     rm -f -- "$old"
   done
 fi
+
+echo "$out"

@@ -1,5 +1,6 @@
 # CI. mypy estricto en core/db/worker; agents/api/integrations/simulation en modo normal.
-# ADR-013 (excluir esos paquetes) queda reemplazado. Sin inventar compose-smoke.
+# ADR-013 (excluir esos paquetes) queda reemplazado.
+# compose-smoke es el único job con Docker.
 
 name: ci
 
@@ -197,3 +198,23 @@ jobs:
       - name: e2e
         working-directory: apps/web
         run: npm run e2e
+
+  compose-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Levantar el stack y correr el smoke
+        run: |
+          set -euo pipefail
+          docker compose -f infra/docker-compose.yml --env-file infra/.env.ci up -d --build --wait
+          python infra/scripts/smoke.py
+
+      - name: Bajar el stack
+        if: always()
+        run: docker compose -f infra/docker-compose.yml --env-file infra/.env.ci down -v

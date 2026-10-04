@@ -1,0 +1,10 @@
+# Cliente de Postgres para pg_dump diario. No levanta otra base.
+FROM postgres:16
+
+COPY infra/scripts/backup.sh /usr/local/bin/backup.sh
+COPY infra/scripts/restore.sh /usr/local/bin/restore.sh
+COPY infra/scripts/backup-loop.sh /usr/local/bin/backup-loop.sh
+RUN sed -i 's/\r$//' /usr/local/bin/backup.sh /usr/local/bin/restore.sh /usr/local/bin/backup-loop.sh \
+    && chmod 0755 /usr/local/bin/backup.sh /usr/local/bin/restore.sh /usr/local/bin/backup-loop.sh
+
+ENTRYPOINT ["/usr/local/bin/backup-loop.sh"]
