@@ -1,5 +1,7 @@
 # PROGRESS — Autonomía 04-10-2026
 
+> Ronda 2: el tablero vigente es `docs/PROGRESS_R2.md`. Este archivo cierra la ronda 1. La casilla D (Docker) no era el único hueco: el worker de producción usa stubs y el sitio en Caddy era un marcador. Ver `instrucciones2_041026.md`.
+
 Rama: `grok/autonomia-041026` · Última actualización: 2026-10-04 18:45 America/Santiago · Ola actual: 3
 
 ## Estado de la DoD
