@@ -200,7 +200,7 @@ Están el README de la raíz, `apps/web/README.md`, `docs/RUNBOOK.md`, `docs/GO_
 | H3 | `fc72ffb` | la base es la fuente; `migrate-json` no reescribe el origen |
 | H4 | `8ed6259` | `test_agents_no_asignan_status`, `test_no_hay_asignacion_de_status_fuera_de_core_y_agents` |
 | H5 | `f96f839` | `test_aprobar_hitl_vuelve_a_paused_from` |
-| H6 | `8ed6259` y este cierre | `hitl_value_clp`, `response_rate_guard`; se quitó `HIGH_VALUE_CLP` |
+| H6 | `8ed6259` y `e0868d6` | `hitl_value_clp`, `response_rate_guard`; se quitó `HIGH_VALUE_CLP` |
 | H7 | `c905390` | Jinja2 `select_autoescape`; `test_temas_mapean_rubros_y_no_filtran_el_id` |
 | H8 | `d65f02f` | `test_rechaza_testimonio_inventado` |
 | H9 | `c905390` | `booking_link` desde configuración |
@@ -213,7 +213,7 @@ Están el README de la raíz, `apps/web/README.md`, `docs/RUNBOOK.md`, `docs/GO_
 | H16 | `c905390` | `test_run_cycle_no_crea_leads_y_respeta_cuota` |
 | H17 | `c905390` | `test_mobile_solo_loguea_un_mensaje_nuevo` |
 | H18 | `fc72ffb` | eventos en la base; ya no está `MAX_LOGS` |
-| H19 | este cierre | `test_la_cola_json_no_se_crea` |
+| H19 | `e0868d6` | `test_la_cola_json_no_se_crea` |
 | H20 | `8ed6259` | `LLM_MODEL=grok-4.7` y alias `GROK_API_KEY` |
 | H21 | `4a17816` | `test_metrics_salen_de_la_base` |
 | H22 | `4a17816` | `test_aprobar_hitl_vuelve_a_paused_from` |
@@ -223,7 +223,7 @@ Están el README de la raíz, `apps/web/README.md`, `docs/RUNBOOK.md`, `docs/GO_
 | H26 | `4a17816` | métricas desde la base, incluido el gasto LLM |
 | H27 | `80f5188` | `test_login_cookie_y_csrf` |
 | H28 | `4ae5920` | el README no trae rutas de `T14 Gen 2` |
-| H29 | este cierre | `apps/web/README.md` describe las rutas reales |
+| H29 | `e0868d6` | `apps/web/README.md` describe las rutas reales |
 | H30 | `84a1202`, `ae2635e` | tests, ruff, mypy, CI y Compose. El binario docker no está en esta máquina |
 
 ## Riesgos y deuda
