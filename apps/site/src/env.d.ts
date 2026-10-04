@@ -9,4 +9,5 @@ interface ImportMetaEnv {
   readonly PUBLIC_AGENCY_EMAIL?: string;
   readonly PUBLIC_AGENCY_ADDRESS?: string;
   readonly PUBLIC_API_BASE?: string;
+  readonly PUBLIC_TURNSTILE_SITE_KEY?: string;
 }

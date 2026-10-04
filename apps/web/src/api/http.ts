@@ -41,6 +41,11 @@ export function readCookie(name: string, source?: string): string | null {
   return null
 }
 
+export function apiPath(path: string): string {
+  if (path === '/api' || path.startsWith('/api/')) return path
+  throw new ApiError(0, 'apiFetch solo acepta una ruta absoluta que empiece por /api', 'bad_path')
+}
+
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const method = (init.method ?? 'GET').toUpperCase()
   const headers = new Headers(init.headers)
@@ -55,7 +60,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
   let response: Response
   try {
-    response = await fetch(path, {
+    response = await fetch(apiPath(path), {
       ...init,
       method,
       headers,

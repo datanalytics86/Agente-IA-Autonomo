@@ -7,7 +7,9 @@ from pathlib import Path
 import pytest
 from pydantic import AliasChoices
 
-from core.config import Settings, get_settings, reset_settings
+from api.app import should_create_schema
+from api.security import dump_session, make_baja_token
+from core.config import ProdConfigError, Settings, get_settings, reset_settings
 from core.hitl import needs_value_review
 
 
@@ -134,7 +136,13 @@ def test_env_de_raiz_pisa_engine_y_el_proceso_pisa_ambos(
         encoding="utf-8",
     )
     root_env.write_text(
-        "APP_MODE=prod\nDRY_RUN=false\nAGENCY_NAME=raiz\n",
+        "APP_MODE=prod\nDRY_RUN=false\nAGENCY_NAME=raiz\n"
+        "SECRET_KEY=raiz-secret-key-de-produccion-32\n"
+        "DATABASE_URL=sqlite:///./state/override.db\n"
+        "ADMIN_EMAIL=admin@raiz.example\n"
+        "ADMIN_PASSWORD_HASH=hash-raiz\n"
+        "PUBLIC_BASE_URL=https://raiz.example\n"
+        "AGENCY_EMAIL=hola@raiz.example\n",
         encoding="utf-8",
     )
     monkeypatch.setenv("HITL_VALUE_CLP", "99")
@@ -145,6 +153,34 @@ def test_env_de_raiz_pisa_engine_y_el_proceso_pisa_ambos(
     assert settings.hitl_value_clp == 99
 
 
+_PROD: dict[str, str] = {
+    "app_mode": "prod",
+    "secret_key": "s" * 32,
+    "database_url": "sqlite:///:memory:",
+    "admin_email": "admin@example.com",
+    "admin_password_hash": "hash-de-prueba",
+    "public_base_url": "https://agencia.example",
+    "agency_name": "Agencia Norte",
+    "agency_email": "hola@agencia.example",
+}
+
+_PROD_ENV = {
+    "SECRET_KEY": "SECRET_KEY",
+    "DATABASE_URL": "DATABASE_URL",
+    "ADMIN_EMAIL": "ADMIN_EMAIL",
+    "ADMIN_PASSWORD_HASH": "ADMIN_PASSWORD_HASH",
+    "PUBLIC_BASE_URL": "PUBLIC_BASE_URL",
+    "AGENCY_NAME": "AGENCY_NAME",
+    "AGENCY_EMAIL": "AGENCY_EMAIL",
+}
+
+
+def _prod_settings(**overrides: str) -> Settings:
+    data = dict(_PROD)
+    data.update(overrides)
+    return Settings(_env_file=None, **data)
+
+
 def test_secreto_efimero_no_se_persiste_en_el_campo(monkeypatch: pytest.MonkeyPatch) -> None:
     _clear_env(monkeypatch)
     first = Settings(_env_file=None)
@@ -152,3 +188,100 @@ def test_secreto_efimero_no_se_persiste_en_el_campo(monkeypatch: pytest.MonkeyPa
     assert first.secret_key == ""
     assert first.resolved_secret_key == second.resolved_secret_key
     assert len(first.resolved_secret_key) >= 16
+
+
+def test_prod_completo_arranca(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_env(monkeypatch)
+    settings = _prod_settings()
+    assert settings.app_mode == "prod"
+    assert settings.resolved_secret_key == "s" * 32
+
+
+def test_prod_sin_secret_key_no_arranca(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_env(monkeypatch)
+    for key, value in _PROD.items():
+        if key == "secret_key":
+            monkeypatch.setenv("SECRET_KEY", "")
+        else:
+            monkeypatch.setenv(key.upper(), value)
+    reset_settings()
+    with pytest.raises(ProdConfigError, match="falta SECRET_KEY") as caught:
+        get_settings()
+    assert "ADMIN_EMAIL" not in str(caught.value)
+    assert "AGENCY_NAME" not in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    ("field", "env_name", "fragment"),
+    [
+        ("secret_key", "SECRET_KEY", "falta SECRET_KEY"),
+        ("database_url", "DATABASE_URL", "falta DATABASE_URL"),
+        ("admin_email", "ADMIN_EMAIL", "falta ADMIN_EMAIL"),
+        ("admin_password_hash", "ADMIN_PASSWORD_HASH", "falta ADMIN_PASSWORD_HASH"),
+        ("public_base_url", "PUBLIC_BASE_URL", "falta PUBLIC_BASE_URL"),
+        ("agency_name", "AGENCY_NAME", "falta AGENCY_NAME"),
+        ("agency_email", "AGENCY_EMAIL", "falta AGENCY_EMAIL"),
+    ],
+)
+def test_prod_sin_variable_obligatoria_no_arranca(
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    env_name: str,
+    fragment: str,
+) -> None:
+    _clear_env(monkeypatch)
+    data = {key: value for key, value in _PROD.items() if key != field}
+    with pytest.raises(ProdConfigError, match=fragment) as caught:
+        Settings(_env_file=None, **data)
+    message = str(caught.value)
+    assert env_name in message
+    for other in _PROD_ENV:
+        if other != env_name:
+            assert other not in message
+    monkeypatch.setenv("APP_MODE", "prod")
+    for key, value in _PROD.items():
+        monkeypatch.setenv(key.upper(), "" if key == field else value)
+    reset_settings()
+    with pytest.raises(ProdConfigError, match=fragment):
+        get_settings()
+
+
+def test_prod_secret_key_corta_no_arranca(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_env(monkeypatch)
+    with pytest.raises(ProdConfigError, match="SECRET_KEY debe tener al menos 32 caracteres"):
+        _prod_settings(secret_key="x" * 31)
+
+
+def test_prod_public_base_url_sin_https_no_arranca(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_env(monkeypatch)
+    with pytest.raises(ProdConfigError, match="PUBLIC_BASE_URL debe empezar por https"):
+        _prod_settings(public_base_url="http://localhost")
+
+
+def test_prod_no_firma_sesiones_ni_baja_con_clave_vacia(monkeypatch: pytest.MonkeyPatch) -> None:
+    broken = Settings.model_construct(app_mode="prod", secret_key="", public_base_url="https://x")
+    monkeypatch.setattr("api.security.get_settings", lambda: broken)
+    with pytest.raises(ProdConfigError, match="SECRET_KEY"):
+        dump_session("user-1", "admin@example.com")
+    with pytest.raises(ProdConfigError, match="SECRET_KEY"):
+        make_baja_token("lead-1")
+
+
+def test_create_all_solo_en_sqlite_de_demo() -> None:
+    demo_sqlite = Settings.model_construct(
+        app_mode="demo",
+        database_url="sqlite:///./state/agencia.db",
+    )
+    demo_memory = Settings.model_construct(app_mode="demo", database_url="sqlite:///:memory:")
+    demo_postgres = Settings.model_construct(
+        app_mode="demo",
+        database_url="postgresql+psycopg://localhost/agencia",
+    )
+    prod_sqlite = Settings.model_construct(
+        app_mode="prod",
+        database_url="sqlite:///./state/agencia.db",
+    )
+    assert should_create_schema(demo_sqlite) is True
+    assert should_create_schema(demo_memory) is True
+    assert should_create_schema(demo_postgres) is False
+    assert should_create_schema(prod_sqlite) is False

@@ -25,6 +25,12 @@ def _settings(**overrides: Any) -> Settings:
     data: dict[str, Any] = {
         "app_mode": "prod",
         "dry_run": False,
+        "secret_key": "s" * 32,
+        "database_url": "sqlite:///:memory:",
+        "admin_email": "admin@example.com",
+        "admin_password_hash": "hash-de-prueba",
+        "agency_name": "Agencia Test",
+        "agency_email": "agencia@example.com",
         "mp_access_token": "TEST-MP",
         "mp_webhook_secret": "mp-secret",
         "public_base_url": "https://agencia.example",

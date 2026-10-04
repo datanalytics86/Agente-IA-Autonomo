@@ -25,6 +25,13 @@ def _settings(**overrides: Any) -> Settings:
     data: dict[str, Any] = {
         "app_mode": "prod",
         "dry_run": False,
+        "secret_key": "s" * 32,
+        "database_url": "sqlite:///:memory:",
+        "admin_email": "admin@example.com",
+        "admin_password_hash": "hash-de-prueba",
+        "public_base_url": "https://agencia.example",
+        "agency_name": "Agencia Test",
+        "agency_email": "agencia@example.com",
         "hosting_provider": "caddy",
         "client_sites_dir": "engine/output/clients",
         "cloudflare_api_token": "",

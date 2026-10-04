@@ -2,6 +2,9 @@
 import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
 import tailwindcss from '@tailwindcss/vite';
+import { assertProdIdentity } from './src/data/prod-identity.mjs';
+
+assertProdIdentity();
 
 const site = process.env.PUBLIC_BASE_URL?.trim() || 'http://localhost';
 

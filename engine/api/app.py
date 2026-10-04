@@ -14,18 +14,27 @@ from api.deps import build_payment_provider
 from api.errors import register_exception_handlers
 from api.log import configure_logging
 from api.routers import admin, auth, health, internal, public, webhooks
-from core.config import get_settings
+from core.config import Settings, get_settings
 from db.session import create_all, reset_engine
 
 logger = logging.getLogger("api.access")
+
+
+def should_create_schema(settings: Settings) -> bool:
+    """create_all solo en el SQLite de demo. En prod el esquema lo aplica Alembic."""
+    if settings.app_mode != "demo":
+        return False
+    return settings.database_url.strip().lower().startswith("sqlite:")
 
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     reset_engine()
-    create_all()
-    app.state.payment_provider = build_payment_provider(get_settings())
+    settings = get_settings()
+    if should_create_schema(settings):
+        create_all()
+    app.state.payment_provider = build_payment_provider(settings)
     yield
 
 

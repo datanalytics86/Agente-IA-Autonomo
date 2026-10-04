@@ -25,6 +25,13 @@ def _settings(**overrides: Any) -> Settings:
     data: dict[str, Any] = {
         "app_mode": "prod",
         "dry_run": False,
+        "secret_key": "s" * 32,
+        "database_url": "sqlite:///:memory:",
+        "admin_email": "admin@example.com",
+        "admin_password_hash": "hash-de-prueba",
+        "public_base_url": "https://agencia.example",
+        "agency_name": "Agencia Test",
+        "agency_email": "agencia@example.com",
         "meta_app_secret": "app-secret",
         "meta_verify_token": "verify-token",
         "ig_access_token": "ig-test",
