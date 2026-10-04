@@ -23,6 +23,13 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 8080,
+    // Misma origen en desarrollo para que la cookie de sesión llegue al navegador.
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     host: '0.0.0.0',

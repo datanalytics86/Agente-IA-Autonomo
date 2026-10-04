@@ -1,46 +1,29 @@
-import { toast } from 'sonner'
-import { formatClp } from '../lib/format'
+import { Link } from '@tanstack/react-router'
+import type { Lead } from '../api/types'
 import { cn } from '../lib/cn'
-import { STATUS_LABELS, type LeadStatus } from '../lib/types'
-import { useAgencyStore } from '../store/useAgencyStore'
+import { formatClp } from '../lib/format'
+import { leadStatusLabel } from '../lib/labels'
+import { ghostButtonClass } from '../lib/ui'
 
-const BADGE: Partial<Record<LeadStatus, string>> = {
-  nuevo: 'bg-sky-500/10 text-sky-300 ring-sky-500/20',
-  diagnosticado: 'bg-violet-500/10 text-violet-300 ring-violet-500/20',
-  landing: 'bg-cyan-500/10 text-cyan-300 ring-cyan-500/20',
-  video: 'bg-teal-500/10 text-teal-300 ring-teal-500/20',
-  pitch_listo: 'bg-lime-500/10 text-lime-300 ring-lime-500/20',
-  enviado: 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/20',
-  respondio: 'bg-green-500/10 text-green-300 ring-green-500/20',
-  agendado: 'bg-accent/10 text-accent ring-accent/25',
-  cerrado: 'bg-zinc-500/10 text-zinc-400 ring-zinc-500/20',
-  revision: 'bg-amber-500/10 text-amber-300 ring-amber-500/25',
+function statusClass(status: string): string {
+  if (status === 'revision') return 'bg-amber-500/10 text-amber-300 ring-amber-500/25'
+  if (status === 'perdido' || status === 'opt_out') return 'bg-zinc-500/10 text-zinc-400 ring-zinc-500/20'
+  if (status === 'pagado' || status === 'entregado') return 'bg-accent/10 text-accent ring-accent/25'
+  return 'bg-white/5 text-zinc-300 ring-white/10'
 }
 
-export function LeadsTable({
-  filterStatus,
-}: {
-  filterStatus?: LeadStatus | 'all'
-}) {
-  const leads = useAgencyStore((s) => s.leads)
-  const advanceLead = useAgencyStore((s) => s.advanceLead)
-  const approveLead = useAgencyStore((s) => s.approveLead)
-  const rejectLead = useAgencyStore((s) => s.rejectLead)
-  const online = useAgencyStore((s) => s.systemOnline)
-
-  const filtered =
-    !filterStatus || filterStatus === 'all'
-      ? leads
-      : leads.filter((l) => l.status === filterStatus)
+export function LeadsTable({ items }: { items: Lead[] }) {
+  if (items.length === 0) {
+    return (
+      <p className="rounded-2xl border border-dashed border-white/10 py-12 text-center text-sm text-zinc-500">
+        No hay leads en esta página
+      </p>
+    )
+  }
 
   return (
     <div className="space-y-3">
-      {filtered.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-white/10 py-12 text-center text-sm text-zinc-500">
-          No hay leads con ese filtro
-        </div>
-      )}
-      {filtered.map((lead) => (
+      {items.map((lead) => (
         <article
           key={lead.id}
           className="rounded-2xl border border-white/5 bg-elevated p-4 shadow-card sm:p-5"
@@ -48,16 +31,16 @@ export function LeadsTable({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-base font-semibold text-zinc-50">{lead.business}</h3>
+                <h3 className="break-words text-base font-semibold text-zinc-50">{lead.business}</h3>
                 <span
                   className={cn(
                     'rounded-full px-2 py-0.5 text-[10px] font-medium ring-1',
-                    BADGE[lead.status],
+                    statusClass(lead.status),
                   )}
                 >
-                  {STATUS_LABELS[lead.status]}
+                  {leadStatusLabel(lead.status)}
                 </span>
-                {lead.highValue && (
+                {lead.high_value && (
                   <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-200 ring-1 ring-amber-500/25">
                     High-value
                   </span>
@@ -65,88 +48,21 @@ export function LeadsTable({
               </div>
               <p className="mt-1 text-xs text-zinc-500">
                 {lead.category} · {lead.commune}
-                {lead.city !== lead.commune ? `, ${lead.city}` : ''} · rating{' '}
-                {lead.rating.toFixed(1)} ({lead.reviews} reseñas)
-                {lead.hasWebsite
-                  ? ` · web ${lead.websiteYear ?? 'sí'}`
-                  : ' · sin web'}
+                {lead.city && lead.city !== lead.commune ? `, ${lead.city}` : ''}
+                {lead.paused_from ? ` · pausa desde ${leadStatusLabel(lead.paused_from)}` : ''}
               </p>
             </div>
-            <p className="text-sm font-semibold tabular-nums text-accent">
-              {formatClp(lead.estimatedValueClp)}
+            <p className="text-sm font-semibold tabular-nums text-zinc-300">
+              {typeof lead.estimated_value_clp === 'number'
+                ? formatClp(lead.estimated_value_clp)
+                : '—'}
             </p>
           </div>
-
-          {lead.diagnosis && (
-            <p className="mt-3 text-sm leading-relaxed text-zinc-300">
-              <span className="font-medium text-zinc-400">Diagnóstico: </span>
-              {lead.diagnosis}
-            </p>
-          )}
-          {lead.pitch && (
-            <p className="mt-2 rounded-xl border border-white/5 bg-surface/60 p-3 text-sm leading-relaxed text-zinc-400">
-              <span className="font-medium text-zinc-300">Pitch: </span>
-              {lead.pitch}
-            </p>
-          )}
-          {lead.reason && (
-            <p className="mt-2 text-xs text-amber-200/90">{lead.reason}</p>
-          )}
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            {lead.status === 'revision' ? (
-              <>
-                <button
-                  type="button"
-                  disabled={!online}
-                  onClick={() => {
-                    approveLead(lead.id)
-                    toast.success('Deal aprobado', {
-                      description: `${lead.business} → enviado`,
-                    })
-                  }}
-                  className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-surface hover:bg-accent-soft disabled:opacity-40"
-                >
-                  Aprobar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    rejectLead(lead.id)
-                    toast.message('Lead descartado', {
-                      description: lead.business,
-                    })
-                  }}
-                  className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-white/5"
-                >
-                  Descartar
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  disabled={!online || lead.status === 'cerrado'}
-                  onClick={() => {
-                    advanceLead(lead.id)
-                    toast.success('Lead avanzado', { description: lead.business })
-                  }}
-                  className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-zinc-100 hover:bg-white/15 disabled:opacity-40"
-                >
-                  Avanzar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    rejectLead(lead.id)
-                    toast.message('Lead descartado', { description: lead.business })
-                  }}
-                  className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-zinc-400 hover:bg-white/5"
-                >
-                  Descartar
-                </button>
-              </>
-            )}
+          <p className="mt-2 text-[11px] text-zinc-500">Valor estimado. No es ingreso.</p>
+          <div className="mt-4">
+            <Link to="/leads/$leadId" params={{ leadId: lead.id }} className={ghostButtonClass}>
+              Ver detalle
+            </Link>
           </div>
         </article>
       ))}

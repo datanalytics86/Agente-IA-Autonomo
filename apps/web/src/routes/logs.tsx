@@ -1,23 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { LiveLogs } from '../components/LiveLogs'
-import { useAgencyStore } from '../store/useAgencyStore'
+import { PageHeader } from '../components/PageHeader'
 
 export const Route = createFileRoute('/logs')({
   component: LogsPage,
 })
 
 function LogsPage() {
-  const total = useAgencyStore((s) => s.logs.length)
-
   return (
     <div className="space-y-5">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Logs</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Historial de actividad multiagente · {total} eventos
-        </p>
-      </header>
-      <LiveLogs limit={50} />
+      <PageHeader title="Logs" subtitle="Eventos del motor, con filtro y stream cuando la API está arriba." />
+      <LiveLogs limit={100} showFilters />
     </div>
   )
 }

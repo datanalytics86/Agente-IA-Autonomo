@@ -7,16 +7,20 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate:api": "openapi-typescript ../../docs/contracts/openapi.yaml -o src/api/schema.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/react-query": "^5.104.1",
     "@tanstack/react-router": "^1.170.18",
     "@tanstack/router-devtools": "^1.167.0",
     "@tanstack/router-plugin": "^1.168.23",
     "lucide-react": "^1.27.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "react-is": "^19.3.0",
     "recharts": "^3.10.1",
     "sonner": "^2.0.7",
     "tailwindcss": "^4.3.3",
@@ -27,8 +31,10 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "openapi-typescript": "^7.13.0",
     "oxlint": "^1.71.0",
     "typescript": "~6.0.2",
-    "vite": "^8.1.1"
+    "vite": "^8.1.1",
+    "vitest": "^5.0.3"
   }
 }
