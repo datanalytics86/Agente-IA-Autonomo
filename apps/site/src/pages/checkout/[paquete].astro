@@ -1,0 +1,51 @@
+---
+import Base from '../../layouts/Base.astro';
+import { findPackage, packages } from '../../data/packages';
+
+export function getStaticPaths() {
+  return packages.map((item) => ({ params: { paquete: item.code } }));
+}
+
+const code = Astro.params.paquete ?? '';
+const item = findPackage(code);
+if (!item) {
+  throw new Error('Paquete desconocido');
+}
+---
+
+<Base
+  title={`Checkout ${item.name}`}
+  description={`Checkout del paquete ${item.name}. El pago ocurre en el proveedor, no en esta página.`}
+  noindex
+  jsonLd={false}
+>
+  <h1 class="text-4xl font-semibold tracking-tight">Checkout · {item.name}</h1>
+  <p class="mt-4 text-3xl font-semibold text-accent" data-live-price>{item.priceLabel}</p>
+  <p class="mt-4 max-w-2xl text-muted">{item.summary}</p>
+  <ul class="mt-4 grid max-w-xl gap-2 text-sm">
+    {item.includes.map((line) => <li>{line}</li>)}
+  </ul>
+  <p class="mt-6 max-w-2xl text-sm text-muted">
+    Esta pantalla no cobra y no pide la tarjeta. Al continuar se llama a la API y, si responde con un enlace,
+    te llevamos al checkout del proveedor. Si no hay enlace, no inventamos uno y no se hace ningún cobro.
+    El anticipo publicado es 50 %. El saldo se paga antes de publicar. El servidor confirma el monto: esta página no lo envía.
+  </p>
+
+  <form id="checkout" class="relative mt-8 grid max-w-xl gap-4" data-package={item.code}>
+    <div class="hp" aria-hidden="true">
+      <label for="checkout-honeypot">No completar</label>
+      <input id="checkout-honeypot" name="honeypot" type="text" tabindex="-1" autocomplete="off" />
+    </div>
+    <label class="flex items-start gap-3 text-sm">
+      <input class="mt-1 h-5 w-5 accent-accent" name="terms" type="checkbox" required />
+      <span>
+        Leí los <a class="text-accent underline-offset-4 hover:underline" href="/terminos">términos</a>
+        y entiendo que el pago, si corresponde, lo toma el proveedor.
+      </span>
+    </label>
+    <button class="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-surface" type="submit">
+      {item.priceClp === null ? 'Solicitar cotización' : 'Continuar al pago'}
+    </button>
+  </form>
+  <p id="checkout-estado" class="mt-4 text-sm text-muted" role="status"></p>
+</Base>

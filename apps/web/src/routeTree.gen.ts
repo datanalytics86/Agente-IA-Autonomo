@@ -11,9 +11,16 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AgentesRouteImport } from './routes/agentes'
+import { Route as ComplianceRouteImport } from './routes/compliance'
 import { Route as ConfigRouteImport } from './routes/config'
+import { Route as ConversacionesRouteImport } from './routes/conversaciones'
+import { Route as HitlRouteImport } from './routes/hitl'
 import { Route as LeadsRouteImport } from './routes/leads'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as LogsRouteImport } from './routes/logs'
+import { Route as ManualRouteImport } from './routes/manual'
+import { Route as ProyectosRouteImport } from './routes/proyectos'
+import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -25,9 +32,24 @@ const AgentesRoute = AgentesRouteImport.update({
   path: '/agentes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ComplianceRoute = ComplianceRouteImport.update({
+  id: '/compliance',
+  path: '/compliance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ConfigRoute = ConfigRouteImport.update({
   id: '/config',
   path: '/config',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConversacionesRoute = ConversacionesRouteImport.update({
+  id: '/conversaciones',
+  path: '/conversaciones',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HitlRoute = HitlRouteImport.update({
+  id: '/hitl',
+  path: '/hitl',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LeadsRoute = LeadsRouteImport.update({
@@ -35,48 +57,132 @@ const LeadsRoute = LeadsRouteImport.update({
   path: '/leads',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LogsRoute = LogsRouteImport.update({
   id: '/logs',
   path: '/logs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ManualRoute = ManualRouteImport.update({
+  id: '/manual',
+  path: '/manual',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProyectosRoute = ProyectosRouteImport.update({
+  id: '/proyectos',
+  path: '/proyectos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeadsLeadIdRoute = LeadsLeadIdRouteImport.update({
+  id: '/$leadId',
+  path: '/$leadId',
+  getParentRoute: () => LeadsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agentes': typeof AgentesRoute
+  '/compliance': typeof ComplianceRoute
   '/config': typeof ConfigRoute
-  '/leads': typeof LeadsRoute
+  '/conversaciones': typeof ConversacionesRoute
+  '/hitl': typeof HitlRoute
+  '/leads': typeof LeadsRouteWithChildren
+  '/login': typeof LoginRoute
   '/logs': typeof LogsRoute
+  '/manual': typeof ManualRoute
+  '/proyectos': typeof ProyectosRoute
+  '/leads/$leadId': typeof LeadsLeadIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agentes': typeof AgentesRoute
+  '/compliance': typeof ComplianceRoute
   '/config': typeof ConfigRoute
-  '/leads': typeof LeadsRoute
+  '/conversaciones': typeof ConversacionesRoute
+  '/hitl': typeof HitlRoute
+  '/leads': typeof LeadsRouteWithChildren
+  '/login': typeof LoginRoute
   '/logs': typeof LogsRoute
+  '/manual': typeof ManualRoute
+  '/proyectos': typeof ProyectosRoute
+  '/leads/$leadId': typeof LeadsLeadIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/agentes': typeof AgentesRoute
+  '/compliance': typeof ComplianceRoute
   '/config': typeof ConfigRoute
-  '/leads': typeof LeadsRoute
+  '/conversaciones': typeof ConversacionesRoute
+  '/hitl': typeof HitlRoute
+  '/leads': typeof LeadsRouteWithChildren
+  '/login': typeof LoginRoute
   '/logs': typeof LogsRoute
+  '/manual': typeof ManualRoute
+  '/proyectos': typeof ProyectosRoute
+  '/leads/$leadId': typeof LeadsLeadIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/agentes' | '/config' | '/leads' | '/logs'
+  fullPaths:
+    | '/'
+    | '/agentes'
+    | '/compliance'
+    | '/config'
+    | '/conversaciones'
+    | '/hitl'
+    | '/leads'
+    | '/login'
+    | '/logs'
+    | '/manual'
+    | '/proyectos'
+    | '/leads/$leadId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/agentes' | '/config' | '/leads' | '/logs'
-  id: '__root__' | '/' | '/agentes' | '/config' | '/leads' | '/logs'
+  to:
+    | '/'
+    | '/agentes'
+    | '/compliance'
+    | '/config'
+    | '/conversaciones'
+    | '/hitl'
+    | '/leads'
+    | '/login'
+    | '/logs'
+    | '/manual'
+    | '/proyectos'
+    | '/leads/$leadId'
+  id:
+    | '__root__'
+    | '/'
+    | '/agentes'
+    | '/compliance'
+    | '/config'
+    | '/conversaciones'
+    | '/hitl'
+    | '/leads'
+    | '/login'
+    | '/logs'
+    | '/manual'
+    | '/proyectos'
+    | '/leads/$leadId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgentesRoute: typeof AgentesRoute
+  ComplianceRoute: typeof ComplianceRoute
   ConfigRoute: typeof ConfigRoute
-  LeadsRoute: typeof LeadsRoute
+  ConversacionesRoute: typeof ConversacionesRoute
+  HitlRoute: typeof HitlRoute
+  LeadsRoute: typeof LeadsRouteWithChildren
+  LoginRoute: typeof LoginRoute
   LogsRoute: typeof LogsRoute
+  ManualRoute: typeof ManualRoute
+  ProyectosRoute: typeof ProyectosRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -95,11 +201,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/compliance': {
+      id: '/compliance'
+      path: '/compliance'
+      fullPath: '/compliance'
+      preLoaderRoute: typeof ComplianceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/config': {
       id: '/config'
       path: '/config'
       fullPath: '/config'
       preLoaderRoute: typeof ConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/conversaciones': {
+      id: '/conversaciones'
+      path: '/conversaciones'
+      fullPath: '/conversaciones'
+      preLoaderRoute: typeof ConversacionesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hitl': {
+      id: '/hitl'
+      path: '/hitl'
+      fullPath: '/hitl'
+      preLoaderRoute: typeof HitlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/leads': {
@@ -109,6 +236,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeadsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/logs': {
       id: '/logs'
       path: '/logs'
@@ -116,15 +250,52 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LogsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/manual': {
+      id: '/manual'
+      path: '/manual'
+      fullPath: '/manual'
+      preLoaderRoute: typeof ManualRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/proyectos': {
+      id: '/proyectos'
+      path: '/proyectos'
+      fullPath: '/proyectos'
+      preLoaderRoute: typeof ProyectosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leads/$leadId': {
+      id: '/leads/$leadId'
+      path: '/$leadId'
+      fullPath: '/leads/$leadId'
+      preLoaderRoute: typeof LeadsLeadIdRouteImport
+      parentRoute: typeof LeadsRoute
+    }
   }
 }
+
+interface LeadsRouteChildren {
+  LeadsLeadIdRoute: typeof LeadsLeadIdRoute
+}
+
+const LeadsRouteChildren: LeadsRouteChildren = {
+  LeadsLeadIdRoute: LeadsLeadIdRoute,
+}
+
+const LeadsRouteWithChildren = LeadsRoute._addFileChildren(LeadsRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgentesRoute: AgentesRoute,
+  ComplianceRoute: ComplianceRoute,
   ConfigRoute: ConfigRoute,
-  LeadsRoute: LeadsRoute,
+  ConversacionesRoute: ConversacionesRoute,
+  HitlRoute: HitlRoute,
+  LeadsRoute: LeadsRouteWithChildren,
+  LoginRoute: LoginRoute,
   LogsRoute: LogsRoute,
+  ManualRoute: ManualRoute,
+  ProyectosRoute: ProyectosRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

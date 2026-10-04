@@ -1,0 +1,99 @@
+---
+import Base from '../../layouts/Base.astro';
+
+export function getStaticPaths() {
+  return [{ params: { token: 'shell' } }];
+}
+---
+
+<Base
+  title="Proyecto"
+  description="Portal del proyecto: intake, vista previa, comentarios y aprobación. No se indexa."
+  noindex
+  portal
+  jsonLd={false}
+>
+  <div id="portal">
+    <h1 class="text-4xl font-semibold tracking-tight">Tu proyecto</h1>
+    <p class="mt-4 max-w-2xl text-muted">
+      Esta dirección no entra en el índice. Sirve para el trabajo ya en curso. El token va en el enlace, no se pide en un buscador.
+    </p>
+
+    <ol class="mt-8 grid gap-4">
+      <li class="rounded-2xl border border-white/10 bg-elevated p-5">
+        <h2 class="text-xl font-semibold">1. Intake</h2>
+        <p class="mt-2 text-sm text-muted">
+          Pasas los datos reales para construir: dirección, teléfono, horarios, servicios, dominio y un enlace a tu logo o a fotos que sean tuyas.
+          Sin eso no inventamos el contenido.
+        </p>
+      </li>
+      <li class="rounded-2xl border border-white/10 bg-elevated p-5">
+        <h2 class="text-xl font-semibold">2. Vista previa</h2>
+        <p class="mt-2 text-sm text-muted">
+          Cuando exista una versión para revisar, el enlace aparece abajo. No ponemos un sitio de ejemplo en su lugar.
+        </p>
+        <p id="portal-preview" class="mt-3 text-sm">Todavía no hay una vista previa. No mostramos un sitio de ejemplo.</p>
+      </li>
+      <li class="rounded-2xl border border-white/10 bg-elevated p-5">
+        <h2 class="text-xl font-semibold">3. Feedback</h2>
+        <p class="mt-2 text-sm text-muted">
+          Cada envío usa una ronda, hasta el máximo del paquete. Lo que quede fuera de alcance lo ve una persona: esta página no lo promete.
+        </p>
+      </li>
+      <li class="rounded-2xl border border-white/10 bg-elevated p-5">
+        <h2 class="text-xl font-semibold">4. Aprobar</h2>
+        <p class="mt-2 text-sm text-muted">
+          Aprobar confirma que la vista previa puede publicarse. El saldo, si corresponde, se cobra antes de publicar.
+          La boleta o factura se emite aparte.
+        </p>
+      </li>
+    </ol>
+
+    <p id="portal-negocio" class="mt-8 text-sm"></p>
+    <p id="portal-revisiones" class="mt-1 text-sm text-muted"></p>
+    <p id="portal-estado" class="mt-3 text-sm text-accent" role="status"></p>
+
+    <fieldset id="portal-acciones" class="mt-8 grid max-w-xl gap-8" disabled>
+      <form id="intake" class="relative grid gap-4">
+        <h3 class="text-lg font-semibold">Enviar intake</h3>
+        <div class="hp" aria-hidden="true">
+          <label for="intake-honeypot">No completar</label>
+          <input id="intake-honeypot" name="honeypot" type="text" tabindex="-1" autocomplete="off" />
+        </div>
+        <label class="grid gap-2 text-sm">Dirección<input class="rounded-lg border border-white/15 bg-surface px-3 py-3" name="address" maxlength="200" /></label>
+        <label class="grid gap-2 text-sm">Teléfono<input class="rounded-lg border border-white/15 bg-surface px-3 py-3" name="phone" maxlength="40" autocomplete="tel" /></label>
+        <label class="grid gap-2 text-sm">Horarios<input class="rounded-lg border border-white/15 bg-surface px-3 py-3" name="hours" maxlength="200" /></label>
+        <label class="grid gap-2 text-sm">Servicios<textarea class="min-h-28 rounded-lg border border-white/15 bg-surface px-3 py-3" name="services" maxlength="2000"></textarea></label>
+        <label class="grid gap-2 text-sm">Dominio deseado<input class="rounded-lg border border-white/15 bg-surface px-3 py-3" name="domain" maxlength="160" /></label>
+        <label class="grid gap-2 text-sm">Enlace a tu logo<input class="rounded-lg border border-white/15 bg-surface px-3 py-3" name="logo_url" type="url" maxlength="300" /></label>
+        <label class="grid gap-2 text-sm">Enlaces a fotos tuyas<textarea class="min-h-20 rounded-lg border border-white/15 bg-surface px-3 py-3" name="photos_note" maxlength="1000"></textarea></label>
+        <button class="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-surface" type="submit">Guardar intake</button>
+      </form>
+
+      <form id="feedback" class="relative grid gap-4">
+        <h3 class="text-lg font-semibold">Enviar comentarios</h3>
+        <div class="hp" aria-hidden="true">
+          <label for="feedback-honeypot">No completar</label>
+          <input id="feedback-honeypot" name="honeypot" type="text" tabindex="-1" autocomplete="off" />
+        </div>
+        <label class="grid gap-2 text-sm">
+          Qué hay que cambiar en esta ronda
+          <textarea class="min-h-28 rounded-lg border border-white/15 bg-surface px-3 py-3" name="text" required maxlength="4000"></textarea>
+        </label>
+        <button class="rounded-full border border-white/20 px-5 py-3 text-sm font-semibold" type="submit">Enviar ronda</button>
+      </form>
+
+      <div>
+        <h2 class="text-lg font-semibold">Aprobar la vista previa</h2>
+        <button id="aprobar" class="mt-4 rounded-full bg-accent px-5 py-3 text-sm font-semibold text-surface" type="button">
+          Aprobar
+        </button>
+      </div>
+    </fieldset>
+    <noscript>
+      <p class="mt-6 text-sm text-muted">
+        Para llamar a la API del proyecto hace falta JavaScript. La explicación de intake, vista previa, comentarios y aprobación está arriba igual.
+      </p>
+    </noscript>
+  </div>
+</Base>

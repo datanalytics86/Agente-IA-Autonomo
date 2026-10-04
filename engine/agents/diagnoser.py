@@ -1,169 +1,166 @@
-"""Diagnoser — diagnóstico de oportunidad + pitch personalizado (ES-CL)."""
+"""Diagnoser: JSON fundamentado y alto valor a revisión."""
 
 from __future__ import annotations
 
-import os
-from typing import Optional
+import re
 
-from agents.base import (
-    HIGH_VALUE_CLP,
-    Lead,
-    LeadStatus,
-    leads_by_status,
-    log_event,
-    read_prompt,
-    upsert_lead,
-)
+from agents.catalog import TONE_BY_CATEGORY
+from agents.context import AgentContext, AgentResult
+from agents.copy import diagnosis_fallback, register_agent_fallbacks
+from agents.runtime import log_event
+from agents.schemas import DiagnosisOutput
+from core.config import get_settings
+from core.hitl import needs_value_review
+from core.states import transition
+from db.models import Approval
+from db.repositories import ApprovalRepository, LeadRepository
+from integrations.llm.base import build_llm
+
+_EMAIL_RE = re.compile(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
+_FIELDS = {
+    "business",
+    "category",
+    "commune",
+    "city",
+    "rating",
+    "reviews",
+    "website_url",
+    "opportunity_score",
+}
 
 
-def _web_gap(lead: Lead) -> str:
-    if not lead.has_website:
-        return (
-            "No aparece un sitio web propio claro en búsquedas públicas. "
-            "Hoy compite solo con ficha de Maps/redes, lo que limita captura de leads 24/7."
+class DiagnoserAgent:
+    def run(self, ctx: AgentContext) -> AgentResult:
+        register_agent_fallbacks()
+        if not ctx.lead_id:
+            return AgentResult(lead_id=None, ok=False, events=["sin lead"], output={})
+        lead = LeadRepository(ctx.session).get(ctx.lead_id)
+        if lead is None:
+            return AgentResult(
+                lead_id=ctx.lead_id, ok=False, events=["lead inexistente"], output={}
+            )
+        if lead.status != "nuevo":
+            return AgentResult(lead_id=lead.id, ok=True, events=[], output={"skipped": True})
+
+        settings = get_settings()
+        data = _payload(lead, settings.agency_name, settings.public_base_url, settings.agency_email)
+        diag = build_llm(settings, ctx.session).complete_json(
+            "diagnoser",
+            DiagnosisOutput,
+            data,
+            model=settings.llm_model,
         )
-    year = lead.website_year or "antes de 2022"
-    return (
-        f"Tiene presencia web, pero el sitio luce desactualizado (aprox. {year}). "
-        "Eso suele bajar confianza y conversión en móvil."
-    )
-
-
-def _price_band(lead: Lead) -> str:
-    v = lead.estimated_value_clp
-    if v >= HIGH_VALUE_CLP:
-        return (
-            f"Propuesta multi-unidad / paquete ampliado estimado en "
-            f"${v:,} CLP (requiere validación humana).".replace(",", ".")
-        )
-    low, high = 250_000, 450_000
-    return (
-        f"Paquete landing profesional orientativo: ${low:,}–${high:,} CLP "
-        f"(este lead ~${v:,} CLP). Pagos: transferencia, Mercado Pago o Webpay."
-    ).replace(",", ".")
-
-
-def template_diagnosis(lead: Lead) -> str:
-    gap = _web_gap(lead)
-    price = _price_band(lead)
-    return (
-        f"### Diagnóstico — {lead.business}\n"
-        f"**Rubro:** {lead.category} · **Ubicación:** {lead.commune}, {lead.city}\n"
-        f"**Reputación:** {lead.rating}★ ({lead.reviews} reseñas públicas)\n\n"
-        f"**Brecha digital:** {gap}\n\n"
-        f"**Oportunidad:** Una landing clara (servicios, prueba social, CTA de WhatsApp/agenda) "
-        f"puede captar consultas de vecinos que hoy se van a la competencia con mejor presencia online.\n\n"
-        f"**Oferta:** {price}\n"
-        f"**Nota:** No se inventan teléfonos ni correos; el contacto se basa en canales públicos "
-        f"o en respuesta del lead. Cumple enfoque Ley 21.719 (minimización de datos)."
-    )
-
-
-def template_pitch(lead: Lead) -> str:
-    """Mensaje de prospección en español chileno profesional."""
-    if lead.has_website:
-        gancho = (
-            f"Vi que {lead.business} en {lead.commune} tiene buena reputación "
-            f"({lead.rating}★), pero el sitio se ve un poco desactualizado."
-        )
-    else:
-        gancho = (
-            f"Estuve revisando negocios de {lead.category} en {lead.commune} y "
-            f"{lead.business} destaca por reseñas, pero no encontré una web propia clara."
+        if not _grounded(diag, data):
+            diag = diagnosis_fallback(data)
+            log_event(
+                "Diagnoser",
+                f"diagnóstico de {lead.business} volvió al template: hechos no fundamentados",
+                level="warn",
+                session=ctx.session,
+                lead_id=lead.id,
+            )
+        stored = diag.model_dump()
+        stored["markdown"] = f"### {lead.business}\n\n{diag.gap_summary}\n"
+        lead.diagnosis = stored
+        lead.tone = diag.tone
+        LeadRepository(ctx.session).save(lead)
+        high = bool(lead.high_value or needs_value_review(lead.estimated_value_clp))
+        if high:
+            _ensure_approval(ctx, lead.id, lead.estimated_value_clp, lead.category)
+            transition(
+                ctx.session,
+                lead,
+                "revision",
+                actor="agente",
+                reason="deal de alto valor: revisión humana antes de enviar",
+            )
+            level = "warn"
+        else:
+            transition(
+                ctx.session,
+                lead,
+                "diagnosticado",
+                actor="agente",
+                reason="diagnóstico listo",
+            )
+            level = "info"
+        message = f"diagnóstico listo · {lead.business} → {lead.status}"
+        log_event("Diagnoser", message, level=level, session=ctx.session, lead_id=lead.id)
+        return AgentResult(
+            lead_id=lead.id,
+            ok=True,
+            events=[message],
+            output=diag.model_dump(),
         )
 
-    formal = lead.category in {"legal", "salud", "servicios profesionales", "inmobiliaria"}
-    saludo = "Estimado/a equipo" if formal else "Hola"
-    usted = "puedan" if formal else "puedas"
-    su = "su" if formal else "tu"
 
+def _payload(
+    lead: object, agency_name: str, public_base_url: str, agency_email: str
+) -> dict[str, object]:
+    rating = getattr(lead, "rating", None)
+    reviews = getattr(lead, "reviews", None)
+    high = bool(getattr(lead, "high_value", False) or needs_value_review(lead.estimated_value_clp))
     price = lead.estimated_value_clp
-    if price >= HIGH_VALUE_CLP:
-        oferta = (
-            "Para una red o multi-sede armamos un paquete a medida "
-            "(landing + piezas cortas + seguimiento). Lo conversamos en una llamada breve."
-        )
+    if high or not isinstance(price, int) or price < 250_000 or price > 450_000:
+        price_out: int | None = None
     else:
-        oferta = (
-            f"Trabajo con un paquete de landing responsive (5 secciones) orientado a pymes locales, "
-            f"en el rango ${250_000:,}–${450_000:,} CLP, con pago por transferencia, "
-            f"Mercado Pago o Webpay.".replace(",", ".")
-        )
+        price_out = price
+    audit = getattr(lead, "website_audit", None)
+    html = ""
+    if isinstance(audit, dict):
+        raw = audit.get("html") or audit.get("page_html") or ""
+        html = raw if isinstance(raw, str) else ""
+    category = str(lead.category)
+    return {
+        "lead_id": lead.id,
+        "business": lead.business,
+        "category": category,
+        "commune": lead.commune,
+        "city": lead.city,
+        "rating": rating,
+        "rating_known": rating is not None,
+        "reviews": reviews,
+        "website_url": lead.website_url,
+        "has_website": bool(lead.website_url),
+        "opportunity_score": lead.opportunity_score,
+        "high_value": high,
+        "tone": TONE_BY_CATEGORY.get(category, "tu"),
+        "price_clp": price_out,
+        "agency_name": agency_name,
+        "agency_email": agency_email,
+        "public_base_url": public_base_url,
+        "page_html_untrusted": html,
+    }
 
-    return (
-        f"{saludo},\n\n"
-        f"{gancho} Eso suele dejar consultas en la mesa, sobre todo en celular.\n\n"
-        f"Puedo armarles una landing simple y profesional (servicios, reseñas, cómo llegar y un CTA claro) "
-        f"pensada para {lead.commune}, más un video vertical corto o storyboard para redes.\n\n"
-        f"{oferta}\n\n"
-        f"Si les hace sentido, me avisan y coordinamos 15 minutos sin compromiso. "
-        f"Si no es de interés, respondan STOP y no vuelvo a escribir.\n\n"
-        f"Saludos cordiales,\n"
-        f"— Agente IA Autónomo (prospección automatizada asistida)\n"
-        f"Canales: Instagram DM / email / LinkedIn · WhatsApp solo si ya hay conversación."
+
+def _grounded(diag: DiagnosisOutput, data: dict[str, object]) -> bool:
+    if diag.tone != data.get("tone"):
+        return False
+    for fact in diag.personalization_facts:
+        if fact.field not in _FIELDS:
+            return False
+        value = data.get(fact.field)
+        if value is None or value == "":
+            return False
+        if str(value) not in fact.text:
+            return False
+    for found in _EMAIL_RE.findall(diag.pitch_body):
+        allowed = str(data.get("agency_email") or "").lower()
+        if found.lower() != allowed:
+            return False
+    return True
+
+
+def _ensure_approval(ctx: AgentContext, lead_id: str, value: int, category: str) -> None:
+    repo = ApprovalRepository(ctx.session)
+    for row in repo.list(status="pending", limit=200):
+        if row.lead_id == lead_id and row.kind == "deal_alto_valor":
+            return
+    repo.add(
+        Approval(
+            lead_id=lead_id,
+            kind="deal_alto_valor",
+            payload={"estimated_value_clp": value, "category": category},
+            status="pending",
+        )
     )
-
-
-def _try_llm_improve(lead: Lead, diagnosis: str, pitch: str) -> tuple[str, str]:
-    """Si hay API key, podría mejorar textos. En demo sin key, retorna templates."""
-    key = os.getenv("GROK_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY")
-    if not key:
-        return diagnosis, pitch
-    # Extensión prod: llamar LLM con read_prompt("diagnoser") + contexto lead.
-    # Por ahora no bloqueamos demo si la API falla; usamos templates de calidad.
-    try:
-        # Placeholder extensible — no falla el pipeline
-        _ = read_prompt("diagnoser")
-        return diagnosis, pitch
-    except Exception:
-        return diagnosis, pitch
-
-
-def diagnose_lead(lead: Lead) -> Lead:
-    diagnosis = template_diagnosis(lead)
-    pitch = template_pitch(lead)
-    diagnosis, pitch = _try_llm_improve(lead, diagnosis, pitch)
-
-    lead.diagnosis = diagnosis
-    lead.pitch = pitch
-
-    if lead.estimated_value_clp >= HIGH_VALUE_CLP:
-        lead.high_value = True
-        lead.status = LeadStatus.REVISION
-        lead.reason = (
-            (lead.reason or "")
-            + f" | Orchestrator: deal {lead.estimated_value_clp:,} CLP → revision manual".replace(",", ".")
-        )
-        log_event(
-            "Orchestrator",
-            f"deal {lead.estimated_value_clp:,} CLP → revision manual".replace(",", "."),
-            level="warn",
-            meta={"lead_id": lead.id, "business": lead.business},
-        )
-    else:
-        lead.status = LeadStatus.DIAGNOSTICADO
-
-    upsert_lead(lead)
-    log_event(
-        "Diagnoser",
-        f"diagnóstico listo · {lead.business} → {lead.status.value}",
-        meta={"lead_id": lead.id},
-    )
-    return lead
-
-
-def run_diagnoser(leads: Optional[list[Lead]] = None) -> list[Lead]:
-    targets = leads if leads is not None else leads_by_status(LeadStatus.NUEVO)
-    # No re-diagnosticar los que ya están en revision por high-value sin pasar
-    out: list[Lead] = []
-    for lead in targets:
-        if lead.status not in (LeadStatus.NUEVO,):
-            continue
-        out.append(diagnose_lead(lead))
-    if not out and targets:
-        # Si se pasan leads explícitos (p.ej. recién scouteados) con status nuevo
-        for lead in targets:
-            if lead.status == LeadStatus.NUEVO:
-                out.append(diagnose_lead(lead))
-    log_event("Diagnoser", f"{len(out)} leads diagnosticados")
-    return out

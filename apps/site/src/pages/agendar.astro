@@ -1,0 +1,36 @@
+---
+import Base from '../layouts/Base.astro';
+import { bookingLink } from '../data/agency';
+---
+
+<Base
+  title="Agendar"
+  description="La agenda se muestra solo si hay un enlace de reservas configurado. Si no, no hay un calendario de relleno."
+>
+  <h1 class="text-4xl font-semibold tracking-tight">Agendar</h1>
+  {
+    bookingLink ? (
+      <>
+        <p class="mt-4 max-w-2xl text-muted">
+          El calendario lo carga el proveedor de agenda configurado. Puede usar cookies de ese proveedor. Esta página no guarda una reserva por su cuenta.
+        </p>
+        <iframe
+          class="mt-8 h-[40rem] w-full rounded-2xl border border-white/10 bg-elevated"
+          title="Agenda de reservas"
+          src={bookingLink}
+          loading="lazy"
+          referrerpolicy="strict-origin-when-cross-origin"
+        />
+      </>
+    ) : (
+      <p class="mt-4 max-w-2xl text-lg text-muted">
+        La agenda se configura con el enlace de reservas. Todavía no está, así que aquí no hay calendario: no mostramos uno falso.
+      </p>
+    )
+  }
+  <p class="mt-8">
+    <a class="text-accent underline-offset-4 hover:underline" href="/diagnostico-gratis">
+      Mientras tanto puedes pedir el diagnóstico
+    </a>
+  </p>
+</Base>

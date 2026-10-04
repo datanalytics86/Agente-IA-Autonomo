@@ -1,143 +1,260 @@
-"""Scout — encuentra o genera leads locales (demo: sintéticos realistas Chile)."""
+"""Scout: busca leads y los deja en `nuevo`. No abre sockets en demo."""
 
 from __future__ import annotations
 
-import random
-from typing import Optional
-
-from agents.base import (
-    HIGH_VALUE_CLP,
-    Lead,
-    LeadStatus,
-    log_event,
-    read_prompt,
-    upsert_leads,
+from agents.base import Lead, load_leads
+from agents.catalog import (
+    COMMUNE_CITY,
+    DEMO_HIGH_VALUE_CATEGORIES,
+    THEME_BY_CATEGORY,
+    TONE_BY_CATEGORY,
 )
-
-# Ciudades/comunas piloto Chile
-PILOT_LOCATIONS = [
-    ("Santiago", "Providencia"),
-    ("Santiago", "Las Condes"),
-    ("Santiago", "Ñuñoa"),
-    ("Santiago", "Maipú"),
-    ("Viña del Mar", "Viña del Mar"),
-    ("Valparaíso", "Valparaíso"),
-    ("Concepción", "Concepción"),
-    ("Temuco", "Temuco"),
-    ("La Serena", "La Serena"),
-]
-
-CATEGORIES = [
-    ("Clínica dental", "salud"),
-    ("Peluquería", "belleza"),
-    ("Cafetería", "gastronomía"),
-    ("Taller mecánico", "automotriz"),
-    ("Estudio contable", "servicios profesionales"),
-    ("Gimnasio boutique", "fitness"),
-    ("Inmobiliaria local", "inmobiliaria"),
-    ("Veterinaria", "mascotas"),
-    ("Estudio de abogados", "legal"),
-    ("Centro de estética", "belleza"),
-    ("Restaurante de barrio", "gastronomía"),
-    ("Óptica", "salud"),
-    ("Escuela de idiomas", "educación"),
-    ("Ferretería", "retail"),
-    ("Spa y masajes", "bienestar"),
-]
-
-BUSINESS_PREFIXES = [
-    "Clínica", "Centro", "Espacio", "Studio", "Casa", "Taller",
-    "Oficina", "Grupo", "Red", "Punto", "Nodo", "Huella",
-]
-
-BUSINESS_SUFFIXES = [
-    "Andes", "Pacifico", "del Sur", "Mapocho", "Cordillera",
-    "Maipo", "Bío Bío", "Araucanía", "Costanera", "Barrio",
-    "Local", "Express", "Pro", "Plus", "Chile",
-]
-
-NAMES_CHILE = [
-    "San Martín", "Los Aromos", "Santa Lucía", "El Roble",
-    "Las Palmas", "Los Leones", "Providencia", "Norte",
-]
+from agents.context import AgentContext, AgentResult
+from agents.copy import register_agent_fallbacks
+from agents.runtime import iter_leads, log_event, prepare_db, start_of_local_day
+from core.config import get_settings
+from core.errors import DuplicateLeadError
+from db.models import Lead as DbLead
+from db.normalize import normalize_business
+from db.repositories import LeadRepository, SettingsRepository
+from db.session import session_scope
+from integrations.pagespeed.base import WebAuditor, build_auditor
+from integrations.places.base import DemoSource, LeadSource, PlaceHit, build_places
 
 
-def _synthetic_name(category_label: str) -> str:
-    style = random.choice(["compound", "person", "place"])
-    if style == "compound":
-        return f"{random.choice(BUSINESS_PREFIXES)} {random.choice(BUSINESS_SUFFIXES)}"
-    if style == "person":
-        return f"{category_label} {random.choice(NAMES_CHILE)}"
-    return f"{random.choice(NAMES_CHILE)} {category_label}"
+def _multi_site(name: str) -> bool:
+    folded = normalize_business(name)
+    return "multi sede" in folded or "multisede" in folded or "sucursales" in folded
 
 
-def generate_demo_leads(n: int = 3, force_high_value: bool = True) -> list[Lead]:
-    """Genera n leads chilenos realistas. Uno puede ser high-value para demo HITL."""
-    _ = read_prompt("scout")  # carga prompt (extensible a LLM)
-    leads: list[Lead] = []
-    used: set[str] = set()
+def _package_value(category: str, has_website: bool, reviews: int) -> int:
+    if not has_website and reviews >= 40 and category in DEMO_HIGH_VALUE_CATEGORIES:
+        return 450_000
+    if not has_website:
+        return 350_000
+    return 250_000
 
-    for i in range(n):
-        city, commune = random.choice(PILOT_LOCATIONS)
-        cat_label, cat_slug = random.choice(CATEGORIES)
-        name = _synthetic_name(cat_label)
-        while name in used:
-            name = _synthetic_name(cat_label)
-        used.add(name)
 
-        has_web = random.random() < 0.35
-        website_year = random.randint(2014, 2021) if has_web else None
-        rating = round(random.uniform(3.6, 4.9), 1)
-        reviews = random.randint(8, 280)
+class ScoutAgent:
+    def __init__(
+        self,
+        source: LeadSource | None = None,
+        auditor: WebAuditor | None = None,
+    ) -> None:
+        self.source = source
+        self.auditor = auditor
 
-        # Paquete estándar 250k–450k; uno high-value en demo
-        if force_high_value and i == 0:
-            value = random.randint(2_900_000, 3_800_000)
-            reason = (
-                "Lead demo high-value: paquete multi-sede / red local "
-                f"sin presencia web moderna en {commune}."
+    def run(self, ctx: AgentContext) -> AgentResult:
+        register_agent_fallbacks()
+        settings = get_settings()
+        source = self.source or build_places(settings)
+        auditor = self.auditor or build_auditor(settings)
+        communes = [item for item in settings.scout_commune_list if item]
+        categories = [item for item in settings.scout_category_list if item in THEME_BY_CATEGORY]
+        if not communes or not categories:
+            return AgentResult(lead_id=None, ok=True, events=[], output={"ids": []})
+
+        eligible = [item for item in categories if item in DEMO_HIGH_VALUE_CATEGORIES]
+        force = bool(ctx.force_high_value and settings.app_mode == "demo" and eligible)
+        remaining = _remaining_quota(ctx, settings.scout_daily_limit)
+        wanted = min(max(ctx.count, 0), remaining)
+        if wanted <= 0:
+            message = "cuota diaria de scout alcanzada"
+            log_event("Scout", message, level="warn", session=ctx.session)
+            return AgentResult(lead_id=None, ok=True, events=[message], output={"ids": []})
+
+        pairs = [(commune, category) for commune in communes for category in categories]
+        slots = _slots(ctx, pairs, wanted, force, eligible[0] if force else "")
+        known_places, known_names = _known(ctx)
+        created: list[str] = []
+        origin = "outbound_demo" if isinstance(source, DemoSource) else "outbound_places"
+        forced_left = force
+        for index, (commune, category) in enumerate(slots):
+            use_force = forced_left and category in DEMO_HIGH_VALUE_CATEGORIES
+            lead_id = _take_one(
+                ctx,
+                source,
+                auditor,
+                commune,
+                category,
+                origin,
+                known_places,
+                known_names,
+                forced=use_force,
+            )
+            if lead_id is None:
+                continue
+            created.append(lead_id)
+            if use_force:
+                forced_left = False
+            if index == 0 and force and not use_force:
+                # El cupo forzado sigue disponible para el próximo rubro elegible.
+                pass
+        if created:
+            names = ", ".join(sorted({_commune_of(ctx, item) for item in created}))
+            message = f"{len(created)} leads nuevos en {names}"
+            log_event(
+                "Scout",
+                message,
+                session=ctx.session,
+                meta={"ids": created, "count": len(created)},
             )
         else:
-            value = random.randint(250_000, 450_000)
-            if not has_web:
-                reason = f"Sin sitio web visible; oportunidad en {commune} ({cat_label})."
-            else:
-                reason = (
-                    f"Sitio desactualizado (~{website_year}); "
-                    f"buena reputación ({rating}★ / {reviews} reseñas) sin conversión online."
-                )
-
-        lead = Lead(
-            business=name,
-            category=cat_slug,
-            city=city,
-            commune=commune,
-            has_website=has_web,
-            website_year=website_year,
-            rating=rating,
-            reviews=reviews,
-            status=LeadStatus.NUEVO,
-            estimated_value_clp=value,
-            reason=reason,
-            channels=["instagram_dm", "email", "linkedin"],
-            contact_hint=f"Búsqueda pública: {name} · {commune} · Instagram/Google Maps",
-            high_value=value >= HIGH_VALUE_CLP,
+            message = "scout sin leads nuevos"
+            log_event("Scout", message, session=ctx.session)
+        return AgentResult(
+            lead_id=created[0] if len(created) == 1 else None,
+            ok=True,
+            events=[message],
+            output={"ids": created},
         )
-        leads.append(lead)
 
-    return leads
+
+def _remaining_quota(ctx: AgentContext, limit: int) -> int:
+    start = start_of_local_day()
+    created = 0
+    for lead in iter_leads(ctx.session):
+        if lead.created_at >= start and lead.source in {"outbound_demo", "outbound_places"}:
+            created += 1
+    return max(0, limit - created)
+
+
+def _slots(
+    ctx: AgentContext,
+    pairs: list[tuple[str, str]],
+    count: int,
+    force: bool,
+    eligible: str,
+) -> list[tuple[str, str]]:
+    repo = SettingsRepository(ctx.session)
+    cursor = repo.get("scout_cursor", {"i": 0})
+    start = int(cursor.get("i", 0)) if isinstance(cursor, dict) else 0
+    chosen = [pairs[(start + offset) % len(pairs)] for offset in range(count)]
+    repo.put("scout_cursor", {"i": start + count}, updated_by="scout")
+    if not force:
+        return chosen
+    if any(category in DEMO_HIGH_VALUE_CATEGORIES for _, category in chosen):
+        return chosen
+    commune = chosen[0][0]
+    chosen[0] = (commune, eligible)
+    return chosen
+
+
+def _known(ctx: AgentContext) -> tuple[set[str], set[tuple[str, str]]]:
+    places: set[str] = set()
+    names: set[tuple[str, str]] = set()
+    for lead in iter_leads(ctx.session):
+        if lead.place_id:
+            places.add(lead.place_id)
+        names.add((normalize_business(lead.business), lead.commune))
+    return places, names
+
+
+def _take_one(
+    ctx: AgentContext,
+    source: LeadSource,
+    auditor: WebAuditor,
+    commune: str,
+    category: str,
+    origin: str,
+    known_places: set[str],
+    known_names: set[tuple[str, str]],
+    *,
+    forced: bool,
+) -> str | None:
+    settings = get_settings()
+    hits = source.search(commune, category, limit=5)
+    for hit in hits:
+        if not _acceptable(hit, settings.scout_min_rating, settings.scout_min_reviews):
+            continue
+        if hit.place_id in known_places:
+            continue
+        key = (normalize_business(hit.name), commune)
+        if key in known_names:
+            continue
+        lead = _build_lead(hit, commune, category, origin, auditor, forced)
+        try:
+            LeadRepository(ctx.session).add(lead)
+        except DuplicateLeadError:
+            continue
+        known_places.add(hit.place_id)
+        known_names.add(key)
+        return lead.id
+    return None
+
+
+def _acceptable(hit: PlaceHit, min_rating: float, min_reviews: int) -> bool:
+    from integrations.places.base import accepts
+
+    return accepts(hit, min_rating=min_rating, min_reviews=min_reviews)
+
+
+def _build_lead(
+    hit: PlaceHit,
+    commune: str,
+    category: str,
+    origin: str,
+    auditor: WebAuditor,
+    forced: bool,
+) -> DbLead:
+    settings = get_settings()
+    audit = auditor.audit(hit.website_uri)
+    email = audit.contact_email if audit.contact_email and audit.contact_email_source_url else None
+    multi = _multi_site(hit.name)
+    high = bool(forced or multi)
+    if high:
+        value = settings.hitl_value_clp
+        reason = (
+            "Demo de alto valor en rubro sujeto a revisión humana."
+            if forced and not multi
+            else "Señal de multi-sede: queda para revisión humana."
+        )
+    else:
+        value = _package_value(category, bool(hit.website_uri), int(hit.user_rating_count or 0))
+        if hit.website_uri:
+            reason = f"Sitio presente y oportunidad {audit.opportunity_score} en {commune}."
+        else:
+            reason = f"Sin sitio propio en {commune}."
+    payload = audit.model_dump()
+    payload["scout_reason"] = reason
+    return DbLead(
+        source=origin,
+        business=hit.name,
+        category=category,
+        city=COMMUNE_CITY.get(commune, commune),
+        commune=commune,
+        address_public=hit.formatted_address or None,
+        place_id=hit.place_id,
+        google_maps_uri=hit.google_maps_uri,
+        website_url=hit.website_uri,
+        website_audit=payload,
+        opportunity_score=audit.opportunity_score,
+        rating=hit.rating,
+        reviews=hit.user_rating_count,
+        contact_email=email,
+        contact_email_source_url=audit.contact_email_source_url if email else None,
+        instagram_handle=audit.instagram_handle,
+        phone_public=hit.national_phone_number,
+        status="nuevo",
+        estimated_value_clp=value,
+        high_value=high,
+        tone=TONE_BY_CATEGORY.get(category, "tu"),
+    )
+
+
+def _commune_of(ctx: AgentContext, lead_id: str) -> str:
+    lead = LeadRepository(ctx.session).get(lead_id)
+    return lead.commune if lead is not None else ""
 
 
 def run_scout(count: int = 3, force_high_value: bool = True) -> list[Lead]:
-    """Ejecuta Scout en modo demo y persiste leads."""
-    leads = generate_demo_leads(n=count, force_high_value=force_high_value)
-    upsert_leads(leads)
-
-    communes = sorted({l.commune for l in leads})
-    commune_str = ", ".join(communes)
-    log_event(
-        "Scout",
-        f"{len(leads)} leads nuevos en {commune_str}",
-        meta={"ids": [l.id for l in leads], "count": len(leads)},
-    )
-    return leads
+    """Compatibilidad del CLI. Persiste en la base y devuelve la proyección."""
+    prepare_db()
+    with session_scope() as session:
+        result = ScoutAgent().run(
+            AgentContext(session, count=count, force_high_value=force_high_value)
+        )
+        created = set(result.output.get("ids") or [])
+    if not created:
+        return []
+    return [lead for lead in load_leads() if lead.id in created]
