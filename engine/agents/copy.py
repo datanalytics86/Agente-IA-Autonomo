@@ -18,12 +18,14 @@ from agents.schemas import (
     MobileReply,
     Opportunity,
     PersonalizationFact,
+    PitchChannel,
     PitchPlan,
     ProposalOutput,
     ScoutLeadDraft,
     ScoutOutput,
     ServiceItem,
     Shot,
+    Tone,
 )
 from integrations.llm.base import register_fallback
 
@@ -32,11 +34,11 @@ def clp(amount: int) -> str:
     return f"{amount:,}".replace(",", ".")
 
 
-def _tone(data: dict[str, Any]) -> str:
+def _tone(data: dict[str, Any]) -> Tone:
     category = str(data.get("category") or "")
     tone = data.get("tone")
-    if tone in {"tu", "usted"}:
-        return str(tone)
+    if tone == "tu" or tone == "usted":
+        return tone
     return TONE_BY_CATEGORY.get(category, "tu")
 
 
@@ -135,7 +137,7 @@ def diagnosis_fallback(data: dict[str, Any]) -> DiagnosisOutput:
             )
         ],
         recommended_package=package,
-        tone=_tone(data),  # type: ignore[arg-type]
+        tone=_tone(data),
         personalization_facts=_facts(data),
         pitch_subject=subject,
         pitch_body=body,
@@ -197,9 +199,10 @@ def filmer_fallback(data: dict[str, Any]) -> FilmerOutput:
 
 
 def pitcher_fallback(data: dict[str, Any]) -> PitchPlan:
-    channel = data.get("channel")
-    if channel not in {"email_outreach", "instagram", "linkedin"}:
-        channel = "instagram"
+    raw_channel = data.get("channel")
+    channel: PitchChannel = (
+        raw_channel if raw_channel in {"email_outreach", "instagram", "linkedin"} else "instagram"
+    )
     manual = channel != "email_outreach"
     subject = str(data.get("pitch_subject") or "Sitio para tu negocio")
     body = str(data.get("pitch_body") or "")

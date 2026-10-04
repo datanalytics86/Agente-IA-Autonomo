@@ -253,8 +253,8 @@ class _SocketGuard:
             guard._reject(address)
             return guard._orig_create(address, *args, **kwargs)  # type: ignore[arg-type]
 
-        socket.socket.connect = connect  # type: ignore[method-assign]
-        socket.socket.connect_ex = connect_ex  # type: ignore[method-assign]
+        socket.socket.connect = connect  # type: ignore[method-assign, assignment]
+        socket.socket.connect_ex = connect_ex  # type: ignore[method-assign, assignment]
         socket.create_connection = create_connection  # type: ignore[assignment]
 
     def restore(self) -> None:

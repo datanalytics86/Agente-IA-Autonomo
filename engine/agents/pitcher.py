@@ -9,7 +9,7 @@ from agents.copy import register_agent_fallbacks
 from agents.runtime import add_business_days, log_event, set_column_status
 from core.config import get_settings
 from core.states import transition
-from db.models import Message, utcnow
+from db.models import Lead, Message, utcnow
 from db.repositories import LeadRepository, MessageRepository
 
 
@@ -40,10 +40,10 @@ def ensure_draft(ctx: AgentContext) -> Message | None:
     if existing:
         return existing[0]
     diagnosis = lead.diagnosis if isinstance(lead.diagnosis, dict) else {}
-    body = diagnosis.get("pitch_body") if isinstance(diagnosis.get("pitch_body"), str) else ""
-    subject = (
-        diagnosis.get("pitch_subject") if isinstance(diagnosis.get("pitch_subject"), str) else ""
-    )
+    raw_body = diagnosis.get("pitch_body")
+    body = raw_body if isinstance(raw_body, str) else ""
+    raw_subject = diagnosis.get("pitch_subject")
+    subject = raw_subject if isinstance(raw_subject, str) else ""
     if not body.strip():
         return None
     channel, _manual = choose_channel(lead)
@@ -73,9 +73,9 @@ class PitcherAgent:
                 lead_id=ctx.lead_id, ok=False, events=["lead inexistente"], output={}
             )
         if lead.high_value or lead.status == "revision":
-            message = f"sin envío · {lead.business} en revisión"
-            log_event("Pitcher", message, level="warn", session=ctx.session, lead_id=lead.id)
-            return AgentResult(lead_id=lead.id, ok=True, events=[message], output={"sent": False})
+            note = f"sin envío · {lead.business} en revisión"
+            log_event("Pitcher", note, level="warn", session=ctx.session, lead_id=lead.id)
+            return AgentResult(lead_id=lead.id, ok=True, events=[note], output={"sent": False})
         if lead.status != "pitch_listo":
             return AgentResult(lead_id=lead.id, ok=True, events=[], output={"skipped": True})
 
@@ -160,17 +160,16 @@ class PitcherAgent:
         )
 
 
-def _schedule(ctx: AgentContext, lead: object) -> None:
+def _schedule(ctx: AgentContext, lead: Lead) -> None:
     settings = get_settings()
     when = add_business_days(utcnow(), settings.followup_1_business_days)
     lead.next_action_at = when
-    LeadRepository(ctx.session).save(lead)  # type: ignore[arg-type]
+    LeadRepository(ctx.session).save(lead)
 
 
-def _manual_hint(lead: object, channel: str, body: str) -> dict[str, str]:
-    if channel == "instagram" and getattr(lead, "instagram_handle", None):
-        handle = str(lead.instagram_handle)
-        return {"profile_url": f"https://instagram.com/{handle}", "copy": body}
-    if channel == "linkedin" and getattr(lead, "linkedin_url", None):
-        return {"profile_url": str(lead.linkedin_url), "copy": body}
+def _manual_hint(lead: Lead, channel: str, body: str) -> dict[str, str]:
+    if channel == "instagram" and lead.instagram_handle:
+        return {"profile_url": f"https://instagram.com/{lead.instagram_handle}", "copy": body}
+    if channel == "linkedin" and lead.linkedin_url:
+        return {"profile_url": lead.linkedin_url, "copy": body}
     return {"profile_url": "", "copy": body}

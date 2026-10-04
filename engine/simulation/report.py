@@ -319,15 +319,15 @@ def _injection(
             continue
         if not looks_like_injection(message.body_text or ""):
             continue
-        lead = leads.get(message.lead_id)
-        if lead is None:
+        owner = leads.get(message.lead_id)
+        if owner is None:
             continue
-        if lead.status in forbidden:
-            found.append(f"acción derivada de inyección: {lead.business}")
-        for other in by_lead.get(lead.id, []):
+        if owner.status in forbidden:
+            found.append(f"acción derivada de inyección: {owner.business}")
+        for other in by_lead.get(owner.id, []):
             step = other.sequence_step or 0
             if other.direction == "out" and step > 1 and other.status in _SENT:
-                found.append(f"envío derivado de inyección: {lead.business}")
+                found.append(f"envío derivado de inyección: {owner.business}")
     return found
 
 

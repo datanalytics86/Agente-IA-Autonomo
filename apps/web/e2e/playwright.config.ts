@@ -1,11 +1,17 @@
 import { defineConfig } from '@playwright/test'
+import { platform } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const engine = resolve(here, '../../../engine')
 const site = resolve(here, '../../site')
-const python = resolve(engine, '.venv/Scripts/python.exe')
+const win = platform() === 'win32'
+const ci = !!process.env.CI
+const python =
+  process.env.E2E_PYTHON ?? (win ? resolve(engine, '.venv/Scripts/python.exe') : 'python')
+const npm = win ? 'npm.cmd' : 'npm'
+const quote = (value: string) => `"${value}"`
 
 export default defineConfig({
   testDir: '.',
@@ -13,16 +19,17 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   timeout: 120_000,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? 'github' : 'list',
+  forbidOnly: ci,
+  retries: ci ? 1 : 0,
+  reporter: ci ? 'github' : 'list',
   use: {
     baseURL: 'http://127.0.0.1:4321',
-    channel: 'msedge',
+    // Windows local sigue en Edge. En CI no hay msedge: Playwright usa chromium.
+    ...(ci ? {} : { channel: 'msedge' as const }),
   },
   webServer: [
     {
-      command: `"${python}" "${resolve(here, 'serve_api.py')}"`,
+      command: `${quote(python)} ${quote(resolve(here, 'serve_api.py'))}`,
       cwd: engine,
       url: 'http://127.0.0.1:8765/healthz',
       reuseExistingServer: false,
@@ -45,7 +52,7 @@ export default defineConfig({
       },
     },
     {
-      command: 'npm.cmd run build && npm.cmd run preview -- --host 127.0.0.1 --port 4321',
+      command: `${npm} run build && ${npm} run preview -- --host 127.0.0.1 --port 4321`,
       cwd: site,
       url: 'http://127.0.0.1:4321',
       reuseExistingServer: false,
