@@ -60,29 +60,53 @@ Alternativa: `revision` (HITL)
 
 ### Instalación
 
+Desde la raíz del repositorio. El venv queda en `engine/.venv`.
+
+**PowerShell**
+
 ```powershell
-cd "C:\Users\T14 Gen 2\Agente-IA-Autonomo\engine"
+cd engine
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+cd ..
+```
+
+**bash**
+
+```bash
+cd engine
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cd ..
 ```
 
 ### Comandos
 
-```powershell
-python main.py --mode demo      # ciclo completo demo
-python main.py --mode status    # tabla + logs
-python main.py --mode scout     # solo Scout
-python main.py --mode cycle     # un ciclo sobre estado
-python main.py --mode prompts   # lista prompts/
-```
+Con ese entorno activo, desde la raíz. Los modos que el CLI ejecuta hoy son `demo`, `status`, `scout`, `cycle` y `prompts`.
 
-Desde la raíz del monorepo:
+**PowerShell**
 
 ```powershell
-python engine/main.py --mode demo
-python engine/main.py --mode status
+python engine/main.py --mode demo      # ciclo completo demo
+python engine/main.py --mode status    # tabla + logs
+python engine/main.py --mode scout     # solo Scout
+python engine/main.py --mode cycle     # un ciclo sobre el estado
+python engine/main.py --mode prompts   # lista prompts/
 ```
+
+**bash**
+
+```bash
+python engine/main.py --mode demo      # ciclo completo demo
+python engine/main.py --mode status    # tabla + logs
+python engine/main.py --mode scout     # solo Scout
+python engine/main.py --mode cycle     # un ciclo sobre el estado
+python engine/main.py --mode prompts   # lista prompts/
+```
+
+Dentro de `engine/`, el equivalente es `python main.py --mode demo` (y el mismo `--mode` en los otros cuatro).
 
 ### Resultado esperado del demo
 
@@ -113,18 +137,27 @@ React 19 · TypeScript · Vite · TanStack Router (file routes) · Tailwind CSS 
 
 ### Instalación y arranque
 
+Desde la raíz del repositorio. `npm ci` usa `apps/web/package-lock.json`.
+
+**PowerShell**
+
 ```powershell
-cd "C:\Users\T14 Gen 2\Agente-IA-Autonomo\apps\web"
-npm install
+cd apps/web
+npm ci
 npm run dev
 ```
 
-Abre **http://localhost:8080** (escucha en `0.0.0.0:8080`).
+**bash**
 
-```powershell
-npm run build    # producción
-npm run preview  # servir build en :8080
+```bash
+cd apps/web
+npm ci
+npm run dev
 ```
+
+Abre **http://localhost:8080**. Vite escucha en `0.0.0.0:8080`.
+
+En la misma carpeta, en cualquiera de las dos shells: `npm run build` compila y `npm run preview` sirve ese build también en el puerto 8080.
 
 ### Acciones del store (demo)
 
@@ -144,13 +177,17 @@ Los datos del dashboard son **mock en Zustand** (independientes del JSON del eng
 - Canales: IG DM, email, LinkedIn; WhatsApp sin cold agresivo  
 - Opt-out claro; no inventar teléfonos/emails no públicos  
 
-## Extender a producción
+## Hacia producción
 
-1. Completar `engine/.env` con APIs reales  
-2. Conectar Google Places en Scout  
-3. Activar LLM en Diagnoser/Pitcher  
-4. Integrar envíos reales con consentimientos  
-5. Opcional: API que lea/escriba el mismo `engine/state` desde el dashboard  
+Hoy es un demo: el motor no envía ni cobra, y el dashboard no está conectado a un backend. El plan y la arquitectura objetivo están en [`instrucciones041026.md`](instrucciones041026.md). Los contratos (dominio, base de datos, OpenAPI, entorno e integraciones) están en [`docs/contracts/`](docs/contracts/); no se copian aquí.
+
+Mientras se construye:
+
+- sin envíos reales
+- sin cobros reales
+- sin DMs automatizados de Instagram o LinkedIn
+
+No hay sitio público, API ni pasarela de pago en este repositorio.
 
 ## Licencia de uso
 
