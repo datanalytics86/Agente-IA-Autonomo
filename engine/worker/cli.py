@@ -12,7 +12,11 @@ from worker.scheduler import build_scheduler
 
 
 def main() -> int:
-    create_all()
+    from api.app import should_create_schema
+    from core.config import get_settings
+
+    if should_create_schema(get_settings()):
+        create_all()
     owner = f"{socket.gethostname()}:{os.getpid()}"
     with session_scope() as session:
         if not acquire_lock(session, owner, datetime.now(UTC)):

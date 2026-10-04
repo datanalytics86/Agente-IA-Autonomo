@@ -65,6 +65,14 @@ _STUBS = (
 )
 _ADMIN = "admin@example.com"
 _PASSWORD = "clave-de-prueba"
+_PROD_CORE = {
+    "secret_key": "s" * 32,
+    "database_url": "sqlite:///./state/wiring-prod.db",
+    "admin_email": _ADMIN,
+    "admin_password_hash": "hash-de-prueba",
+    "agency_name": "Agencia Norte",
+    "agency_email": "hola@agencia.example",
+}
 
 
 @pytest.fixture(autouse=True)
@@ -80,79 +88,91 @@ def _aislar() -> Iterator[None]:
 
 
 def _full(**overrides: Any) -> Settings:
-    data: dict[str, Any] = {
-        "app_mode": "prod",
-        "dry_run": False,
-        "outreach_enabled": True,
-        "public_base_url": "https://agencia.example",
-        "google_places_api_key": "places-test",
-        "pagespeed_api_key": "ps-test",
-        "resend_api_key": "re_test",
-        "email_tx_from": "tx@example.com",
-        "outreach_smtp_host": "smtp.example",
-        "outreach_smtp_port": 587,
-        "outreach_smtp_user": "smtp-user",
-        "outreach_smtp_password": "smtp-secret",
-        "outreach_imap_host": "imap.example",
-        "outreach_imap_port": 993,
-        "outreach_imap_user": "inbox@example.com",
-        "outreach_imap_password": "imap-secret",
-        "outreach_from": "Agencia <out@example.com>",
-        "booking_provider": "calcom",
-        "booking_link": "https://cal.example/cita",
-        "calcom_webhook_secret": "cal-secret",
-        "calendly_webhook_signing_key": "",
-        "mp_access_token": "TEST-MP",
-        "mp_webhook_secret": "mp-secret",
-        "meta_app_secret": "meta-secret",
-        "meta_verify_token": "meta-verify",
-        "notify_email": "dueno@example.com",
-        "telegram_bot_token": "123:abc",
-        "telegram_chat_id": "99",
-        "hosting_provider": "caddy",
-        "ig_access_token": "",
-        "whatsapp_token": "",
-    }
+    data: dict[str, Any] = dict(_PROD_CORE)
+    data.update(
+        {
+            "app_mode": "prod",
+            "dry_run": False,
+            "outreach_enabled": True,
+            "public_base_url": "https://agencia.example",
+            "google_places_api_key": "places-test",
+            "pagespeed_api_key": "ps-test",
+            "resend_api_key": "re_test",
+            "email_tx_from": "tx@example.com",
+            "outreach_smtp_host": "smtp.example",
+            "outreach_smtp_port": 587,
+            "outreach_smtp_user": "smtp-user",
+            "outreach_smtp_password": "smtp-secret",
+            "outreach_imap_host": "imap.example",
+            "outreach_imap_port": 993,
+            "outreach_imap_user": "inbox@example.com",
+            "outreach_imap_password": "imap-secret",
+            "outreach_from": "Agencia <out@example.com>",
+            "booking_provider": "calcom",
+            "booking_link": "https://cal.example/cita",
+            "calcom_webhook_secret": "cal-secret",
+            "calendly_webhook_signing_key": "",
+            "mp_access_token": "TEST-MP",
+            "mp_webhook_secret": "mp-secret",
+            "meta_app_secret": "meta-secret",
+            "meta_verify_token": "meta-verify",
+            "notify_email": "dueno@example.com",
+            "telegram_bot_token": "123:abc",
+            "telegram_chat_id": "99",
+            "hosting_provider": "caddy",
+            "ig_access_token": "",
+            "whatsapp_token": "",
+        }
+    )
     data.update(overrides)
     return Settings(_env_file=None, **data)
 
 
 def _empty(**overrides: Any) -> Settings:
-    data: dict[str, Any] = {
-        "app_mode": "prod",
-        "dry_run": False,
-        "outreach_enabled": False,
-        "public_base_url": "https://agencia.example",
-        "google_places_api_key": "",
-        "pagespeed_api_key": "",
-        "resend_api_key": "",
-        "email_tx_from": "",
-        "outreach_smtp_host": "",
-        "outreach_smtp_user": "",
-        "outreach_smtp_password": "",
-        "outreach_imap_host": "",
-        "outreach_imap_user": "",
-        "outreach_imap_password": "",
-        "outreach_from": "",
-        "booking_provider": "calcom",
-        "booking_link": "",
-        "calcom_webhook_secret": "",
-        "calendly_webhook_signing_key": "",
-        "mp_access_token": "",
-        "mp_webhook_secret": "",
-        "meta_app_secret": "",
-        "meta_verify_token": "",
-        "notify_email": "",
-        "telegram_bot_token": "",
-        "telegram_chat_id": "",
-        "hosting_provider": "caddy",
-    }
+    data: dict[str, Any] = dict(_PROD_CORE)
+    data.update(
+        {
+            "app_mode": "prod",
+            "dry_run": False,
+            "outreach_enabled": False,
+            "public_base_url": "https://agencia.example",
+            "google_places_api_key": "",
+            "pagespeed_api_key": "",
+            "resend_api_key": "",
+            "email_tx_from": "",
+            "outreach_smtp_host": "",
+            "outreach_smtp_user": "",
+            "outreach_smtp_password": "",
+            "outreach_imap_host": "",
+            "outreach_imap_user": "",
+            "outreach_imap_password": "",
+            "outreach_from": "",
+            "booking_provider": "calcom",
+            "booking_link": "",
+            "calcom_webhook_secret": "",
+            "calendly_webhook_signing_key": "",
+            "mp_access_token": "",
+            "mp_webhook_secret": "",
+            "meta_app_secret": "",
+            "meta_verify_token": "",
+            "notify_email": "",
+            "telegram_bot_token": "",
+            "telegram_chat_id": "",
+            "hosting_provider": "caddy",
+        }
+    )
     data.update(overrides)
     return Settings(_env_file=None, **data)
 
 
 def _use_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     url = f"sqlite:///{(tmp_path / 'wiring.db').as_posix()}"
+    monkeypatch.setenv("SECRET_KEY", "s" * 32)
+    monkeypatch.setenv("ADMIN_EMAIL", _ADMIN)
+    monkeypatch.setenv("ADMIN_PASSWORD_HASH", "hash-de-prueba")
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://agencia.example")
+    monkeypatch.setenv("AGENCY_NAME", "Agencia Norte")
+    monkeypatch.setenv("AGENCY_EMAIL", "hola@agencia.example")
     monkeypatch.setenv("DATABASE_URL", url)
     monkeypatch.setenv("APP_MODE", "prod")
     monkeypatch.setenv("DRY_RUN", "false")

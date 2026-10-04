@@ -10,7 +10,7 @@ from __future__ import annotations
 import hmac
 import secrets
 from collections.abc import Iterator, Mapping
-from typing import Annotated, Protocol
+from typing import Annotated, Protocol, cast
 
 from fastapi import Depends, Request
 from pydantic import BaseModel, Field
@@ -107,7 +107,9 @@ def build_payment_provider(settings: Settings) -> PaymentProvider:
 
     built = build_payments(settings)
     if isinstance(built, MercadoPagoProvider):
-        return built
+        # La API y integrations declaran el mismo contrato con modelos distintos.
+        # El checkout solo usa .id y .checkout_url; el webhook usa los campos del hecho.
+        return cast(PaymentProvider, built)
     return LocalPaymentProvider(settings.public_base_url)
 
 
