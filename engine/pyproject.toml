@@ -35,8 +35,8 @@ dev = [
     "pip-audit",
 ]
 
-[tool.setuptools]
-packages = ["core", "db"]
+[tool.setuptools.packages.find]
+include = ["core*", "db*", "api*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
@@ -51,7 +51,7 @@ src = [".", "tests"]
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["core", "db"]
+known-first-party = ["api", "core", "db"]
 
 [tool.mypy]
 python_version = "3.11"

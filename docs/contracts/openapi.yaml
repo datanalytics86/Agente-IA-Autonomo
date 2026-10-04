@@ -1,808 +1,2195 @@
-openapi: 3.0.3
-info:
-  title: Agencia API
-  version: 0.1.0
-  description: >
-    Borrador F0. F2 lo regenera desde FastAPI y el CI compara el resultado
-    con este archivo. JSON en snake_case. Errores con el esquema Error.
-servers:
-  - url: http://localhost
-tags:
-  - name: public
-  - name: webhooks
-  - name: admin
-  - name: internal
-paths:
-  /healthz:
-    get:
-      tags: [public]
-      summary: Proceso vivo
-      responses:
+"openapi": "3.1.0"
+"info":
+  "title": "Agencia API"
+  "description": "API de la agencia. JSON en snake_case. Los errores usan el esquema Error. Regenerada desde FastAPI."
+  "version": "0.1.0"
+"paths":
+  "/healthz":
+    "get":
+      "tags":
+        - "public"
+      "summary": "Healthz"
+      "operationId": "healthz_healthz_get"
+      "responses":
         "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [status]
-                properties:
-                  status: {type: string, example: ok}
-  /readyz:
-    get:
-      tags: [public]
-      summary: Base de datos alcanzable
-      responses:
-        "200": {description: listo}
-        "503": {description: no listo, $ref: "#/components/responses/Error"}
-  /api/public/paquetes:
-    get:
-      tags: [public]
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "additionalProperties":
+                  "type": "string"
+                "type": "object"
+                "title": "Response Healthz Healthz Get"
+  "/readyz":
+    "get":
+      "tags":
+        - "public"
+      "summary": "Readyz"
+      "operationId": "readyz_readyz_get"
+      "responses":
         "200":
-          description: paquetes
-          content:
-            application/json:
-              schema:
-                type: array
-                items: {$ref: "#/components/schemas/Package"}
-  /api/public/diagnostico:
-    post:
-      tags: [public]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/DiagnosticoIn"}
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema": {}
+  "/api/public/paquetes":
+    "get":
+      "tags":
+        - "public"
+      "summary": "Paquetes"
+      "operationId": "paquetes_api_public_paquetes_get"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "items":
+                  "$ref": "#/components/schemas/Package"
+                "type": "array"
+                "title": "Response Paquetes Api Public Paquetes Get"
+  "/api/public/diagnostico":
+    "post":
+      "tags":
+        - "public"
+      "summary": "Diagnostico"
+      "operationId": "diagnostico_api_public_diagnostico_post"
+      "requestBody":
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/DiagnosticoIn"
+        "required": true
+      "responses":
         "202":
-          description: aceptado
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/Accepted"}
-        "422": {$ref: "#/components/responses/Error"}
-  /api/public/contacto:
-    post:
-      tags: [public]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/ContactoIn"}
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/Accepted"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/public/contacto":
+    "post":
+      "tags":
+        - "public"
+      "summary": "Contacto"
+      "operationId": "contacto_api_public_contacto_post"
+      "requestBody":
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/ContactoIn"
+        "required": true
+      "responses":
         "202":
-          description: aceptado
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/Accepted"}
-  /api/public/checkout:
-    post:
-      tags: [public]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/CheckoutIn"}
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/Accepted"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/public/checkout":
+    "post":
+      "tags":
+        - "public"
+      "summary": "Checkout Route"
+      "operationId": "checkout_route_api_public_checkout_post"
+      "requestBody":
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/CheckoutIn"
+        "required": true
+      "responses":
         "201":
-          description: preferencia
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/CheckoutOut"}
-  /api/public/baja:
-    get:
-      tags: [public]
-      parameters:
-        - $ref: "#/components/parameters/Token"
-      responses:
-        "200": {description: página o confirmación de baja}
-    post:
-      tags: [public]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [token]
-              properties:
-                token: {type: string}
-      responses:
-        "200": {description: suprimido}
-  /u/{token}:
-    post:
-      tags: [public]
-      parameters:
-        - $ref: "#/components/parameters/Token"
-      responses:
-        "200": {description: one-click RFC 8058}
-  /api/public/derechos:
-    post:
-      tags: [public]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/DerechosIn"}
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/CheckoutOut"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/public/baja":
+    "get":
+      "tags":
+        - "public"
+      "summary": "Baja Get"
+      "operationId": "baja_get_api_public_baja_get"
+      "parameters":
+        -
+          "name": "token"
+          "in": "query"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Token"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema": {}
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+    "post":
+      "tags":
+        - "public"
+      "summary": "Baja Post"
+      "operationId": "baja_post_api_public_baja_post"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/BajaIn"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "type": "object"
+                "additionalProperties":
+                  "type": "boolean"
+                "title": "Response Baja Post Api Public Baja Post"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/u/{token}":
+    "post":
+      "tags":
+        - "public"
+      "summary": "One Click"
+      "operationId": "one_click_u__token__post"
+      "parameters":
+        -
+          "name": "token"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Token"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "type": "object"
+                "additionalProperties":
+                  "type": "boolean"
+                "title": "Response One Click U  Token  Post"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/public/derechos":
+    "post":
+      "tags":
+        - "public"
+      "summary": "Derechos"
+      "operationId": "derechos_api_public_derechos_post"
+      "requestBody":
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/DerechosIn"
+        "required": true
+      "responses":
         "202":
-          description: solicitud registrada
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/Accepted"}
-  /demo/{token}:
-    get:
-      tags: [public]
-      parameters:
-        - $ref: "#/components/parameters/Token"
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/Accepted"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/demo/{token}":
+    "get":
+      "tags":
+        - "public"
+      "summary": "Demo"
+      "operationId": "demo_demo__token__get"
+      "parameters":
+        -
+          "name": "token"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Token"
+      "responses":
         "200":
-          description: HTML de la landing demo. Header X-Robots-Tag noindex, nofollow
-        "410": {description: expirada}
-  /api/public/proyecto/{token}:
-    get:
-      tags: [public]
-      parameters:
-        - $ref: "#/components/parameters/Token"
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema": {}
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/public/proyecto/{token}":
+    "get":
+      "tags":
+        - "public"
+      "summary": "Proyecto"
+      "operationId": "proyecto_api_public_proyecto__token__get"
+      "parameters":
+        -
+          "name": "token"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Token"
+      "responses":
         "200":
-          description: portal
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/ProjectPublic"}
-  /api/public/proyecto/{token}/intake:
-    post:
-      tags: [public]
-      parameters:
-        - $ref: "#/components/parameters/Token"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {type: object, additionalProperties: true}
-      responses:
-        "200": {description: intake guardado}
-  /api/public/proyecto/{token}/feedback:
-    post:
-      tags: [public]
-      parameters:
-        - $ref: "#/components/parameters/Token"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [text]
-              properties:
-                text: {type: string}
-      responses:
-        "202": {description: ronda registrada}
-  /api/public/proyecto/{token}/aprobar:
-    post:
-      tags: [public]
-      parameters:
-        - $ref: "#/components/parameters/Token"
-      responses:
-        "200": {description: proyecto aprobado}
-  /api/internal/domain-check:
-    get:
-      tags: [internal]
-      parameters:
-        - name: domain
-          in: query
-          required: true
-          schema: {type: string}
-      responses:
-        "200": {description: dominio autorizado}
-        "404": {description: Caddy no debe emitir certificado}
-  /webhooks/mercadopago:
-    post:
-      tags: [webhooks]
-      responses:
-        "200": {description: aceptado}
-        "401": {$ref: "#/components/responses/Error"}
-  /webhooks/calcom:
-    post:
-      tags: [webhooks]
-      responses:
-        "200": {description: aceptado}
-        "401": {$ref: "#/components/responses/Error"}
-  /webhooks/calendly:
-    post:
-      tags: [webhooks]
-      responses:
-        "200": {description: aceptado}
-        "401": {$ref: "#/components/responses/Error"}
-  /webhooks/email:
-    post:
-      tags: [webhooks]
-      responses:
-        "200": {description: aceptado}
-        "401": {$ref: "#/components/responses/Error"}
-  /webhooks/meta:
-    get:
-      tags: [webhooks]
-      parameters:
-        - {name: hub.mode, in: query, schema: {type: string}}
-        - {name: hub.verify_token, in: query, schema: {type: string}}
-        - {name: hub.challenge, in: query, schema: {type: string}}
-      responses:
-        "200": {description: challenge en texto}
-    post:
-      tags: [webhooks]
-      responses:
-        "200": {description: aceptado}
-        "401": {$ref: "#/components/responses/Error"}
-  /api/auth/login:
-    post:
-      tags: [admin]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email, password]
-              properties:
-                email: {type: string, format: email}
-                password: {type: string}
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ProjectPublic"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/public/proyecto/{token}/intake":
+    "post":
+      "tags":
+        - "public"
+      "summary": "Intake"
+      "operationId": "intake_api_public_proyecto__token__intake_post"
+      "parameters":
+        -
+          "name": "token"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Token"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "type": "object"
+              "additionalProperties": true
+              "title": "Payload"
+      "responses":
         "200":
-          description: cookie de sesión
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/User"}
-        "401": {$ref: "#/components/responses/Error"}
-        "429": {$ref: "#/components/responses/Error"}
-  /api/auth/logout:
-    post:
-      tags: [admin]
-      responses:
-        "204": {description: sesión cerrada}
-  /api/auth/me:
-    get:
-      tags: [admin]
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "type": "object"
+                "additionalProperties":
+                  "type": "boolean"
+                "title": "Response Intake Api Public Proyecto  Token  Intake Post"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/public/proyecto/{token}/feedback":
+    "post":
+      "tags":
+        - "public"
+      "summary": "Feedback"
+      "operationId": "feedback_api_public_proyecto__token__feedback_post"
+      "parameters":
+        -
+          "name": "token"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Token"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/FeedbackIn"
+      "responses":
+        "202":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "type": "object"
+                "additionalProperties":
+                  "type": "string"
+                "title": "Response Feedback Api Public Proyecto  Token  Feedback Post"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/public/proyecto/{token}/aprobar":
+    "post":
+      "tags":
+        - "public"
+      "summary": "Aprobar"
+      "operationId": "aprobar_api_public_proyecto__token__aprobar_post"
+      "parameters":
+        -
+          "name": "token"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Token"
+      "responses":
         "200":
-          description: usuario
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/User"}
-        "401": {$ref: "#/components/responses/Error"}
-  /api/leads:
-    get:
-      tags: [admin]
-      parameters:
-        - {name: status, in: query, schema: {type: string}}
-        - {name: q, in: query, schema: {type: string}}
-        - {name: page, in: query, schema: {type: integer, default: 1}}
-        - {name: page_size, in: query, schema: {type: integer, default: 20}}
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "type": "object"
+                "additionalProperties":
+                  "type": "string"
+                "title": "Response Aprobar Api Public Proyecto  Token  Aprobar Post"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/webhooks/mercadopago":
+    "post":
+      "tags":
+        - "webhooks"
+      "summary": "Mercadopago"
+      "operationId": "mercadopago_webhooks_mercadopago_post"
+      "responses":
         "200":
-          description: página
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/LeadPage"}
-  /api/leads/{id}:
-    get:
-      tags: [admin]
-      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "additionalProperties": true
+                "type": "object"
+                "title": "Response Mercadopago Webhooks Mercadopago Post"
+  "/webhooks/calcom":
+    "post":
+      "tags":
+        - "webhooks"
+      "summary": "Calcom"
+      "operationId": "calcom_webhooks_calcom_post"
+      "responses":
         "200":
-          description: detalle
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/LeadDetail"}
-    patch:
-      tags: [admin]
-      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
-      requestBody:
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/LeadPatch"}
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "additionalProperties": true
+                "type": "object"
+                "title": "Response Calcom Webhooks Calcom Post"
+  "/webhooks/calendly":
+    "post":
+      "tags":
+        - "webhooks"
+      "summary": "Calendly"
+      "operationId": "calendly_webhooks_calendly_post"
+      "responses":
         "200":
-          description: actualizado
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/Lead"}
-  /api/leads/{id}/transition:
-    post:
-      tags: [admin]
-      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [to, reason]
-              properties:
-                to: {type: string}
-                reason: {type: string}
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "additionalProperties": true
+                "type": "object"
+                "title": "Response Calendly Webhooks Calendly Post"
+  "/webhooks/email":
+    "post":
+      "tags":
+        - "webhooks"
+      "summary": "Email Hook"
+      "operationId": "email_hook_webhooks_email_post"
+      "responses":
         "200":
-          description: transicionado
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/Lead"}
-        "409": {$ref: "#/components/responses/Error"}
-  /api/approvals:
-    get:
-      tags: [admin]
-      parameters:
-        - {name: status, in: query, schema: {type: string, default: pending}}
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "additionalProperties": true
+                "type": "object"
+                "title": "Response Email Hook Webhooks Email Post"
+  "/webhooks/meta":
+    "get":
+      "tags":
+        - "webhooks"
+      "summary": "Meta Verify"
+      "operationId": "meta_verify_webhooks_meta_get"
+      "responses":
         "200":
-          description: lista
-          content:
-            application/json:
-              schema:
-                type: array
-                items: {$ref: "#/components/schemas/Approval"}
-  /api/approvals/{id}/approve:
-    post:
-      tags: [admin]
-      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
-      responses:
-        "200": {description: aprobado. El lead vuelve a paused_from}
-  /api/approvals/{id}/reject:
-    post:
-      tags: [admin]
-      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                note: {type: string}
-      responses:
-        "200": {description: rechazado}
-  /api/approvals/{id}/edit:
-    post:
-      tags: [admin]
-      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                body_text: {type: string}
-                subject: {type: string}
-      responses:
-        "200": {description: editado y devuelto al Checker}
-  /api/messages:
-    get:
-      tags: [admin]
-      parameters:
-        - {name: lead_id, in: query, schema: {type: string}}
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema": {}
+    "post":
+      "tags":
+        - "webhooks"
+      "summary": "Meta Hook"
+      "operationId": "meta_hook_webhooks_meta_post"
+      "responses":
         "200":
-          description: mensajes
-          content:
-            application/json:
-              schema:
-                type: array
-                items: {$ref: "#/components/schemas/Message"}
-  /api/manual-queue:
-    get:
-      tags: [admin]
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "additionalProperties": true
+                "type": "object"
+                "title": "Response Meta Hook Webhooks Meta Post"
+  "/api/internal/domain-check":
+    "get":
+      "tags":
+        - "internal"
+      "summary": "Domain Check"
+      "operationId": "domain_check_api_internal_domain_check_get"
+      "parameters":
+        -
+          "name": "domain"
+          "in": "query"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Domain"
+      "responses":
         "200":
-          description: cola IG/LinkedIn
-          content:
-            application/json:
-              schema:
-                type: array
-                items: {$ref: "#/components/schemas/Message"}
-  /api/manual-queue/{id}/mark-sent:
-    post:
-      tags: [admin]
-      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
-      responses:
-        "200": {description: marcado manual_sent}
-  /api/conversations:
-    get:
-      tags: [admin]
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema": {}
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/auth/login":
+    "post":
+      "tags":
+        - "admin"
+      "summary": "Login"
+      "operationId": "login_api_auth_login_post"
+      "requestBody":
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/LoginIn"
+        "required": true
+      "responses":
         "200":
-          description: hilos
-          content:
-            application/json:
-              schema:
-                type: array
-                items: {$ref: "#/components/schemas/Thread"}
-  /api/conversations/{id}/reply:
-    post:
-      tags: [admin]
-      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [body_text]
-              properties:
-                body_text: {type: string}
-      responses:
-        "202": {description: pasa por el Checker}
-  /api/agents:
-    get:
-      tags: [admin]
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/UserOut"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/auth/logout":
+    "post":
+      "tags":
+        - "admin"
+      "summary": "Logout"
+      "operationId": "logout_api_auth_logout_post"
+      "responses":
+        "204":
+          "description": "Successful Response"
+  "/api/auth/me":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Me"
+      "operationId": "me_api_auth_me_get"
+      "responses":
         "200":
-          description: estado real y prompts
-          content:
-            application/json:
-              schema:
-                type: array
-                items: {$ref: "#/components/schemas/AgentStatus"}
-  /api/actions/{name}:
-    post:
-      tags: [admin]
-      parameters:
-        - name: name
-          in: path
-          required: true
-          schema: {type: string, enum: [scout, cycle, followups, digest]}
-      responses:
-        "202": {description: job encolado}
-  /api/events:
-    get:
-      tags: [admin]
-      parameters:
-        - {name: level, in: query, schema: {type: string}}
-        - {name: agent, in: query, schema: {type: string}}
-        - {name: limit, in: query, schema: {type: integer, default: 100}}
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/UserOut"
+  "/api/leads":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Leads"
+      "operationId": "leads_api_leads_get"
+      "parameters":
+        -
+          "name": "status"
+          "in": "query"
+          "required": false
+          "schema":
+            "anyOf":
+              -
+                "type": "string"
+              -
+                "type": "null"
+            "title": "Status"
+        -
+          "name": "q"
+          "in": "query"
+          "required": false
+          "schema":
+            "anyOf":
+              -
+                "type": "string"
+              -
+                "type": "null"
+            "title": "Q"
+        -
+          "name": "page"
+          "in": "query"
+          "required": false
+          "schema":
+            "type": "integer"
+            "default": 1
+            "title": "Page"
+        -
+          "name": "page_size"
+          "in": "query"
+          "required": false
+          "schema":
+            "type": "integer"
+            "default": 20
+            "title": "Page Size"
+      "responses":
         "200":
-          description: eventos
-          content:
-            application/json:
-              schema:
-                type: array
-                items: {$ref: "#/components/schemas/Event"}
-  /api/events/stream:
-    get:
-      tags: [admin]
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/LeadPage"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/leads/{id}":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Lead Get"
+      "operationId": "lead_get_api_leads__id__get"
+      "parameters":
+        -
+          "name": "id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Id"
+      "responses":
         "200":
-          description: SSE text/event-stream
-  /api/metrics:
-    get:
-      tags: [admin]
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/LeadDetail"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+    "patch":
+      "tags":
+        - "admin"
+      "summary": "Lead Patch"
+      "operationId": "lead_patch_api_leads__id__patch"
+      "parameters":
+        -
+          "name": "id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Id"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/LeadPatch"
+      "responses":
         "200":
-          description: KPIs
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/Metrics"}
-  /api/orders:
-    get:
-      tags: [admin]
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/LeadOut"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/leads/{id}/transition":
+    "post":
+      "tags":
+        - "admin"
+      "summary": "Lead Transition"
+      "operationId": "lead_transition_api_leads__id__transition_post"
+      "parameters":
+        -
+          "name": "id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Id"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/TransitionIn"
+      "responses":
         "200":
-          description: pedidos
-          content:
-            application/json:
-              schema:
-                type: array
-                items: {$ref: "#/components/schemas/Order"}
-  /api/projects:
-    get:
-      tags: [admin]
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/LeadOut"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/approvals":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Approvals"
+      "operationId": "approvals_api_approvals_get"
+      "parameters":
+        -
+          "name": "status"
+          "in": "query"
+          "required": false
+          "schema":
+            "type": "string"
+            "default": "pending"
+            "title": "Status"
+      "responses":
         "200":
-          description: proyectos
-          content:
-            application/json:
-              schema:
-                type: array
-                items: {$ref: "#/components/schemas/Project"}
-  /api/projects/{id}:
-    patch:
-      tags: [admin]
-      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
-      requestBody:
-        content:
-          application/json:
-            schema: {type: object, additionalProperties: true}
-      responses:
-        "200": {description: actualizado}
-  /api/settings:
-    get:
-      tags: [admin]
-      responses:
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "type": "array"
+                "items":
+                  "$ref": "#/components/schemas/ApprovalOut"
+                "title": "Response Approvals Api Approvals Get"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/approvals/{id}/approve":
+    "post":
+      "tags":
+        - "admin"
+      "summary": "Approve"
+      "operationId": "approve_api_approvals__id__approve_post"
+      "parameters":
+        -
+          "name": "id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Id"
+      "responses":
         "200":
-          description: settings
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/Settings"}
-    put:
-      tags: [admin]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/Settings"}
-      responses:
-        "200": {description: guardado}
-  /api/compliance/suppression:
-    get:
-      tags: [admin]
-      responses:
-        "200": {description: hashes, sin valores en claro}
-    post:
-      tags: [admin]
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [kind, value, reason]
-              properties:
-                kind: {type: string}
-                value: {type: string}
-                reason: {type: string}
-      responses:
-        "201": {description: agregado}
-    delete:
-      tags: [admin]
-      parameters:
-        - {name: id, in: query, required: true, schema: {type: string}}
-      responses:
-        "204": {description: borrado solo por humano}
-  /api/compliance/data-requests:
-    get:
-      tags: [admin]
-      responses:
-        "200": {description: solicitudes}
-    patch:
-      tags: [admin]
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [id, status]
-              properties:
-                id: {type: string}
-                status: {type: string}
-      responses:
-        "200": {description: actualizada}
-  /api/meta/categories:
-    get:
-      tags: [admin]
-      responses:
-        "200": {description: 15 rubros}
-  /api/meta/statuses:
-    get:
-      tags: [admin]
-      responses:
-        "200": {description: estados y transiciones}
-components:
-  parameters:
-    Token:
-      name: token
-      in: path
-      required: true
-      schema: {type: string}
-  responses:
-    Error:
-      description: error
-      content:
-        application/json:
-          schema: {$ref: "#/components/schemas/Error"}
-  schemas:
-    Error:
-      type: object
-      required: [error]
-      properties:
-        error:
-          type: object
-          required: [code, message]
-          properties:
-            code: {type: string}
-            message: {type: string}
-            details: {type: object, additionalProperties: true}
-    Accepted:
-      type: object
-      required: [id, status]
-      properties:
-        id: {type: string}
-        status: {type: string}
-    Package:
-      type: object
-      required: [code, name, price_clp, revisions]
-      properties:
-        code: {type: string}
-        name: {type: string}
-        price_clp: {type: integer, nullable: true}
-        revisions: {type: integer}
-        includes: {type: array, items: {type: string}}
-    DiagnosticoIn:
-      type: object
-      required: [business, email, commune, category, consent, consent_text]
-      properties:
-        business: {type: string}
-        website_url: {type: string, nullable: true}
-        email: {type: string, format: email}
-        commune: {type: string}
-        category: {type: string}
-        consent: {type: boolean}
-        consent_text: {type: string}
-        honeypot: {type: string}
-        turnstile_token: {type: string}
-    ContactoIn:
-      type: object
-      required: [name, email, message, consent]
-      properties:
-        name: {type: string}
-        email: {type: string, format: email}
-        message: {type: string}
-        consent: {type: boolean}
-        honeypot: {type: string}
-        turnstile_token: {type: string}
-    DerechosIn:
-      type: object
-      required: [kind, email, details]
-      properties:
-        kind: {type: string}
-        email: {type: string, format: email}
-        details: {type: string}
-        honeypot: {type: string}
-        turnstile_token: {type: string}
-    CheckoutIn:
-      type: object
-      required: [package_code]
-      properties:
-        package_code: {type: string}
-        lead_id: {type: string, nullable: true}
-    CheckoutOut:
-      type: object
-      required: [order_id, checkout_url]
-      properties:
-        order_id: {type: string}
-        checkout_url: {type: string}
-    User:
-      type: object
-      required: [email]
-      properties:
-        email: {type: string}
-    Lead:
-      type: object
-      required: [id, business, category, commune, status, source]
-      properties:
-        id: {type: string}
-        business: {type: string}
-        category: {type: string}
-        city: {type: string}
-        commune: {type: string}
-        status: {type: string}
-        source: {type: string}
-        estimated_value_clp: {type: integer}
-        high_value: {type: boolean}
-        opportunity_score: {type: integer}
-        paused_from: {type: string, nullable: true}
-    LeadPatch:
-      type: object
-      properties:
-        tone: {type: string}
-        next_action_at: {type: string, format: date-time, nullable: true}
-    LeadPage:
-      type: object
-      required: [items, page, page_size, total]
-      properties:
-        items: {type: array, items: {$ref: "#/components/schemas/Lead"}}
-        page: {type: integer}
-        page_size: {type: integer}
-        total: {type: integer}
-    LeadDetail:
-      allOf:
-        - $ref: "#/components/schemas/Lead"
-        - type: object
-          properties:
-            timeline: {type: array, items: {type: object}}
-            messages: {type: array, items: {$ref: "#/components/schemas/Message"}}
-            artifacts: {type: array, items: {type: object}}
-            website_audit: {type: object, nullable: true}
-            diagnosis: {type: object, nullable: true}
-    Message:
-      type: object
-      required: [id, channel, direction, status]
-      properties:
-        id: {type: string}
-        lead_id: {type: string}
-        channel: {type: string}
-        direction: {type: string}
-        status: {type: string}
-        subject: {type: string, nullable: true}
-        body_text: {type: string}
-        check_result: {type: object, nullable: true}
-    Approval:
-      type: object
-      required: [id, lead_id, kind, status]
-      properties:
-        id: {type: string}
-        lead_id: {type: string}
-        kind: {type: string}
-        status: {type: string}
-        payload: {type: object}
-    Thread:
-      type: object
-      required: [id, lead_id]
-      properties:
-        id: {type: string}
-        lead_id: {type: string}
-        last_message: {type: string}
-    AgentStatus:
-      type: object
-      required: [name, prompt_version]
-      properties:
-        name: {type: string}
-        prompt_name: {type: string}
-        prompt_version: {type: string}
-        prompt_markdown: {type: string}
-        last_run_at: {type: string, format: date-time, nullable: true}
-        last_error: {type: string, nullable: true}
-    Event:
-      type: object
-      required: [id, ts, agent, level, message]
-      properties:
-        id: {type: string}
-        ts: {type: string, format: date-time}
-        agent: {type: string}
-        level: {type: string}
-        message: {type: string}
-        lead_id: {type: string, nullable: true}
-    Metrics:
-      type: object
-      required: [revenue_clp, llm_cost_usd]
-      properties:
-        revenue_clp: {type: integer}
-        llm_cost_usd: {type: number}
-        tokens_today: {type: integer}
-        response_rate_by_channel: {type: object, additionalProperties: {type: number}}
-        funnel: {type: object, additionalProperties: {type: integer}}
-        pipeline: {type: object, additionalProperties: {type: integer}}
-        quotas: {type: object, additionalProperties: true}
-    Order:
-      type: object
-      required: [id, status, total_clp]
-      properties:
-        id: {type: string}
-        lead_id: {type: string}
-        package_code: {type: string}
-        status: {type: string}
-        total_clp: {type: integer}
-    Project:
-      type: object
-      required: [id, status]
-      properties:
-        id: {type: string}
-        status: {type: string}
-        revisions_used: {type: integer}
-        max_revisions: {type: integer}
-        domain: {type: string, nullable: true}
-        deploy_url: {type: string, nullable: true}
-    ProjectPublic:
-      type: object
-      required: [status]
-      properties:
-        status: {type: string}
-        business: {type: string}
-        revisions_used: {type: integer}
-        max_revisions: {type: integer}
-        preview_url: {type: string, nullable: true}
-    Settings:
-      type: object
-      required: [kill_switch, app_mode]
-      properties:
-        kill_switch: {type: boolean}
-        app_mode: {type: string, readOnly: true}
-        quotas: {type: object, additionalProperties: true}
-        prices: {type: object, additionalProperties: true}
-        hitl_response_rate_by_channel: {type: object, additionalProperties: {type: number}}
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/LeadOut"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/approvals/{id}/reject":
+    "post":
+      "tags":
+        - "admin"
+      "summary": "Reject"
+      "operationId": "reject_api_approvals__id__reject_post"
+      "parameters":
+        -
+          "name": "id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Id"
+      "requestBody":
+        "content":
+          "application/json":
+            "schema":
+              "anyOf":
+                -
+                  "$ref": "#/components/schemas/RejectIn"
+                -
+                  "type": "null"
+              "title": "Payload"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "type": "object"
+                "additionalProperties":
+                  "type": "string"
+                "title": "Response Reject Api Approvals  Id  Reject Post"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/approvals/{id}/edit":
+    "post":
+      "tags":
+        - "admin"
+      "summary": "Edit"
+      "operationId": "edit_api_approvals__id__edit_post"
+      "parameters":
+        -
+          "name": "id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Id"
+      "requestBody":
+        "content":
+          "application/json":
+            "schema":
+              "anyOf":
+                -
+                  "$ref": "#/components/schemas/EditIn"
+                -
+                  "type": "null"
+              "title": "Payload"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "type": "object"
+                "additionalProperties":
+                  "type": "string"
+                "title": "Response Edit Api Approvals  Id  Edit Post"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/messages":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Messages"
+      "operationId": "messages_api_messages_get"
+      "parameters":
+        -
+          "name": "lead_id"
+          "in": "query"
+          "required": false
+          "schema":
+            "anyOf":
+              -
+                "type": "string"
+              -
+                "type": "null"
+            "title": "Lead Id"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "type": "array"
+                "items":
+                  "$ref": "#/components/schemas/MessageOut"
+                "title": "Response Messages Api Messages Get"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/manual-queue":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Queue"
+      "operationId": "queue_api_manual_queue_get"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "items":
+                  "$ref": "#/components/schemas/MessageOut"
+                "type": "array"
+                "title": "Response Queue Api Manual Queue Get"
+  "/api/manual-queue/{id}/mark-sent":
+    "post":
+      "tags":
+        - "admin"
+      "summary": "Mark Sent"
+      "operationId": "mark_sent_api_manual_queue__id__mark_sent_post"
+      "parameters":
+        -
+          "name": "id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Id"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/MessageOut"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/conversations":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Conversations"
+      "operationId": "conversations_api_conversations_get"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "items":
+                  "$ref": "#/components/schemas/ThreadOut"
+                "type": "array"
+                "title": "Response Conversations Api Conversations Get"
+  "/api/conversations/{id}/reply":
+    "post":
+      "tags":
+        - "admin"
+      "summary": "Reply"
+      "operationId": "reply_api_conversations__id__reply_post"
+      "parameters":
+        -
+          "name": "id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Id"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/ReplyIn"
+      "responses":
+        "202":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "type": "object"
+                "additionalProperties":
+                  "type": "string"
+                "title": "Response Reply Api Conversations  Id  Reply Post"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/agents":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Agents"
+      "operationId": "agents_api_agents_get"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "items":
+                  "$ref": "#/components/schemas/AgentStatus"
+                "type": "array"
+                "title": "Response Agents Api Agents Get"
+  "/api/actions/{name}":
+    "post":
+      "tags":
+        - "admin"
+      "summary": "Action"
+      "operationId": "action_api_actions__name__post"
+      "parameters":
+        -
+          "name": "name"
+          "in": "path"
+          "required": true
+          "schema":
+            "enum":
+              - "scout"
+              - "cycle"
+              - "followups"
+              - "digest"
+            "type": "string"
+            "title": "Name"
+      "responses":
+        "202":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema": {}
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/events":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Events"
+      "operationId": "events_api_events_get"
+      "parameters":
+        -
+          "name": "level"
+          "in": "query"
+          "required": false
+          "schema":
+            "anyOf":
+              -
+                "type": "string"
+              -
+                "type": "null"
+            "title": "Level"
+        -
+          "name": "agent"
+          "in": "query"
+          "required": false
+          "schema":
+            "anyOf":
+              -
+                "type": "string"
+              -
+                "type": "null"
+            "title": "Agent"
+        -
+          "name": "limit"
+          "in": "query"
+          "required": false
+          "schema":
+            "type": "integer"
+            "default": 100
+            "title": "Limit"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "type": "array"
+                "items":
+                  "$ref": "#/components/schemas/EventOut"
+                "title": "Response Events Api Events Get"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/events/stream":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Stream"
+      "operationId": "stream_api_events_stream_get"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema": {}
+  "/api/metrics":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Metrics Route"
+      "operationId": "metrics_route_api_metrics_get"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/MetricsOut"
+  "/api/orders":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Orders"
+      "operationId": "orders_api_orders_get"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "items":
+                  "$ref": "#/components/schemas/OrderOut"
+                "type": "array"
+                "title": "Response Orders Api Orders Get"
+  "/api/projects":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Projects"
+      "operationId": "projects_api_projects_get"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "items":
+                  "$ref": "#/components/schemas/ProjectOut"
+                "type": "array"
+                "title": "Response Projects Api Projects Get"
+  "/api/projects/{id}":
+    "patch":
+      "tags":
+        - "admin"
+      "summary": "Project Patch"
+      "operationId": "project_patch_api_projects__id__patch"
+      "parameters":
+        -
+          "name": "id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Id"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "type": "object"
+              "additionalProperties": true
+              "title": "Payload"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "type": "object"
+                "additionalProperties": true
+                "title": "Response Project Patch Api Projects  Id  Patch"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/settings":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Settings Get"
+      "operationId": "settings_get_api_settings_get"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/SettingsOut"
+    "put":
+      "tags":
+        - "admin"
+      "summary": "Settings Put"
+      "operationId": "settings_put_api_settings_put"
+      "requestBody":
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/SettingsIn"
+        "required": true
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/SettingsOut"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/compliance/suppression":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Suppression List"
+      "operationId": "suppression_list_api_compliance_suppression_get"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "type": "array"
+                "items":
+                  "type": "object"
+                  "additionalProperties": true
+                "title": "Response Suppression List Api Compliance Suppression Get"
+    "post":
+      "tags":
+        - "admin"
+      "summary": "Suppression Add"
+      "operationId": "suppression_add_api_compliance_suppression_post"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/SuppressionIn"
+      "responses":
+        "201":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "type": "object"
+                "additionalProperties":
+                  "type": "string"
+                "title": "Response Suppression Add Api Compliance Suppression Post"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+    "delete":
+      "tags":
+        - "admin"
+      "summary": "Suppression Delete"
+      "operationId": "suppression_delete_api_compliance_suppression_delete"
+      "parameters":
+        -
+          "name": "id"
+          "in": "query"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Id"
+      "responses":
+        "204":
+          "description": "Successful Response"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/compliance/data-requests":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Data Requests"
+      "operationId": "data_requests_api_compliance_data_requests_get"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "items":
+                  "additionalProperties": true
+                  "type": "object"
+                "type": "array"
+                "title": "Response Data Requests Api Compliance Data Requests Get"
+    "patch":
+      "tags":
+        - "admin"
+      "summary": "Data Request Patch"
+      "operationId": "data_request_patch_api_compliance_data_requests_patch"
+      "requestBody":
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/DataRequestPatch"
+        "required": true
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "additionalProperties":
+                  "type": "string"
+                "type": "object"
+                "title": "Response Data Request Patch Api Compliance Data Requests Patch"
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/meta/categories":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Categories"
+      "operationId": "categories_api_meta_categories_get"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "items":
+                  "additionalProperties":
+                    "type": "string"
+                  "type": "object"
+                "type": "array"
+                "title": "Response Categories Api Meta Categories Get"
+  "/api/meta/statuses":
+    "get":
+      "tags":
+        - "admin"
+      "summary": "Statuses"
+      "operationId": "statuses_api_meta_statuses_get"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema":
+                "additionalProperties": true
+                "type": "object"
+                "title": "Response Statuses Api Meta Statuses Get"
+"components":
+  "schemas":
+    "Accepted":
+      "properties":
+        "id":
+          "type": "string"
+          "title": "Id"
+        "status":
+          "type": "string"
+          "title": "Status"
+      "type": "object"
+      "required":
+        - "id"
+        - "status"
+      "title": "Accepted"
+    "AgentStatus":
+      "properties":
+        "name":
+          "type": "string"
+          "title": "Name"
+        "prompt_name":
+          "type": "string"
+          "title": "Prompt Name"
+        "prompt_version":
+          "type": "string"
+          "title": "Prompt Version"
+        "prompt_markdown":
+          "type": "string"
+          "title": "Prompt Markdown"
+        "last_run_at":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "Last Run At"
+        "last_error":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "Last Error"
+      "type": "object"
+      "required":
+        - "name"
+        - "prompt_name"
+        - "prompt_version"
+        - "prompt_markdown"
+      "title": "AgentStatus"
+    "ApprovalOut":
+      "properties":
+        "id":
+          "type": "string"
+          "title": "Id"
+        "lead_id":
+          "type": "string"
+          "title": "Lead Id"
+        "kind":
+          "type": "string"
+          "title": "Kind"
+        "status":
+          "type": "string"
+          "title": "Status"
+        "payload":
+          "additionalProperties": true
+          "type": "object"
+          "title": "Payload"
+      "type": "object"
+      "required":
+        - "id"
+        - "lead_id"
+        - "kind"
+        - "status"
+      "title": "ApprovalOut"
+    "BajaIn":
+      "properties":
+        "token":
+          "type": "string"
+          "title": "Token"
+      "type": "object"
+      "required":
+        - "token"
+      "title": "BajaIn"
+    "CheckoutIn":
+      "properties":
+        "package_code":
+          "type": "string"
+          "title": "Package Code"
+        "lead_id":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "Lead Id"
+      "type": "object"
+      "required":
+        - "package_code"
+      "title": "CheckoutIn"
+    "CheckoutOut":
+      "properties":
+        "order_id":
+          "type": "string"
+          "title": "Order Id"
+        "checkout_url":
+          "type": "string"
+          "title": "Checkout Url"
+      "type": "object"
+      "required":
+        - "order_id"
+        - "checkout_url"
+      "title": "CheckoutOut"
+    "ContactoIn":
+      "properties":
+        "name":
+          "type": "string"
+          "title": "Name"
+        "email":
+          "type": "string"
+          "title": "Email"
+        "message":
+          "type": "string"
+          "title": "Message"
+        "consent":
+          "type": "boolean"
+          "title": "Consent"
+        "honeypot":
+          "type": "string"
+          "title": "Honeypot"
+          "default": ""
+        "turnstile_token":
+          "type": "string"
+          "title": "Turnstile Token"
+          "default": ""
+      "type": "object"
+      "required":
+        - "name"
+        - "email"
+        - "message"
+        - "consent"
+      "title": "ContactoIn"
+    "DataRequestPatch":
+      "properties":
+        "id":
+          "type": "string"
+          "title": "Id"
+        "status":
+          "type": "string"
+          "title": "Status"
+      "type": "object"
+      "required":
+        - "id"
+        - "status"
+      "title": "DataRequestPatch"
+    "DerechosIn":
+      "properties":
+        "kind":
+          "type": "string"
+          "title": "Kind"
+        "email":
+          "type": "string"
+          "title": "Email"
+        "details":
+          "type": "string"
+          "title": "Details"
+        "honeypot":
+          "type": "string"
+          "title": "Honeypot"
+          "default": ""
+        "turnstile_token":
+          "type": "string"
+          "title": "Turnstile Token"
+          "default": ""
+      "type": "object"
+      "required":
+        - "kind"
+        - "email"
+        - "details"
+      "title": "DerechosIn"
+    "DiagnosticoIn":
+      "properties":
+        "business":
+          "type": "string"
+          "title": "Business"
+        "email":
+          "type": "string"
+          "title": "Email"
+        "commune":
+          "type": "string"
+          "title": "Commune"
+        "category":
+          "type": "string"
+          "title": "Category"
+        "consent":
+          "type": "boolean"
+          "title": "Consent"
+        "consent_text":
+          "type": "string"
+          "title": "Consent Text"
+        "website_url":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "Website Url"
+        "honeypot":
+          "type": "string"
+          "title": "Honeypot"
+          "default": ""
+        "turnstile_token":
+          "type": "string"
+          "title": "Turnstile Token"
+          "default": ""
+      "type": "object"
+      "required":
+        - "business"
+        - "email"
+        - "commune"
+        - "category"
+        - "consent"
+        - "consent_text"
+      "title": "DiagnosticoIn"
+    "EditIn":
+      "properties":
+        "body_text":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "Body Text"
+        "subject":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "Subject"
+        "message_id":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "Message Id"
+      "type": "object"
+      "title": "EditIn"
+    "EventOut":
+      "properties":
+        "id":
+          "type": "string"
+          "title": "Id"
+        "ts":
+          "type": "string"
+          "title": "Ts"
+        "agent":
+          "type": "string"
+          "title": "Agent"
+        "level":
+          "type": "string"
+          "title": "Level"
+        "message":
+          "type": "string"
+          "title": "Message"
+        "lead_id":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "Lead Id"
+      "type": "object"
+      "required":
+        - "id"
+        - "ts"
+        - "agent"
+        - "level"
+        - "message"
+      "title": "EventOut"
+    "FeedbackIn":
+      "properties":
+        "text":
+          "type": "string"
+          "title": "Text"
+      "type": "object"
+      "required":
+        - "text"
+      "title": "FeedbackIn"
+    "HTTPValidationError":
+      "properties":
+        "detail":
+          "items":
+            "$ref": "#/components/schemas/ValidationError"
+          "type": "array"
+          "title": "Detail"
+      "type": "object"
+      "title": "HTTPValidationError"
+    "LeadDetail":
+      "properties":
+        "id":
+          "type": "string"
+          "title": "Id"
+        "business":
+          "type": "string"
+          "title": "Business"
+        "category":
+          "type": "string"
+          "title": "Category"
+        "city":
+          "type": "string"
+          "title": "City"
+        "commune":
+          "type": "string"
+          "title": "Commune"
+        "status":
+          "type": "string"
+          "title": "Status"
+        "source":
+          "type": "string"
+          "title": "Source"
+        "estimated_value_clp":
+          "type": "integer"
+          "title": "Estimated Value Clp"
+          "default": 0
+        "high_value":
+          "type": "boolean"
+          "title": "High Value"
+          "default": false
+        "opportunity_score":
+          "type": "integer"
+          "title": "Opportunity Score"
+          "default": 0
+        "paused_from":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "Paused From"
+        "timeline":
+          "items":
+            "additionalProperties": true
+            "type": "object"
+          "type": "array"
+          "title": "Timeline"
+        "messages":
+          "items":
+            "$ref": "#/components/schemas/MessageOut"
+          "type": "array"
+          "title": "Messages"
+        "artifacts":
+          "items":
+            "additionalProperties": true
+            "type": "object"
+          "type": "array"
+          "title": "Artifacts"
+        "website_audit":
+          "title": "Website Audit"
+        "diagnosis":
+          "title": "Diagnosis"
+      "type": "object"
+      "required":
+        - "id"
+        - "business"
+        - "category"
+        - "city"
+        - "commune"
+        - "status"
+        - "source"
+        - "timeline"
+        - "messages"
+        - "artifacts"
+      "title": "LeadDetail"
+    "LeadOut":
+      "properties":
+        "id":
+          "type": "string"
+          "title": "Id"
+        "business":
+          "type": "string"
+          "title": "Business"
+        "category":
+          "type": "string"
+          "title": "Category"
+        "city":
+          "type": "string"
+          "title": "City"
+        "commune":
+          "type": "string"
+          "title": "Commune"
+        "status":
+          "type": "string"
+          "title": "Status"
+        "source":
+          "type": "string"
+          "title": "Source"
+        "estimated_value_clp":
+          "type": "integer"
+          "title": "Estimated Value Clp"
+          "default": 0
+        "high_value":
+          "type": "boolean"
+          "title": "High Value"
+          "default": false
+        "opportunity_score":
+          "type": "integer"
+          "title": "Opportunity Score"
+          "default": 0
+        "paused_from":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "Paused From"
+      "type": "object"
+      "required":
+        - "id"
+        - "business"
+        - "category"
+        - "city"
+        - "commune"
+        - "status"
+        - "source"
+      "title": "LeadOut"
+    "LeadPage":
+      "properties":
+        "items":
+          "items":
+            "$ref": "#/components/schemas/LeadOut"
+          "type": "array"
+          "title": "Items"
+        "page":
+          "type": "integer"
+          "title": "Page"
+        "page_size":
+          "type": "integer"
+          "title": "Page Size"
+        "total":
+          "type": "integer"
+          "title": "Total"
+      "type": "object"
+      "required":
+        - "items"
+        - "page"
+        - "page_size"
+        - "total"
+      "title": "LeadPage"
+    "LeadPatch":
+      "properties":
+        "tone":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "Tone"
+        "next_action_at":
+          "anyOf":
+            -
+              "type": "string"
+              "format": "date-time"
+            -
+              "type": "null"
+          "title": "Next Action At"
+      "type": "object"
+      "title": "LeadPatch"
+    "LoginIn":
+      "properties":
+        "email":
+          "type": "string"
+          "title": "Email"
+        "password":
+          "type": "string"
+          "title": "Password"
+      "type": "object"
+      "required":
+        - "email"
+        - "password"
+      "title": "LoginIn"
+    "MessageOut":
+      "properties":
+        "id":
+          "type": "string"
+          "title": "Id"
+        "lead_id":
+          "type": "string"
+          "title": "Lead Id"
+        "channel":
+          "type": "string"
+          "title": "Channel"
+        "direction":
+          "type": "string"
+          "title": "Direction"
+        "status":
+          "type": "string"
+          "title": "Status"
+        "subject":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "Subject"
+        "body_text":
+          "type": "string"
+          "title": "Body Text"
+        "check_result":
+          "title": "Check Result"
+      "type": "object"
+      "required":
+        - "id"
+        - "lead_id"
+        - "channel"
+        - "direction"
+        - "status"
+        - "body_text"
+      "title": "MessageOut"
+    "MetricsOut":
+      "properties":
+        "revenue_clp":
+          "type": "integer"
+          "title": "Revenue Clp"
+        "llm_cost_usd":
+          "type": "number"
+          "title": "Llm Cost Usd"
+        "tokens_today":
+          "type": "integer"
+          "title": "Tokens Today"
+        "response_rate_by_channel":
+          "additionalProperties":
+            "type": "number"
+          "type": "object"
+          "title": "Response Rate By Channel"
+        "funnel":
+          "additionalProperties":
+            "type": "integer"
+          "type": "object"
+          "title": "Funnel"
+        "pipeline":
+          "additionalProperties":
+            "type": "integer"
+          "type": "object"
+          "title": "Pipeline"
+        "quotas":
+          "additionalProperties": true
+          "type": "object"
+          "title": "Quotas"
+      "type": "object"
+      "required":
+        - "revenue_clp"
+        - "llm_cost_usd"
+        - "tokens_today"
+        - "response_rate_by_channel"
+        - "funnel"
+        - "pipeline"
+        - "quotas"
+      "title": "MetricsOut"
+    "OrderOut":
+      "properties":
+        "id":
+          "type": "string"
+          "title": "Id"
+        "lead_id":
+          "type": "string"
+          "title": "Lead Id"
+        "package_code":
+          "type": "string"
+          "title": "Package Code"
+        "status":
+          "type": "string"
+          "title": "Status"
+        "total_clp":
+          "type": "integer"
+          "title": "Total Clp"
+      "type": "object"
+      "required":
+        - "id"
+        - "lead_id"
+        - "package_code"
+        - "status"
+        - "total_clp"
+      "title": "OrderOut"
+    "Package":
+      "properties":
+        "code":
+          "type": "string"
+          "title": "Code"
+        "name":
+          "type": "string"
+          "title": "Name"
+        "price_clp":
+          "anyOf":
+            -
+              "type": "integer"
+            -
+              "type": "null"
+          "title": "Price Clp"
+        "revisions":
+          "type": "integer"
+          "title": "Revisions"
+        "includes":
+          "items":
+            "type": "string"
+          "type": "array"
+          "title": "Includes"
+      "type": "object"
+      "required":
+        - "code"
+        - "name"
+        - "price_clp"
+        - "revisions"
+        - "includes"
+      "title": "Package"
+    "ProjectOut":
+      "properties":
+        "id":
+          "type": "string"
+          "title": "Id"
+        "status":
+          "type": "string"
+          "title": "Status"
+        "revisions_used":
+          "type": "integer"
+          "title": "Revisions Used"
+        "max_revisions":
+          "type": "integer"
+          "title": "Max Revisions"
+        "domain":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "Domain"
+        "deploy_url":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "Deploy Url"
+      "type": "object"
+      "required":
+        - "id"
+        - "status"
+        - "revisions_used"
+        - "max_revisions"
+      "title": "ProjectOut"
+    "ProjectPublic":
+      "properties":
+        "status":
+          "type": "string"
+          "title": "Status"
+        "business":
+          "type": "string"
+          "title": "Business"
+        "revisions_used":
+          "type": "integer"
+          "title": "Revisions Used"
+        "max_revisions":
+          "type": "integer"
+          "title": "Max Revisions"
+        "preview_url":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "Preview Url"
+      "type": "object"
+      "required":
+        - "status"
+        - "business"
+        - "revisions_used"
+        - "max_revisions"
+      "title": "ProjectPublic"
+    "RejectIn":
+      "properties":
+        "note":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "Note"
+      "type": "object"
+      "title": "RejectIn"
+    "ReplyIn":
+      "properties":
+        "body_text":
+          "type": "string"
+          "title": "Body Text"
+      "type": "object"
+      "required":
+        - "body_text"
+      "title": "ReplyIn"
+    "SettingsIn":
+      "properties":
+        "kill_switch":
+          "type": "boolean"
+          "title": "Kill Switch"
+        "app_mode":
+          "anyOf":
+            -
+              "type": "string"
+            -
+              "type": "null"
+          "title": "App Mode"
+        "quotas":
+          "anyOf":
+            -
+              "additionalProperties": true
+              "type": "object"
+            -
+              "type": "null"
+          "title": "Quotas"
+        "prices":
+          "anyOf":
+            -
+              "additionalProperties": true
+              "type": "object"
+            -
+              "type": "null"
+          "title": "Prices"
+        "hitl_response_rate_by_channel":
+          "anyOf":
+            -
+              "additionalProperties":
+                "type": "number"
+              "type": "object"
+            -
+              "type": "null"
+          "title": "Hitl Response Rate By Channel"
+      "type": "object"
+      "required":
+        - "kill_switch"
+      "title": "SettingsIn"
+    "SettingsOut":
+      "properties":
+        "kill_switch":
+          "type": "boolean"
+          "title": "Kill Switch"
+        "app_mode":
+          "type": "string"
+          "title": "App Mode"
+        "quotas":
+          "additionalProperties": true
+          "type": "object"
+          "title": "Quotas"
+        "prices":
+          "additionalProperties": true
+          "type": "object"
+          "title": "Prices"
+        "hitl_response_rate_by_channel":
+          "additionalProperties": true
+          "type": "object"
+          "title": "Hitl Response Rate By Channel"
+      "type": "object"
+      "required":
+        - "kill_switch"
+        - "app_mode"
+        - "quotas"
+        - "prices"
+        - "hitl_response_rate_by_channel"
+      "title": "SettingsOut"
+    "SuppressionIn":
+      "properties":
+        "kind":
+          "type": "string"
+          "title": "Kind"
+        "value":
+          "type": "string"
+          "title": "Value"
+        "reason":
+          "type": "string"
+          "title": "Reason"
+      "type": "object"
+      "required":
+        - "kind"
+        - "value"
+        - "reason"
+      "title": "SuppressionIn"
+    "ThreadOut":
+      "properties":
+        "id":
+          "type": "string"
+          "title": "Id"
+        "lead_id":
+          "type": "string"
+          "title": "Lead Id"
+        "last_message":
+          "type": "string"
+          "title": "Last Message"
+      "type": "object"
+      "required":
+        - "id"
+        - "lead_id"
+        - "last_message"
+      "title": "ThreadOut"
+    "TransitionIn":
+      "properties":
+        "to":
+          "type": "string"
+          "title": "To"
+        "reason":
+          "type": "string"
+          "title": "Reason"
+      "type": "object"
+      "required":
+        - "to"
+        - "reason"
+      "title": "TransitionIn"
+    "UserOut":
+      "properties":
+        "email":
+          "type": "string"
+          "title": "Email"
+      "type": "object"
+      "required":
+        - "email"
+      "title": "UserOut"
+    "ValidationError":
+      "properties":
+        "loc":
+          "items":
+            "anyOf":
+              -
+                "type": "string"
+              -
+                "type": "integer"
+          "type": "array"
+          "title": "Location"
+        "msg":
+          "type": "string"
+          "title": "Message"
+        "type":
+          "type": "string"
+          "title": "Error Type"
+        "input":
+          "title": "Input"
+        "ctx":
+          "type": "object"
+          "title": "Context"
+      "type": "object"
+      "required":
+        - "loc"
+        - "msg"
+        - "type"
+      "title": "ValidationError"
+"servers":
+  -
+    "url": "http://localhost"
