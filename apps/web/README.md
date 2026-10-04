@@ -1,32 +1,52 @@
-# React + TypeScript + Vite
+# Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Panel local del monorepo para seguir el demo de landings a pymes en Chile. No es un sitio público y no habla con el motor: los datos salen de un store Zustand con mocks. Conectar el panel a una API es trabajo posterior; hoy no hay cliente HTTP.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Leído de `package.json`:
 
-## React Compiler
+- React 19 (`react` y `react-dom` ^19.2.7) y TypeScript ~6.0.2
+- Vite ^8.1.1 con `@vitejs/plugin-react`
+- TanStack Router (`@tanstack/react-router` ^1.170.18), rutas por archivo en `src/routes/`
+- Tailwind CSS v4 (`tailwindcss` ^4.3.3 y `@tailwindcss/vite`)
+- Zustand ^5.0.14
+- Recharts ^3.10.1
+- Lucide (`lucide-react`) y toasts Sonner (`sonner`)
+- Lint: oxlint (`npm run lint`)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Rutas
 
-## Expanding the Oxlint configuration
+| Ruta | Qué muestra hoy |
+|------|-----------------|
+| `/` | Panel: KPIs, acciones rápidas, gráfico, logs y agentes |
+| `/agentes` | Los 8 agentes, el flujo de status y el prompt del orchestrator |
+| `/leads` | Pipeline con filtros; avanzar, aprobar o descartar |
+| `/logs` | Historial de eventos del store |
+| `/config` | Precios CLP, Ley 21.719, ciudades piloto y stack |
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## Datos
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+Mock de Zustand (`src/store/useAgencyStore.ts`, semillas en `src/lib/mock.ts`). Es independiente de `engine/state/*.json`, con la misma idea de status y de agentes. Las acciones del panel (correr Scout, enviar pitches, revisar deals en `revision`, avanzar, aprobar o descartar) solo mutan ese store.
+
+## Arranque
+
+Desde la raíz del repositorio. `npm ci` instala lo fijado en `package-lock.json`.
+
+**PowerShell**
+
+```powershell
+cd apps/web
+npm ci
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+**bash**
+
+```bash
+cd apps/web
+npm ci
+npm run dev
+```
+
+Abre http://localhost:8080. Vite escucha en `0.0.0.0:8080` (`vite.config.ts`, también en `preview`). `npm run build` compila; `npm run preview` sirve ese build en el mismo puerto.
