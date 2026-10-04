@@ -1433,6 +1433,11 @@
             -
               "type": "null"
           "title": "Last Error"
+        "channels":
+          "additionalProperties":
+            "type": "string"
+          "type": "object"
+          "title": "Channels"
       "type": "object"
       "required":
         - "name"
