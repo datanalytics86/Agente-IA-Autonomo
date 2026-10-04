@@ -1,6 +1,6 @@
 # PROGRESS — Ronda 2 deploy 04-10-2026
 
-Rama: `grok/deploy-r2-041026` · Base: `main` en `d5dcc6b` (incluye el merge del PR #1) · Auditoría de partida: `cb347d0` · Ola actual: 0
+Rama: `grok/deploy-r2-041026` · Base: `main` en `d5dcc6b` (incluye el merge del PR #1) · Auditoría de partida: `cb347d0` · Ola actual: 1
 
 ## Estado de la DoD (§8)
 
@@ -39,14 +39,14 @@ Docker local: el comando `docker` no existe en esta máquina. La evidencia del s
 | G21 | P1 | ☐ | R2-B6-03 CI |
 | G22 | P1 | ☐ | R2-B6-04 simulación real |
 | G23 | P1 | ☐ | R2-B1-06 backups |
-| G24 | P1 | ⏳ | R2-B0-01 nota en los docs de la ronda 1 |
+| G24 | P1 | ✅ | R2-B0-01 nota en los docs de la ronda 1 |
 
 ## Tablero
 
 | ID | Tarea | Agente | Estado | Commit | Evidencia |
 |----|-------|--------|--------|--------|-----------|
-| R2-B0-00 | Rama y contratos | B0 | ⏳ | | esta ola |
-| R2-B0-01 | Nota en docs de la ronda 1 | B0 | ⏳ | | G24 |
+| R2-B0-00 | Rama y contratos | B0 | ✅ | 589a37a | tablero y contrato de `build_ports` |
+| R2-B0-01 | Nota en docs de la ronda 1 | B0 | ✅ | 589a37a | nota al inicio de PROGRESS e INFORME |
 | R2-B0-02 | `.env.example` e `infra/.env.ci` | B0 | ☐ | | |
 | R2-B0-03 | Informe y PR | B0 | ☐ | | `docs/INFORME_FINAL_R2.md` |
 | R2-B1-01 | psycopg y requirements | B1 | ☐ | | G1 |
@@ -90,4 +90,4 @@ Docker local: el comando `docker` no existe en esta máquina. La evidencia del s
 
 ## Próxima acción exacta
 
-Pegar la línea base de pytest y lanzar la ola 1: B1, B2, B5 y B6 en paralelo.
+Ola 1 en worktrees: B1 infra, B2 wiring, B5 fail-fast y `/admin`, B6 mypy y CI. Al volver, integrar en `grok/deploy-r2-041026` y seguir con B3, B4 y B7.
