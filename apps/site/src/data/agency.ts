@@ -1,3 +1,7 @@
+import { assertProdIdentity } from './prod-identity.mjs';
+
+assertProdIdentity();
+
 export const IDENTITY_PLACEHOLDER = '[datos de la agencia]';
 
 function clean(value: string | undefined): string {

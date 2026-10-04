@@ -13,6 +13,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger("core.config")
 
+_SECRET_MIN_LEN = 32
+
 ENGINE_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = ENGINE_DIR.parent
 
@@ -62,6 +64,39 @@ def _warn_ephemeral_once() -> None:
 
 def _csv(value: str) -> list[str]:
     return [part.strip() for part in value.split(",") if part.strip()]
+
+
+class ProdConfigError(RuntimeError):
+    """APP_MODE=prod sin lo mínimo. El proceso no debe seguir ni firmar sesiones."""
+
+    def __init__(self, gaps: list[str]) -> None:
+        self.gaps = tuple(gaps)
+        super().__init__("APP_MODE=prod no arranca: " + "; ".join(gaps))
+
+
+def _prod_gaps(settings: Settings) -> list[str]:
+    gaps: list[str] = []
+    secret = settings.secret_key.strip()
+    if secret == "":
+        gaps.append("falta SECRET_KEY")
+    elif len(secret) < _SECRET_MIN_LEN:
+        gaps.append("SECRET_KEY debe tener al menos 32 caracteres")
+    if "database_url" not in settings.model_fields_set or not settings.database_url.strip():
+        gaps.append("falta DATABASE_URL")
+    if not settings.admin_email.strip():
+        gaps.append("falta ADMIN_EMAIL")
+    if not settings.admin_password_hash.strip():
+        gaps.append("falta ADMIN_PASSWORD_HASH")
+    public = settings.public_base_url.strip()
+    if "public_base_url" not in settings.model_fields_set or public == "":
+        gaps.append("falta PUBLIC_BASE_URL")
+    elif not public.lower().startswith("https://") or len(public) <= len("https://"):
+        gaps.append("PUBLIC_BASE_URL debe empezar por https")
+    if not settings.agency_name.strip():
+        gaps.append("falta AGENCY_NAME")
+    if not settings.agency_email.strip():
+        gaps.append("falta AGENCY_EMAIL")
+    return gaps
 
 
 class Settings(BaseSettings):
@@ -182,17 +217,28 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _note_empty_secret(self) -> Self:
-        if self.app_mode == "demo" and self.secret_key == "":
-            _warn_ephemeral_once()
+        if self.app_mode == "demo":
+            if self.secret_key == "":
+                _warn_ephemeral_once()
+            return self
+        gaps = _prod_gaps(self)
+        if gaps:
+            raise ProdConfigError(gaps)
         return self
 
     @property
     def resolved_secret_key(self) -> str:
+        """En prod nunca devuelve una clave vacía: no se firman sesiones con ella."""
+        stripped = self.secret_key.strip()
+        if self.app_mode == "prod":
+            if stripped == "":
+                raise ProdConfigError(["falta SECRET_KEY"])
+            if len(stripped) < _SECRET_MIN_LEN:
+                raise ProdConfigError(["SECRET_KEY debe tener al menos 32 caracteres"])
+            return self.secret_key
         if self.secret_key:
             return self.secret_key
-        if self.app_mode == "demo":
-            return _EPHEMERAL_SECRET
-        return ""
+        return _EPHEMERAL_SECRET
 
     @property
     def cors_origin_list(self) -> list[str]:

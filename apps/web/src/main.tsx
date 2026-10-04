@@ -3,11 +3,13 @@ import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { isUnauthorized } from './api/http'
+import { ADMIN_BASEPATH } from './admin-base'
 import { routeTree } from './routeTree.gen'
 import './index.css'
 
 const router = createRouter({
   routeTree,
+  basepath: ADMIN_BASEPATH,
   defaultPreload: 'intent',
 })
 

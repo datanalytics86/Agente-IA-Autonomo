@@ -47,6 +47,17 @@ test('el build muestra el placeholder y no inventa un RUT', async () => {
   assert.match(source, /\[datos de la agencia\]/);
   assert.doesNotMatch(source, /\d{1,2}\.\d{3}\.\d{3}-[\dkK]/);
   assert.equal(source.includes('T14'), false);
+  assert.match(source, /id="diagnostico"/);
+  assert.match(source, /id="contacto-form"/);
+  assert.match(source, /id="derechos-form"/);
+  assert.match(source, /id="baja-form"/);
+  const siteKey = String(process.env.PUBLIC_TURNSTILE_SITE_KEY || '').trim();
+  if (!siteKey) {
+    assert.doesNotMatch(source, /challenges\.cloudflare\.com|cf-turnstile/);
+  } else {
+    assert.match(source, /cf-turnstile/);
+    assert.match(source, /challenges\.cloudflare\.com/);
+  }
 });
 
 test('textos públicos obligatorios y precios', async () => {

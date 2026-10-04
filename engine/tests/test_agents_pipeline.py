@@ -246,6 +246,11 @@ def test_pitcher_prod_encola_email_sin_enviado(
     monkeypatch.setenv("APP_MODE", "prod")
     monkeypatch.setenv("DRY_RUN", "false")
     monkeypatch.setenv("XAI_API_KEY", "")
+    monkeypatch.setenv("SECRET_KEY", "s" * 32)
+    monkeypatch.setenv("ADMIN_EMAIL", "admin@example.com")
+    monkeypatch.setenv("ADMIN_PASSWORD_HASH", "hash-de-prueba")
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://agencia.example")
+    monkeypatch.setenv("AGENCY_EMAIL", "hola@agencia.example")
     reset_settings()
     with session_scope() as session:
         lead = _lead(

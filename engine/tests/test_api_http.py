@@ -330,16 +330,21 @@ def test_turnstile_rechaza_token_invalido(
     assert _lead_count() == 0
 
 
-def test_turnstile_prod_sin_secret_rechaza(
+def test_turnstile_sin_secret_no_exige_token(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("APP_MODE", "prod")
+    monkeypatch.setenv("SECRET_KEY", "s" * 32)
+    monkeypatch.setenv("ADMIN_EMAIL", _EMAIL)
+    monkeypatch.setenv("ADMIN_PASSWORD_HASH", "hash-de-prueba")
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://agencia.example")
+    monkeypatch.setenv("AGENCY_NAME", "Agencia Test")
+    monkeypatch.setenv("AGENCY_EMAIL", "hola@agencia.example")
     monkeypatch.setenv("TURNSTILE_SECRET_KEY", "")
     reset_settings()
     response = client.post("/api/public/diagnostico", json=_diag())
-    assert response.status_code == 403
-    assert response.json()["error"]["code"] == "turnstile_rejected"
-    assert _lead_count() == 0
+    assert response.status_code == 202, response.text
+    assert _lead_count() == 1
 
 
 def test_webhook_firma_invalida_es_401(client: TestClient) -> None:
