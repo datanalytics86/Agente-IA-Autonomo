@@ -283,7 +283,7 @@ Agente-IA-Autonomo/
 
 | ID | Rol | Misión | Ownership (solo él edita) |
 |---|---|---|---|
-| **A0** | Integrador (tú) | Plan, contratos, merges, gates, PROGRESS, decisiones, DoD | `docs/contracts/`, `docs/PROGRESS.md`, `docs/DECISIONES.md`, `.env.example`, archivos raíz |
+| **A0** | Integrador (tú) | Plan, contratos, merges, gates, PROGRESS, decisiones, DoD | `docs/contracts/`, `docs/PROGRESS.md`, `docs/DECISIONES.md`, `.env.example`, archivos raíz, `engine/main.py` (solo registra modos que delegan en funciones de cada paquete, p. ej. `worker.cli`, `api.cli`) |
 | **A1** | Núcleo y Datos | Config, dominio, máquina de estados, BD, migraciones, repositorios, migración JSON→BD | `engine/core/`, `engine/db/`, `engine/migrations/` |
 | **A2** | API | FastAPI, auth, routers, webhooks, SSE, OpenAPI | `engine/api/` |
 | **A3** | Agentes IA | Cliente LLM, prompts v2, los 11 agentes, auditor web, video | `engine/agents/`, `engine/prompts/`, `engine/templates/`, `engine/integrations/{llm,places,pagespeed,video}/` |
@@ -292,7 +292,7 @@ Agente-IA-Autonomo/
 | **A6** | Dashboard | `apps/web` conectado a la API, nuevas vistas, login | `apps/web/` |
 | **A7** | Sitio público | `apps/site` (Astro): páginas, formularios, checkout, portal de cliente, SEO | `apps/site/` |
 | **A8** | Compliance y Seguridad | Políticas, textos legales, reglas del Checker, threat model; **revisa con veto** todo lo que toque envíos, datos personales, pagos o auth | `docs/compliance/`, `docs/security/`, `engine/core/compliance.py` |
-| **A9** | QA y DevOps | Estrategia de tests, harness, e2e, CI, Docker, Caddy, backups | `engine/tests/conftest.py` y fixtures, `apps/*/e2e/`, `infra/`, `.github/` |
+| **A9** | QA y DevOps | Estrategia de tests, harness, e2e, CI, Docker, Caddy, backups | `engine/pyproject.toml`, `engine/requirements.txt`, `engine/tests/conftest.py` y fixtures, `apps/*/e2e/`, `infra/`, `.github/` |
 | **A10** | Documentación | README, runbook, GO_LIVE, informe final | `README.md`, `apps/web/README.md`, `docs/RUNBOOK.md`, `docs/GO_LIVE.md`, `docs/INFORME_FINAL.md` |
 
 Cada agente escribe los tests de su propio código; A9 provee el harness y los e2e.
@@ -314,8 +314,8 @@ Cada agente escribe los tests de su propio código; A9 provee el harness y los e
 ### 6.4 Olas de trabajo
 
 - **Ola 0 (A0):** reconocimiento, línea base, contratos, tablero.
-- **Ola 1 (paralelo):** A1 núcleo y BD · A8 políticas y reglas · A9 harness de tests, CI y esqueleto Docker · A10 limpieza de READMEs.
-- **Ola 2 (paralelo, depende de A1):** A2 API · A3 agentes · A4 worker · A5 canales y pagos · A6 dashboard · A7 sitio.
+- **Ola 1 (paralelo):** A1 núcleo y BD · A3 adaptación de los agentes actuales a la BD (F1-06 a F1-09, después de F1-03/F1-04 de A1) · A8 políticas y reglas · A9 harness de tests, CI y esqueleto Docker · A10 limpieza de READMEs.
+- **Ola 2 (paralelo, depende de A1):** A2 API · A3 agentes reales (F3) · A4 worker · A5 canales y pagos · A6 dashboard · A7 sitio.
 - **Ola 3 (convergencia):** A4 simulación de 14 días · A9 e2e y deploy · A8 auditoría final · A10 documentación final · A0 verificación de la DoD.
 
 ---
@@ -332,30 +332,30 @@ Cada agente escribe los tests de su propio código; A9 provee el harness y los e
 
 *Aceptación:* contratos completos y coherentes entre sí; tablero creado.
 
-### F1 — Fundaciones y bugs críticos (A1, A8, A9, A10)
+### F1 — Fundaciones y bugs críticos (A1, A3, A8, A9, A10)
 
-- [ ] **F1-01** `engine/pyproject.toml` (deps, ruff, mypy, pytest con `pythonpath = ["."]`); mantener `requirements.txt` generado.
-- [ ] **F1-02** `core/config.py` con pydantic-settings (todas las variables de §8.8); eliminar hardcodes (H6, H9, H20).
-- [ ] **F1-03** Modelos SQLAlchemy + Alembic (§8.1), sesión y repositorios. Escrituras con transacciones; en Postgres, `SELECT … FOR UPDATE SKIP LOCKED` para tomar trabajo.
-- [ ] **F1-04** Máquina de estados v2 (§8.2): única función `transition(lead, to, actor, reason)` que valida, escribe `lead_events` y emite `events`. **Test que falla si aparece una asignación `.status =` fuera de `core/`** (H4, H5).
-- [ ] **F1-05** `--mode migrate-json`: importa `state/leads.json` y `state/logs.json` a la BD con backup previo, idempotente y **sin borrar nunca el JSON de origen**; reporta registros inválidos en vez de descartarlos (H1, H2, H3).
-- [ ] **F1-06** Adaptar los 8 agentes actuales a los repositorios de BD sin cambiar su comportamiento demo: `--mode demo` y `--mode status` siguen verdes.
-- [ ] **F1-07** Eliminar código muerto y duplicación HITL (H15); corregir H16 (Scout solo por job con cuota), H17 (log solo en cambios), H18 (tabla `events` sin tope; retención configurable), H19.
-- [ ] **F1-08** Builder con Jinja2 + autoescape (H7), sin testimonio falso (H8), link de agenda desde config (H9), sin Lead ID (H10).
-- [ ] **F1-09** Scout demo: high-value solo en `APP_MODE=demo` y en rubros plausibles (multi-sede, salud, inmobiliaria, legal) (H12).
-- [ ] **F1-10** Tests unitarios de todo lo anterior; cobertura ≥ 80 % en `core/`, `agents/` y `worker/`.
-- [ ] **F1-11** CI en GitHub Actions: job engine (ruff, mypy, pytest), job web (lint, tsc, vitest, build), job site (build, test), job openapi (diff del contrato).
-- [ ] **F1-12** README sin rutas personales (H28) y README real para `apps/web` (H29).
+- [ ] **F1-01** (A9) `engine/pyproject.toml` (deps, ruff, mypy, pytest con `pythonpath = ["."]`); mantener `requirements.txt` generado.
+- [ ] **F1-02** (A1) `core/config.py` con pydantic-settings (todas las variables de §8.8); eliminar hardcodes (H6, H9, H20).
+- [ ] **F1-03** (A1) Modelos SQLAlchemy + Alembic (§8.1), sesión y repositorios. Escrituras con transacciones; en Postgres, `SELECT … FOR UPDATE SKIP LOCKED` para tomar trabajo.
+- [ ] **F1-04** (A1) Máquina de estados v2 (§8.2): única función `transition(lead, to, actor, reason)` que valida, escribe `lead_events` y emite `events`. **Test que falla si aparece una asignación `.status =` fuera de `core/`** (H4, H5).
+- [ ] **F1-05** (A1) `--mode migrate-json`: importa `state/leads.json` y `state/logs.json` a la BD con backup previo, idempotente y **sin borrar nunca el JSON de origen**; reporta registros inválidos en vez de descartarlos (H1, H2, H3).
+- [ ] **F1-06** (A3) Adaptar los 8 agentes actuales a los repositorios de BD sin cambiar su comportamiento demo: `--mode demo` y `--mode status` siguen verdes.
+- [ ] **F1-07** (A3, salvo H18 y H19 que son de A1) Eliminar código muerto y duplicación HITL (H15); corregir H16 (Scout solo por job con cuota), H17 (log solo en cambios), H18 (tabla `events` sin tope; retención configurable), H19.
+- [ ] **F1-08** (A3) Builder con Jinja2 + autoescape (H7), sin testimonio falso (H8), link de agenda desde config (H9), sin Lead ID (H10).
+- [ ] **F1-09** (A3) Scout demo: high-value solo en `APP_MODE=demo` y en rubros plausibles (multi-sede, salud, inmobiliaria, legal) (H12).
+- [ ] **F1-10** (cada dueño; A9 provee el harness) Tests unitarios de todo lo anterior; cobertura ≥ 80 % en `core/`, `agents/` y `worker/`.
+- [ ] **F1-11** (A9) CI en GitHub Actions con **solo lo que ya existe**: job engine (ruff, mypy, pytest) y job web (lint, build). Los demás jobs se agregan **en la misma tarea que crea lo que validan**: `npm test` de web en F2-05, openapi-diff en F2-04, job site en F4-01, simulación corta en F5-06, build Docker en F7-01. Nunca se introduce un job que falle por falta de proyecto o de script.
+- [ ] **F1-12** (A10) README sin rutas personales (H28) y README real para `apps/web` (H29).
 
-*Aceptación:* bloques A y B de la §12 en verde.
+*Aceptación:* bloque A de la §12 en verde, `npm run lint && npm run build` de `apps/web` en verde y CI en verde.
 
 ### F2 — API y dashboard conectado (A2, A6)
 
 - [ ] **F2-01** App FastAPI con `/healthz`, `/readyz`, CORS restringido a los orígenes configurados, manejo uniforme de errores y logging JSON.
 - [ ] **F2-02** Auth admin de usuario único (`ADMIN_EMAIL` + hash argon2), sesión en cookie `HttpOnly; Secure; SameSite=Lax`, protección CSRF y rate-limit en login; comando `--mode create-admin` para crear o rotar la contraseña (H27).
 - [ ] **F2-03** Endpoints admin de §8.3 y SSE de eventos.
-- [ ] **F2-04** `--mode export-openapi` → `docs/contracts/openapi.yaml`; CI falla si el contrato commiteado difiere del generado.
-- [ ] **F2-05** Dashboard: login, cliente tipado (`openapi-typescript`), TanStack Query; reemplazar el store mock (H24); `mock.ts` queda solo como fixture de tests.
+- [ ] **F2-04** `--mode export-openapi` → `docs/contracts/openapi.yaml`; agrega a CI el job openapi-diff, que falla si el contrato commiteado difiere del generado.
+- [ ] **F2-05** Dashboard: login, cliente tipado (`openapi-typescript`), TanStack Query; reemplazar el store mock (H24); `mock.ts` queda solo como fixture de tests. Configura vitest, agrega el script `npm test` y su paso en el job web de CI.
 - [ ] **F2-06** Corregir H21 (ingresos **solo** desde `payments`), H22 (aprobar → vuelve a la etapa pausada y **pasa por el Checker**), H23, H25 (kill switch real vía `/api/settings`), H26 (costos y tokens reales desde `llm_calls`).
 - [ ] **F2-07** Vistas nuevas (§8.7).
 
@@ -379,7 +379,7 @@ Cada agente escribe los tests de su propio código; A9 provee el harness y los e
 
 ### F4 — Sitio público y ciclo de venta (A7, A5, A2)
 
-- [ ] **F4-01** `apps/site` con las páginas de §8.6, tokens de diseño compartidos y textos con placeholders de identidad de la agencia (no inventar nombre, RUT ni dirección).
+- [ ] **F4-01** `apps/site` con las páginas de §8.6, tokens de diseño compartidos y textos con placeholders de identidad de la agencia (no inventar nombre, RUT ni dirección). Agrega el job site (build, test) a CI.
 - [ ] **F4-02** Diagnóstico gratis (lead magnet con consentimiento) end-to-end.
 - [ ] **F4-03** Checkout Mercado Pago + webhooks con verificación de firma + páginas de resultado.
 - [ ] **F4-04** Webhooks de agenda (Cal.com/Calendly) con correlación por `lead_id`.
@@ -395,7 +395,7 @@ Cada agente escribe los tests de su propio código; A9 provee el harness y los e
 - [ ] **F5-03** Cadencias de seguimiento y detención automática.
 - [ ] **F5-04** Guardias HITL (valor, tasa de respuesta, confianza, errores) y digest al dueño.
 - [ ] **F5-05** Reintentos con backoff exponencial y dead-letter → HITL `error_sistema`.
-- [ ] **F5-06** Simulación de 14 días (§10).
+- [ ] **F5-06** Simulación de 14 días (§10) y job de simulación corta en CI.
 
 *Aceptación:* `python main.py --mode simulate --days 14 --seed 42` cumple todas las aserciones de §10.
 
@@ -403,14 +403,14 @@ Cada agente escribe los tests de su propio código; A9 provee el harness y los e
 
 - [ ] **F6-01** Threat model en `docs/security/THREAT_MODEL.md` (STRIDE breve por componente).
 - [ ] **F6-02** Verificación de firmas en todos los webhooks; rechazo de repeticiones (timestamp + id).
-- [ ] **F6-03** Rate limits, honeypot y Cloudflare Turnstile en formularios públicos.
+- [ ] **F6-03** Rate limits, honeypot y Cloudflare Turnstile en formularios públicos enviados por personas, con la baja de un clic (`POST /u/{token}`) exenta según §8.3.
 - [ ] **F6-04** Headers de seguridad (CSP, HSTS, X-Content-Type-Options, Referrer-Policy) en API, sitio y landings.
 - [ ] **F6-05** Escaneo de secretos en CI; `pip-audit` y `npm audit --omit=dev` sin altas/críticas sin justificar.
 - [ ] **F6-06** Tests de prompt-injection (mensajes entrantes y sitios con instrucciones maliciosas no alteran acciones).
 
 ### F7 — Deploy y entrega (A9, A10, A0)
 
-- [ ] **F7-01** Dockerfiles multi-stage (api/worker con Chromium + FFmpeg; build estático de site y web).
+- [ ] **F7-01** Dockerfiles multi-stage (api/worker con Chromium + FFmpeg; build estático de site y web) y job de build Docker en CI.
 - [ ] **F7-02** `infra/docker-compose.yml` + `infra/Caddyfile` (sitio en `/`, admin en subdominio o `/admin`, proxy de `/api`, `/webhooks`, `/demo`, `/u`).
 - [ ] **F7-03** Backups diarios (`pg_dump`) con rotación y restauración probada.
 - [ ] **F7-04** `docs/RUNBOOK.md` (operar, pausar, restaurar, rotar claves, responder solicitudes de derechos).
@@ -482,7 +482,7 @@ Un cliente que ya pagó y pide no recibir marketing queda en supresión de marke
 
 ### 8.3 API
 
-**Públicos** (rate limit + Turnstile + honeypot en los `POST`):
+**Públicos** (rate limit en todos; Turnstile + honeypot solo en formularios enviados por personas: diagnóstico, contacto, checkout, baja por formulario, derechos, intake y feedback. **`POST /u/{token}` queda exento** porque los proveedores de correo lo llaman de forma automática (RFC 8058) y no pueden resolver un desafío; se valida con token firmado HMAC, es idempotente y tiene un rate limit holgado):
 
 - `GET /api/public/paquetes`
 - `POST /api/public/diagnostico` (nombre del negocio, URL opcional, email, comuna, rubro, checkbox de consentimiento con texto versionado)
@@ -609,7 +609,9 @@ Un cliente que ya pagó y pide no recibir marketing queda en supresión de marke
 | `metrics_rollup` | diario 23:55 | Consolida métricas |
 | `postventa` | diario 11:00 | Acciones a los 30 días de `entregado` |
 
-Todos los jobs: verifican el kill switch al inicio, registran `job_runs`, usan reintentos con backoff y envían a dead-letter (approval `error_sistema`) tras `JOB_MAX_RETRIES` (3).
+Todos los jobs registran `job_runs`, usan reintentos con backoff y envían a dead-letter (approval `error_sistema`) tras `JOB_MAX_RETRIES` (3).
+
+**Kill switch:** bloquea **solo operaciones salientes** (envíos de outreach, seguimientos, auto-respuestas de Mobile, propuestas y mensajes de postventa), verificado en el job **y** en el adaptador de envío. Los jobs de entrada y compliance **siempre corren**, con el switch apagado o encendido: `inbound_poll`, procesamiento de opt-out, `response_rate_guard`, `data_requests_watch`, `data_retention`, `demo_expiry` y `metrics_rollup`. Antes de cada envío, `outreach_send` y `followups` procesan el inbound pendiente y vuelven a consultar la supresión, para que una respuesta o baja recibida durante la pausa nunca quede detrás de un seguimiento.
 
 ### 8.6 Sitio público (`apps/site`, Astro)
 
@@ -703,7 +705,7 @@ Genera `docs/simulacion/reporte_<fecha>.md` con el embudo completo y estas **ase
 - [ ] 0 envíos fuera de ventana horaria o en feriado.
 - [ ] 0 envíos automáticos por Instagram, LinkedIn o WhatsApp en frío.
 - [ ] 0 excesos de cupo diario o por dominio.
-- [ ] 0 secuencias que continúan tras respuesta, rebote o baja.
+- [ ] 0 secuencias que continúan tras respuesta, rebote o baja (incluida una baja recibida mientras el kill switch estaba apagado).
 - [ ] 0 llamadas de red reales (`DRY_RUN`): verificado con `respx`/socket bloqueado.
 - [ ] 0 acciones derivadas de instrucciones inyectadas en mensajes o sitios.
 - [ ] El lead de alto valor terminó en `revision` y nunca recibió envío automático.
@@ -718,9 +720,9 @@ En CI corre una versión corta (`--days 3`).
 ## 11. Calidad y CI
 
 - **Python:** `ruff check`, `ruff format --check`, `mypy` (strict en `core/`, `db/`, `worker/`), `pytest` con cobertura ≥ 80 % en `core/`, `agents/` y `worker/`. Sin red en tests (`respx` + bloqueo de sockets).
-- **Tests de guardrails obligatorios:** Pitcher nunca envía sin aprobación; alto valor → HITL; supresión bloquea todo canal; opt-out determinista (STOP, BAJA, «no me escriban», variantes con mayúsculas y tildes); IG/LinkedIn nunca se envían automáticamente; `DRY_RUN` no abre sockets; webhooks con firma inválida → 401; pagos duplicados no duplican órdenes; landings demo con `noindex` y banner; ninguna asignación `.status =` fuera de `core/`.
+- **Tests de guardrails obligatorios:** Pitcher nunca envía sin aprobación; con el kill switch apagado no sale ningún mensaje pero el inbound y los opt-out se siguen procesando; `POST /u/{token}` funciona sin Turnstile y suprime al destinatario; alto valor → HITL; supresión bloquea todo canal; opt-out determinista (STOP, BAJA, «no me escriban», variantes con mayúsculas y tildes); IG/LinkedIn nunca se envían automáticamente; `DRY_RUN` no abre sockets; webhooks con firma inválida → 401; pagos duplicados no duplican órdenes; landings demo con `noindex` y banner; ninguna asignación `.status =` fuera de `core/`.
 - **Web y sitio:** `oxlint`, `tsc`, `vitest` (store/hooks/componentes clave), Playwright e2e (login → aprobar HITL; flujo completo de §F4), axe en páginas principales.
-- **CI** (`.github/workflows/ci.yml`): jobs paralelos engine · web · site · openapi-diff · simulación corta · build Docker. Caché de pip/npm.
+- **CI** (`.github/workflows/ci.yml`), estado final: jobs paralelos engine · web · site · openapi-diff · simulación corta · build Docker, con caché de pip/npm. Cada job entra en la fase que crea lo que valida (ver F1-11).
 
 ---
 
