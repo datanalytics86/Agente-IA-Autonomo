@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from core.config import Settings
 from integrations.results import SendResult
+
+if TYPE_CHECKING:
+    from integrations.email.inbound import ImapClient
 
 SYSTEM_KINDS = frozenset({"recibo", "portal", "derechos"})
 
@@ -180,7 +183,7 @@ def build_outreach_email(
 def build_inbound_poller(
     settings: Settings,
     *,
-    client_factory: object | None = None,
+    client_factory: Callable[[Settings], ImapClient] | None = None,
 ) -> InboundPoller:
     from integrations.email.inbound import FakeInbound, ImapPoller
 
@@ -193,4 +196,4 @@ def build_inbound_poller(
         return FakeInbound()
     if client_factory is None:
         return ImapPoller(settings)
-    return ImapPoller(settings, client_factory=client_factory)  # type: ignore[arg-type]
+    return ImapPoller(settings, client_factory=client_factory)

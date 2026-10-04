@@ -229,7 +229,8 @@ def _parse_place(raw: object) -> PlaceHit | None:
     name = display.get("text") if isinstance(display, dict) else None
     if not isinstance(place_id, str) or not isinstance(name, str) or not name.strip():
         return None
-    types = raw.get("types") if isinstance(raw.get("types"), list) else []
+    raw_types = raw.get("types")
+    types = raw_types if isinstance(raw_types, list) else []
     return PlaceHit(
         place_id=place_id,
         name=name.strip(),

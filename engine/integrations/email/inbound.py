@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import imaplib
+from collections.abc import Callable
 from email import message_from_bytes
 from email import policy as email_policy
-from typing import Protocol
+from typing import Protocol, cast
 
 from core.config import Settings
 from integrations.email.base import InboundMail
@@ -33,7 +34,8 @@ class StdlibImapClient:
         return data[0].split()
 
     def fetch(self, uid: bytes) -> bytes:
-        status, data = self._client.fetch(uid, "(RFC822)")
+        # El stub de IMAP4 pide str; en runtime el uid de SEARCH ya es bytes.
+        status, data = self._client.fetch(cast(str, uid), "(RFC822)")
         if status != "OK" or not data:
             raise ProviderRequestError("imap no devolvió el mensaje")
         for item in data:
@@ -75,7 +77,7 @@ class ImapPoller:
         self,
         settings: Settings,
         *,
-        client_factory: object | None = None,
+        client_factory: Callable[[Settings], ImapClient] | None = None,
     ) -> None:
         self.settings = settings
         self._client_factory = client_factory or StdlibImapClient

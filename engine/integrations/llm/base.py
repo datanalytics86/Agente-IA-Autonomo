@@ -7,7 +7,7 @@ import time
 from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -34,16 +34,17 @@ UNTRUSTED_INSTRUCTION = (
 _UNTRUSTED_KEYS = {"html", "page_html", "scraped_html", "inbound_text", "untrusted"}
 _Fallback = Callable[[dict[str, Any]], BaseModel]
 _FALLBACKS: dict[str, _Fallback] = {}
+SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
 
 class LlmClient(Protocol):
     def complete_json(
         self,
         prompt_name: str,
-        schema: type[BaseModel],
+        schema: type[SchemaT],
         data: dict[str, Any],
         model: str | None = None,
-    ) -> BaseModel: ...
+    ) -> SchemaT: ...
 
 
 class LlmError(RuntimeError):
@@ -195,10 +196,10 @@ class FakeLlm:
     def complete_json(
         self,
         prompt_name: str,
-        schema: type[BaseModel],
+        schema: type[SchemaT],
         data: dict[str, Any],
         model: str | None = None,
-    ) -> BaseModel:
+    ) -> SchemaT:
         version, _system = load_prompt(prompt_name)
         lead_id = _lead_id(data)
         started = time.perf_counter()
@@ -249,10 +250,10 @@ class XaiLlm:
     def complete_json(
         self,
         prompt_name: str,
-        schema: type[BaseModel],
+        schema: type[SchemaT],
         data: dict[str, Any],
         model: str | None = None,
-    ) -> BaseModel:
+    ) -> SchemaT:
         version, system = load_prompt(prompt_name)
         lead_id = _lead_id(data)
         chosen = model or self.settings.llm_model
@@ -271,7 +272,7 @@ class XaiLlm:
             try:
                 raw, tokens_in, tokens_out, reported = self._post(chosen, system, user)
                 parsed = json.loads(_strip_fence(raw))
-                value = schema.model_validate(parsed)
+                value = _validate(schema, parsed)
             except (ValidationError, json.JSONDecodeError, LlmError, httpx.HTTPError) as exc:
                 latency = int((time.perf_counter() - started) * 1000)
                 last_error = str(exc)
@@ -356,12 +357,16 @@ def build_llm(settings: Settings | None = None, session: Session | None = None) 
     return XaiLlm(current, session)
 
 
-def _invoke_fallback(prompt_name: str, schema: type[BaseModel], data: dict[str, Any]) -> BaseModel:
+def _validate(schema: type[SchemaT], payload: object) -> SchemaT:
+    return schema.model_validate(payload)
+
+
+def _invoke_fallback(prompt_name: str, schema: type[SchemaT], data: dict[str, Any]) -> SchemaT:
     builder = _FALLBACKS.get(prompt_name)
     if builder is None:
         raise LlmError(f"sin fallback registrado para {prompt_name}")
     value = builder(dict(data))
-    return schema.model_validate(value.model_dump())
+    return _validate(schema, value.model_dump())
 
 
 def _lead_id(data: dict[str, Any]) -> str | None:

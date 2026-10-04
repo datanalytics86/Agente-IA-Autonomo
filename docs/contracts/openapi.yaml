@@ -284,6 +284,58 @@
             "application/json":
               "schema":
                 "$ref": "#/components/schemas/HTTPValidationError"
+  "/pago/fake/{pref_id}":
+    "get":
+      "tags":
+        - "public"
+      "summary": "Pago Fake"
+      "operationId": "pago_fake_pago_fake__pref_id__get"
+      "parameters":
+        -
+          "name": "pref_id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Pref Id"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema": {}
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
+  "/api/public/proyecto/{token}/preview":
+    "get":
+      "tags":
+        - "public"
+      "summary": "Proyecto Preview"
+      "operationId": "proyecto_preview_api_public_proyecto__token__preview_get"
+      "parameters":
+        -
+          "name": "token"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+            "title": "Token"
+      "responses":
+        "200":
+          "description": "Successful Response"
+          "content":
+            "application/json":
+              "schema": {}
+        "422":
+          "description": "Validation Error"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/HTTPValidationError"
   "/api/public/proyecto/{token}/intake":
     "post":
       "tags":
@@ -1982,12 +2034,16 @@
             -
               "type": "null"
           "title": "Deploy Url"
+        "portal_token":
+          "type": "string"
+          "title": "Portal Token"
       "type": "object"
       "required":
         - "id"
         - "status"
         - "revisions_used"
         - "max_revisions"
+        - "portal_token"
       "title": "ProjectOut"
     "ProjectPublic":
       "properties":

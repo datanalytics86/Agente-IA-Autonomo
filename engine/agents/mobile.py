@@ -10,7 +10,7 @@ from agents.schemas import MobileIntent
 from core.compliance import is_opt_out
 from core.config import get_settings
 from core.states import TRANSITIONS, transition
-from db.models import Approval, Message
+from db.models import Approval, Lead, Message
 from db.repositories import (
     ApprovalRepository,
     LeadRepository,
@@ -129,7 +129,7 @@ def _suppress(ctx: AgentContext, lead: object) -> None:
         repo.add("linkedin", str(linkedin), reason="opt-out", source="mobile")
 
 
-def _advance(ctx: AgentContext, lead: object, intent: str) -> None:
+def _advance(ctx: AgentContext, lead: Lead, intent: str) -> None:
     status = str(lead.status)
     if intent == "agendar" and status in {"enviado", "respondio"}:
         target = "agendado"
@@ -139,4 +139,4 @@ def _advance(ctx: AgentContext, lead: object, intent: str) -> None:
         return
     if target not in TRANSITIONS.get(status, frozenset()):
         return
-    transition(ctx.session, lead, target, actor="agente", reason=f"intención {intent}")  # type: ignore[arg-type]
+    transition(ctx.session, lead, target, actor="agente", reason=f"intención {intent}")
