@@ -39,6 +39,9 @@ htmlcov/
 coverage.xml
 playwright-report/
 test-results/
+apps/web/e2e/sites/
+apps/web/e2e/e2e.db
+apps/web/e2e/e2e.db-*
 infra/backups/
 
 # Compat rutas legacy

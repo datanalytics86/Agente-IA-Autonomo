@@ -1,6 +1,6 @@
-# CI de la ola 1. Sin job de Docker: la imagen es un esqueleto y se
-# valida en local con `docker compose config` solo si Docker está instalado.
-# Sin pyproject no hay mypy (ADR-011). ruff sobre agents/ queda para la ola 3.
+# CI. mypy estricto queda en core/db/worker (ADR-013). Sin job de Docker:
+# en la máquina de integración no hay binario docker, y el healthcheck
+# de Compose no se afirma sin esa evidencia.
 
 name: ci
 
@@ -41,21 +41,12 @@ jobs:
         run: |
           set -euo pipefail
           if [ -f pyproject.toml ]; then
-            ruff check core db migrations tests
-            ruff format --check core db migrations tests
-            mypy_targets=()
-            if [ -d core ]; then
-              mypy_targets+=(core)
-            fi
-            if [ -d db ]; then
-              mypy_targets+=(db)
-            fi
-            if [ "${#mypy_targets[@]}" -gt 0 ]; then
-              mypy "${mypy_targets[@]}"
-            else
-              echo "core/ y db/ no existen; no se corre mypy."
-            fi
-            pytest -q
+            ruff check .
+            ruff format --check .
+            mypy .
+            # F6-05: tests/test_secret_scan.py entra en esta suite.
+            pytest -q --cov=core --cov=agents --cov=worker --cov-fail-under=80
+            PYTHONPATH=. python main.py --mode simulate --days 3 --seed 42
           else
             echo "Sin pyproject.toml: no se corre mypy ni ruff sobre agents/."
             PYTHONPATH=. python main.py --mode prompts
@@ -135,6 +126,7 @@ jobs:
             npm install
           fi
           npm run build
+          npm test
 
   openapi:
     runs-on: ubuntu-latest

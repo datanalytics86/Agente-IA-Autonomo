@@ -93,4 +93,5 @@ def project_dict(project: Project) -> dict[str, Any]:
         "max_revisions": project.max_revisions,
         "domain": project.domain,
         "deploy_url": project.deploy_url,
+        "portal_token": project.portal_token,
     }

@@ -54,6 +54,20 @@ def create_app() -> FastAPI:
         route = request.scope.get("route")
         path = getattr(route, "path", request.url.path)
         logger.info("%s %s %s", request.method, path, response.status_code)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; style-src 'self' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+            "object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+        )
+        if get_settings().app_mode == "prod":
+            response.headers.setdefault(
+                "Strict-Transport-Security",
+                "max-age=31536000; includeSubDomains",
+            )
         return response
 
     register_exception_handlers(app)

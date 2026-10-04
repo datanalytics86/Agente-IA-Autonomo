@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import html
 import os
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -36,6 +37,7 @@ from api.present import (
 from api.schemas import LeadPatch, SettingsIn
 from api.security import consent_record, read_baja_token, text_version
 from core.config import ENGINE_DIR, get_settings
+from core.hitl import needs_value_review
 from core.states import STATUSES, TRANSITIONS
 from core.states import transition as transition_lead
 from db.models import (
@@ -68,6 +70,8 @@ from db.repositories import (
     SuppressionRepository,
     _start_of_local_day,
 )
+from integrations.email.base import build_transactional_email
+from integrations.hosting.base import copy_site, project_slug, resolve_sites_dir
 
 _RIGHTS = frozenset(
     {"acceso", "rectificacion", "supresion", "oposicion", "portabilidad", "bloqueo"}
@@ -169,6 +173,94 @@ def write_settings(session: Session, email: str, payload: SettingsIn) -> dict[st
     return read_settings_view(session)
 
 
+def _preview_dir(token: str) -> Path:
+    return resolve_sites_dir(get_settings()) / "_previews" / project_slug(token)
+
+
+def _preview_url(token: str) -> str:
+    base = get_settings().public_base_url.rstrip("/") or "http://localhost"
+    return f"{base}/api/public/proyecto/{token}/preview"
+
+
+def _write_preview(project: Project, lead: Lead) -> Path:
+    dest = _preview_dir(project.portal_token)
+    dest.mkdir(parents=True, exist_ok=True)
+    business = html.escape(lead.business)
+    commune = html.escape(lead.commune or "")
+    page = (
+        "<!doctype html>\n"
+        '<html lang="es-CL">\n'
+        "<head>\n"
+        '<meta charset="utf-8">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        '<meta name="robots" content="noindex, nofollow">\n'
+        f'<meta name="description" content="Vista previa del sitio de {business}.">\n'
+        f"<title>{business}</title>\n"
+        "</head>\n"
+        "<body>\n"
+        "<p>Propuesta no oficial. Vista previa del sitio.</p>\n"
+        f"<h1>{business}</h1>\n"
+        f"<p>{commune}</p>\n"
+        "</body>\n"
+        "</html>\n"
+    )
+    (dest / "index.html").write_text(page, encoding="utf-8")
+    return dest
+
+
+def preview_html(session: Session, token: str) -> str:
+    project = project_by_token(session, token)
+    path = _preview_dir(project.portal_token) / "index.html"
+    if not path.is_file():
+        raise ApiError(404, "not_found", "vista previa no encontrada")
+    return path.read_text(encoding="utf-8")
+
+
+def _publish_project(project: Project, lead: Lead | None) -> Path:
+    source = _preview_dir(project.portal_token)
+    if lead is None:
+        raise ApiError(404, "not_found", "el proyecto no tiene lead")
+    if not (source / "index.html").is_file():
+        _write_preview(project, lead)
+    slug = project_slug(lead.business)
+    return copy_site(resolve_sites_dir(get_settings()), slug, source)
+
+
+def _send_diagnostico_mail(session: Session, lead: Lead, email: str) -> None:
+    subject = f"Recibimos el diagnóstico de {lead.business}"
+    text = (
+        f"Recibimos el diagnóstico de {lead.business}. "
+        "Puedes agendar una conversación desde el sitio. "
+        "Este correo es transaccional y no es una oferta en frío."
+    )
+    body = f"<p>{html.escape(text)}</p>"
+    result = build_transactional_email(get_settings()).send(
+        email,
+        subject,
+        text,
+        body,
+        {},
+        consent=True,
+        kind="diagnostico",
+    )
+    sent = result.status == "sent"
+    session.add(
+        Message(
+            lead_id=lead.id,
+            thread_id=lead.id,
+            direction="out",
+            channel="email_tx",
+            status="sent" if sent else "failed",
+            subject=subject,
+            body_text=text,
+            body_html=body,
+            provider_message_id=f"tx-{lead.id}" if sent else None,
+            sent_at=datetime.now(UTC) if sent else None,
+        )
+    )
+    session.flush()
+
+
 def submit_diagnostico(
     session: Session,
     *,
@@ -207,6 +299,7 @@ def submit_diagnostico(
         actor="sistema",
         reason="diagnóstico gratis con consentimiento",
     )
+    _send_diagnostico_mail(session, lead, email)
     return {"id": lead.id, "status": lead.status}
 
 
@@ -295,6 +388,31 @@ def checkout(
     order.checkout_url = preference.checkout_url
     order.provider_preference_id = preference.id
     session.add(order)
+    if lead.status == "agendado":
+        if lead.high_value or needs_value_review(lead.estimated_value_clp):
+            transition_lead(
+                session,
+                lead,
+                "revision",
+                actor="sistema",
+                reason="la propuesta supera el umbral y espera revisión humana",
+            )
+            session.add(
+                Approval(
+                    lead_id=lead.id,
+                    kind="deal_alto_valor",
+                    payload={"order_id": order.id, "package_code": package_code},
+                    status="pending",
+                )
+            )
+        else:
+            transition_lead(
+                session,
+                lead,
+                "propuesta",
+                actor="sistema",
+                reason="checkout del paquete elegido",
+            )
     session.flush()
     return {"order_id": order.id, "checkout_url": preference.checkout_url}
 
@@ -357,6 +475,34 @@ def project_public(session: Session, token: str) -> dict[str, Any]:
 def save_intake(session: Session, token: str, payload: dict[str, Any]) -> dict[str, bool]:
     project = project_by_token(session, token)
     project.intake = payload
+    lead = session.get(Lead, project.lead_id)
+    if lead is not None and lead.status == "pagado":
+        transition_lead(
+            session,
+            lead,
+            "en_produccion",
+            actor="sistema",
+            reason="el cliente envió el intake",
+        )
+        _write_preview(project, lead)
+        transition_lead(
+            session,
+            lead,
+            "en_revision_cliente",
+            actor="sistema",
+            reason="la vista previa quedó lista",
+        )
+        session.execute(
+            update(Project)
+            .where(Project.id == project.id)
+            .values(
+                status="en_revision_cliente",
+                deploy_url=_preview_url(project.portal_token),
+                intake=payload,
+            )
+        )
+        session.flush()
+        return {"ok": True}
     session.add(project)
     session.flush()
     return {"ok": True}
@@ -389,8 +535,6 @@ def save_feedback(session: Session, token: str, text: str) -> dict[str, str]:
 
 def approve_project_public(session: Session, token: str) -> dict[str, str]:
     project = project_by_token(session, token)
-    session.execute(update(Project).where(Project.id == project.id).values(status="aprobado"))
-    session.flush()
     lead = session.get(Lead, project.lead_id)
     if lead is not None and lead.status == "en_revision_cliente":
         transition_lead(
@@ -400,7 +544,21 @@ def approve_project_public(session: Session, token: str) -> dict[str, str]:
             actor="humano",
             reason="el cliente aprobó el proyecto",
         )
-    return {"id": project.id, "status": "aprobado"}
+    published = _publish_project(project, lead)
+    current = dict(project.intake) if isinstance(project.intake, dict) else {}
+    current["published_path"] = str(published)
+    session.execute(
+        update(Project)
+        .where(Project.id == project.id)
+        .values(
+            status="publicado",
+            deploy_url=_preview_url(project.portal_token),
+            delivered_at=datetime.now(UTC),
+            intake=current,
+        )
+    )
+    session.flush()
+    return {"id": project.id, "status": "publicado"}
 
 
 def domain_authorized(session: Session, domain: str) -> bool:

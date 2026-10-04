@@ -56,6 +56,16 @@ def db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     return tmp_path
 
 
+def test_la_cola_json_no_se_crea(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("agents.base.STATE_DIR", tmp_path)
+    monkeypatch.setattr("agents.base.OUTPUT_DIR", tmp_path / "output")
+    monkeypatch.setattr("agents.base.LEADS_FILE", tmp_path / "leads.json")
+    monkeypatch.setattr("agents.base.LOGS_FILE", tmp_path / "logs.json")
+    ensure_state_dirs()
+    assert not (tmp_path / "queue.json").exists()
+    assert (tmp_path / "leads.json").is_file()
+
+
 def test_nombres_que_importa_main(db: Path) -> None:
     assert Lead is not None
     assert callable(ensure_state_dirs)

@@ -20,7 +20,7 @@ Laterales: `revision` (guarda `paused_from`), `perdido` (exige `close_reason`), 
 | «Descartado» o `reject` | `perdido` (`close_reason=descartado`) |
 | cualquier otro `cerrado` | `perdido` (`close_reason=legacy_cerrado`) |
 
-Inbound: diagnóstico gratis entra en `diagnosticado`; contacto entra en `respondio`. Ambos llevan `source` inbound y `consent` completo.
+Inbound: diagnóstico gratis entra en `diagnosticado`; contacto entra en `respondio`. Ambos llevan `source` inbound y `consent` completo. Un webhook de agenda firmado puede pasar ese diagnóstico a `agendado` sin recorrer el pitch (ADR-012).
 
 ## Transiciones
 
@@ -37,7 +37,7 @@ La función valida la arista, escribe `lead_events` y un `events` de nivel `info
 | Desde | Hacia |
 |---|---|
 | nuevo | diagnosticado, revision, perdido, opt_out |
-| diagnosticado | landing, revision, perdido, opt_out |
+| diagnosticado | landing, agendado, revision, perdido, opt_out |
 | landing | video, pitch_listo, revision, perdido, opt_out |
 | video | pitch_listo, revision, perdido, opt_out |
 | pitch_listo | enviado, revision, perdido, opt_out |

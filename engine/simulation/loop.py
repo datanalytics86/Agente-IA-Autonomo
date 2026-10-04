@@ -83,9 +83,7 @@ def run_simulation(
     clock = FakeClock(start)
     world = World(rng=random.Random(seed))
     ports = _ports(world)
-    path = report_path or (
-        REPO_ROOT / "docs" / "simulacion" / f"reporte_seed{seed}_d{days}.md"
-    )
+    path = report_path or (REPO_ROOT / "docs" / "simulacion" / f"reporte_seed{seed}_d{days}.md")
     guard = _SocketGuard()
     guard.install()
     session = Session(engine, expire_on_commit=False)

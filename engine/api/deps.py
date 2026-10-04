@@ -70,12 +70,14 @@ class LocalPaymentProvider:
         base = public_base_url.rstrip("/") or "http://localhost"
         self.public_base_url = base
         self._payments: dict[str, PaymentFact] = {}
+        self._preferences: dict[str, tuple[str, int]] = {}
 
     def remember(self, fact: PaymentFact) -> None:
         self._payments[fact.provider_payment_id] = fact
 
     def create_preference(self, order_id: str, title: str, amount_clp: int) -> Preference:
         pref_id = new_id()
+        self._preferences[pref_id] = (order_id, amount_clp)
         url = (
             f"{self.public_base_url}/pago/fake/{pref_id}"
             f"?order={order_id}&amount={amount_clp}&title={title[:40]}"
@@ -87,9 +89,18 @@ class LocalPaymentProvider:
 
     def fetch_payment(self, provider_payment_id: str) -> PaymentFact:
         fact = self._payments.get(provider_payment_id)
-        if fact is None:
+        if fact is not None:
+            return fact
+        staged = self._preferences.get(provider_payment_id)
+        if staged is None:
             raise KeyError(provider_payment_id)
-        return fact
+        order_id, amount_clp = staged
+        return PaymentFact(
+            provider_payment_id=provider_payment_id,
+            status="approved",
+            amount_clp=amount_clp,
+            order_id=order_id,
+        )
 
 
 def build_payment_provider(settings: Settings) -> PaymentProvider:

@@ -62,11 +62,11 @@ def _quotas(session: Session) -> dict[str, object]:
 def daily_limit(session: Session) -> int:
     quotas = _quotas(session)
     raw = quotas.get("email_outreach_daily_limit")
-    if raw is None:
+    if isinstance(raw, bool) or not isinstance(raw, int | str):
         return get_settings().email_outreach_daily_limit
     try:
         return int(raw)
-    except (TypeError, ValueError):
+    except ValueError:
         return get_settings().email_outreach_daily_limit
 
 

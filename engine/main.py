@@ -11,7 +11,6 @@ from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich.text import Text
 
 # Asegurar imports desde raíz del proyecto
 ROOT = Path(__file__).resolve().parent
@@ -73,7 +72,7 @@ def table_leads(leads: list[Lead]) -> Table:
             lead.commune,
             lead.status.value,
             f"{lead.estimated_value_clp:,}".replace(",", "."),
-            "⚠" if lead.high_value or lead.status.value == "revision" else "",
+            "⚠" if lead.high_value else "",
         )
     return table
 
@@ -202,6 +201,7 @@ def _load_extra(mode: str):
         module = importlib.import_module(module_name)
         return getattr(module, func_name), inspect.signature(getattr(module, func_name))
     except (ImportError, AttributeError):
+
         def _missing(**_kwargs: object) -> int:
             console.print(
                 f"[yellow]Modo {mode} todavía no está implementado "
@@ -215,7 +215,7 @@ def _load_extra(mode: str):
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="main.py",
-        description="Agente IA Autónomo — sistema multiagente para vender landings a pymes en Chile",
+        description="Agente IA Autónomo — landings para pymes en Chile",
     )
     parser.add_argument(
         "--mode",

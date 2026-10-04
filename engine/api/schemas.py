@@ -285,6 +285,7 @@ class ProjectOut(BaseModel):
     max_revisions: int
     domain: str | None = None
     deploy_url: str | None = None
+    portal_token: str
 
 
 class ProjectPublic(BaseModel):

@@ -55,7 +55,7 @@ RESUMABLE = frozenset(
 
 TRANSITIONS: dict[str, frozenset[str]] = {
     "nuevo": frozenset({"diagnosticado", "revision", "perdido", "opt_out"}),
-    "diagnosticado": frozenset({"landing", "revision", "perdido", "opt_out"}),
+    "diagnosticado": frozenset({"landing", "agendado", "revision", "perdido", "opt_out"}),
     "landing": frozenset({"video", "pitch_listo", "revision", "perdido", "opt_out"}),
     "video": frozenset({"pitch_listo", "revision", "perdido", "opt_out"}),
     "pitch_listo": frozenset({"enviado", "revision", "perdido", "opt_out"}),

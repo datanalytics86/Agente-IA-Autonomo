@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -26,6 +29,7 @@ from db.models import (
     Message,
     Order,
     Payment,
+    Project,
     User,
 )
 from db.repositories import EventRepository, LeadRepository, MessageRepository, SettingsRepository
@@ -51,6 +55,8 @@ _PATHS = {
     "/api/public/proyecto/{token}/intake",
     "/api/public/proyecto/{token}/feedback",
     "/api/public/proyecto/{token}/aprobar",
+    "/api/public/proyecto/{token}/preview",
+    "/pago/fake/{pref_id}",
     "/api/internal/domain-check",
     "/webhooks/mercadopago",
     "/webhooks/calcom",
@@ -602,3 +608,117 @@ def test_rutas_admin_de_lectura(client: TestClient) -> None:
     assert "paused_from" in statuses["transitions"]["revision"]
     assert client.get("/api/orders").status_code == 200
     assert client.get("/api/events").status_code == 200
+
+
+def test_flujo_publico_diagnostico_hasta_sitio(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
+    sites = tmp_path / "clientes"
+    monkeypatch.setenv("CLIENT_SITES_DIR", str(sites))
+    reset_settings()
+    health = client.get("/healthz")
+    assert health.headers["x-content-type-options"] == "nosniff"
+    assert "default-src" in health.headers["content-security-policy"]
+
+    created = client.post(
+        "/api/public/diagnostico",
+        json=_diag(business="Ferretería Norte", category="ferreteria"),
+    )
+    assert created.status_code == 202, created.text
+    lead_id = created.json()["id"]
+    with session_scope() as session:
+        mail = session.scalar(select(Message).where(Message.lead_id == lead_id))
+        assert mail is not None
+        assert mail.channel == "email_tx"
+        assert mail.status == "sent"
+        assert mail.direction == "out"
+
+    body = json.dumps({"lead_id": lead_id, "triggerEvent": "BOOKING_CREATED"}).encode()
+    signature = hmac.new(b"cal-test-secret", body, hashlib.sha256).hexdigest()
+    booked = client.post(
+        "/webhooks/calcom",
+        content=body,
+        headers={"x-cal-signature-256": signature, "content-type": "application/json"},
+    )
+    assert booked.status_code == 200, booked.text
+    with session_scope() as session:
+        lead = session.get(Lead, lead_id)
+        assert lead is not None
+        assert lead.status == "agendado"
+
+    checkout = client.post(
+        "/api/public/checkout",
+        json={"package_code": "landing_esencial", "lead_id": lead_id},
+    )
+    assert checkout.status_code == 201, checkout.text
+    order_id = checkout.json()["order_id"]
+    assert "/pago/fake/" in checkout.json()["checkout_url"]
+    with session_scope() as session:
+        lead = session.get(Lead, lead_id)
+        assert lead is not None
+        assert lead.status == "propuesta"
+
+    provider = client.app.state.payment_provider
+    assert isinstance(provider, LocalPaymentProvider)
+    provider.remember(
+        PaymentFact(
+            provider_payment_id="pay-venta",
+            status="approved",
+            amount_clp=250_000,
+            order_id=order_id,
+            lead_id=lead_id,
+            package_code="landing_esencial",
+        )
+    )
+    paid = client.post(
+        "/webhooks/mercadopago",
+        content=b'{"data":{"id":"pay-venta"}}',
+        headers=_mp_headers("pay-venta"),
+    )
+    assert paid.status_code == 200, paid.text
+    with session_scope() as session:
+        lead = session.get(Lead, lead_id)
+        assert lead is not None
+        assert lead.status == "pagado"
+        project = session.scalar(select(Project).where(Project.lead_id == lead_id))
+        assert project is not None
+        token = project.portal_token
+        note = session.scalar(
+            select(Approval).where(
+                Approval.lead_id == lead_id,
+                Approval.kind == "tarea_manual",
+            )
+        )
+        assert note is not None
+        assert note.payload["note"] == "emitir documento tributario"
+
+    intake = client.post(
+        f"/api/public/proyecto/{token}/intake",
+        json={"objetivo": "Mostrar horario y dirección"},
+    )
+    assert intake.status_code == 200, intake.text
+    preview = client.get(f"/api/public/proyecto/{token}/preview")
+    assert preview.status_code == 200, preview.text
+    assert preview.headers["x-robots-tag"] == "noindex, nofollow"
+    assert "Ferretería Norte" in preview.text
+    assert "noindex" in preview.text
+    public = client.get(f"/api/public/proyecto/{token}")
+    assert public.json()["status"] == "en_revision_cliente"
+
+    approved = client.post(f"/api/public/proyecto/{token}/aprobar")
+    assert approved.status_code == 200, approved.text
+    assert approved.json()["status"] == "publicado"
+    with session_scope() as session:
+        lead = session.get(Lead, lead_id)
+        assert lead is not None
+        assert lead.status == "entregado"
+        project = session.scalar(select(Project).where(Project.lead_id == lead_id))
+        assert project is not None
+        assert project.status == "publicado"
+    pages = list(sites.rglob("index.html"))
+    assert any("Ferretería Norte" in page.read_text(encoding="utf-8") for page in pages)
+    assert any(
+        page.parent.name != "_previews" and page.parent.parent.name != "_previews" for page in pages
+    )

@@ -25,9 +25,7 @@ def _caches() -> object:
     reset_engine()
 
 
-def test_create_admin_sin_password_sale_2(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_create_admin_sin_password_sale_2(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
     monkeypatch.setenv("ADMIN_EMAIL", "admin@example.com")
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{(tmp_path / 'cli.db').as_posix()}")

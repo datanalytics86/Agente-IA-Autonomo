@@ -1,37 +1,42 @@
 # Dashboard
 
-Panel local del monorepo para seguir el demo de landings a pymes en Chile. No es un sitio público y no habla con el motor: los datos salen de un store Zustand con mocks. Conectar el panel a una API es trabajo posterior; hoy no hay cliente HTTP.
+Panel de administración. Las cifras salen de la API del motor (`/api/...`) con la cookie de sesión HttpOnly y la cabecera `X-CSRF-Token` en las escrituras. Zustand guarda estado de interfaz. Si la API no responde, el panel no muestra leads, ingresos ni textos inventados.
 
 ## Stack
 
 Leído de `package.json`:
 
-- React 19 (`react` y `react-dom` ^19.2.7) y TypeScript ~6.0.2
-- Vite ^8.1.1 con `@vitejs/plugin-react`
-- TanStack Router (`@tanstack/react-router` ^1.170.18), rutas por archivo en `src/routes/`
-- Tailwind CSS v4 (`tailwindcss` ^4.3.3 y `@tailwindcss/vite`)
-- Zustand ^5.0.14
-- Recharts ^3.10.1
-- Lucide (`lucide-react`) y toasts Sonner (`sonner`)
+- React 19 y TypeScript ~6
+- Vite 8
+- TanStack Router (rutas por archivo en `src/routes/`) y TanStack Query
+- Tailwind CSS v4
+- Zustand 5, solo interfaz
+- Recharts, Lucide y Sonner
 - Lint: oxlint (`npm run lint`)
+- Tests: Vitest (`npm test`) y Playwright (`npm run e2e`)
 
 ## Rutas
 
-| Ruta | Qué muestra hoy |
-|------|-----------------|
-| `/` | Panel: KPIs, acciones rápidas, gráfico, logs y agentes |
-| `/agentes` | Los 8 agentes, el flujo de status y el prompt del orchestrator |
-| `/leads` | Pipeline con filtros; avanzar, aprobar o descartar |
-| `/logs` | Historial de eventos del store |
-| `/config` | Precios CLP, Ley 21.719, ciudades piloto y stack |
+| Ruta | Qué muestra |
+|------|-------------|
+| `/login` | Ingreso del admin |
+| `/` | Panel. Indicadores de `GET /api/metrics` |
+| `/agentes` | Agentes y prompts de `GET /api/agents`. Ejecutar encola un job |
+| `/leads` | Pipeline |
+| `/leads/$leadId` | Detalle, timeline, mensajes y artefactos |
+| `/hitl` | Bandeja humana. Aprobar devuelve el lead a la etapa en pausa |
+| `/manual` | Instagram y LinkedIn se copian y se marcan enviados a mano |
+| `/conversaciones` | Respuesta asistida. Pasa por el Checker |
+| `/proyectos` | Entrega y pedidos. El ingreso del mes está en el panel |
+| `/logs` | Eventos del motor |
+| `/compliance` | Supresión por hash y solicitudes de derechos. Sin el valor en claro |
+| `/config` | Ajustes. El kill switch se guarda. El modo demo o prod no se edita aquí |
 
-## Datos
-
-Mock de Zustand (`src/store/useAgencyStore.ts`, semillas en `src/lib/mock.ts`). Es independiente de `engine/state/*.json`, con la misma idea de status y de agentes. Las acciones del panel (correr Scout, enviar pitches, revisar deals en `revision`, avanzar, aprobar o descartar) solo mutan ese store.
+`src/lib/mock.ts` lo importa un test (`src/api/metrics.test.ts`). Ninguna pantalla lo importa.
 
 ## Arranque
 
-Desde la raíz del repositorio. `npm ci` instala lo fijado en `package-lock.json`.
+La API tiene que estar arriba. Los comandos de `create-admin` y `--mode api` están en `docs/RUNBOOK.md`.
 
 **PowerShell**
 
@@ -49,4 +54,6 @@ npm ci
 npm run dev
 ```
 
-Abre http://localhost:8080. Vite escucha en `0.0.0.0:8080` (`vite.config.ts`, también en `preview`). `npm run build` compila; `npm run preview` sirve ese build en el mismo puerto.
+Abre http://localhost:8080. Vite escucha en `0.0.0.0:8080`.
+
+En la misma carpeta: `npm run lint`, `npm run build`, `npm test` y `npm run e2e`. El e2e levanta la API en `127.0.0.1:8765` con una base SQLite desechable y el sitio en el puerto 4321. El pago es el falso local: no llama a Mercado Pago y no cobra.

@@ -166,8 +166,7 @@ def landing_fallback(data: dict[str, Any]) -> LandingCopy:
             FaqItem(
                 question="¿Cómo agendo?",
                 answer=(
-                    "Usa el enlace de agenda configurado. "
-                    "Si no está, el negocio confirma el canal."
+                    "Usa el enlace de agenda configurado. Si no está, el negocio confirma el canal."
                 ),
             ),
         ],

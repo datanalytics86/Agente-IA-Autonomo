@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -28,6 +29,7 @@ from api.services import (
     approve_project_public,
     checkout,
     load_demo,
+    preview_html,
     project_public,
     save_feedback,
     save_intake,
@@ -155,6 +157,26 @@ def demo(token: str, session: Db) -> HTMLResponse | JSONResponse:
 @router.get("/api/public/proyecto/{token}", response_model=ProjectPublic)
 def proyecto(token: str, session: Db) -> dict[str, Any]:
     return project_public(session, token)
+
+
+@router.get("/pago/fake/{pref_id}", response_model=None)
+def pago_fake(pref_id: str) -> HTMLResponse:
+    safe = html.escape(pref_id)
+    page = (
+        '<!doctype html><html lang="es-CL"><head>'
+        '<meta charset="utf-8">'
+        '<meta name="robots" content="noindex, nofollow">'
+        "<title>Pago simulado</title></head><body>"
+        "<p>Pago simulado. No se hizo ningún cobro.</p>"
+        f"<p>Referencia {safe}.</p>"
+        "</body></html>"
+    )
+    return HTMLResponse(page, headers=_ROBOTS)
+
+
+@router.get("/api/public/proyecto/{token}/preview", response_model=None)
+def proyecto_preview(token: str, session: Db) -> HTMLResponse:
+    return HTMLResponse(preview_html(session, token), headers=_ROBOTS)
 
 
 @router.post("/api/public/proyecto/{token}/intake")

@@ -21,8 +21,6 @@ STATE_DIR = ROOT / "state"
 PROMPTS_DIR = ROOT / "prompts"
 LEADS_FILE = STATE_DIR / "leads.json"
 LOGS_FILE = STATE_DIR / "logs.json"
-QUEUE_FILE = STATE_DIR / "queue.json"
-HIGH_VALUE_CLP = 2_800_000
 
 
 class LeadStatus(StrEnum):
@@ -91,7 +89,6 @@ def ensure_state_dirs() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     _write_if_missing(LEADS_FILE, "[]")
     _write_if_missing(LOGS_FILE, "[]")
-    _write_if_missing(QUEUE_FILE, '{"pending": [], "priority": []}')
 
 
 def _write_if_missing(path: Path, content: str) -> None:

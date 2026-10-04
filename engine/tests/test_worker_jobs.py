@@ -289,9 +289,7 @@ def test_opt_out_en_el_mismo_tick(session: Session) -> None:
     assert stored.status == "opt_out"
     assert box.sent == []
     follow = [
-        row
-        for row in MessageRepository(session).list(lead_id=lead.id)
-        if row.direction == "out"
+        row for row in MessageRepository(session).list(lead_id=lead.id) if row.direction == "out"
     ]
     assert len(follow) == 1
     assert follow[0].status == "blocked"

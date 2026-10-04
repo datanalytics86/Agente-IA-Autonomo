@@ -141,9 +141,9 @@ def test_fabrica_hosting_y_cloudflare(tmp_path: Path, respx_mock: Any) -> None:
     assert published.is_dir()
     assert (published / "index.html").is_file()
 
-    route = respx_mock.post(
-        f"{CF_API}/accounts/acc-1/pages/projects/abc/deployments"
-    ).respond(201, json={"success": True, "result": {"url": "https://abc.pages.dev"}})
+    route = respx_mock.post(f"{CF_API}/accounts/acc-1/pages/projects/abc/deployments").respond(
+        201, json={"success": True, "result": {"url": "https://abc.pages.dev"}}
+    )
     remote = build_hosting(
         _settings(
             hosting_provider="cloudflare_pages",
@@ -179,5 +179,5 @@ def test_storage_local_y_fake(tmp_path: Path) -> None:
     assert isinstance(build_storage(_settings(app_mode="demo", dry_run=True)), FakeStorage)
     prod = build_storage(_settings(), root=tmp_path / "prod")
     assert isinstance(prod, LocalStorage)
-    assert prod.put("b.txt", b"ok") 
+    assert prod.put("b.txt", b"ok")
     assert prod.get("b.txt") == b"ok"

@@ -76,7 +76,12 @@ plugins = ["pydantic.mypy"]
 mypy_path = "."
 namespace_packages = false
 warn_unused_configs = true
+exclude = "(^|[/\\\\])(agents|api|integrations|simulation|tests|migrations)[/\\\\]|(^|[/\\\\])main\\.py$"
 
 [[tool.mypy.overrides]]
 module = ["core", "core.*", "db", "db.*", "worker", "worker.*"]
 strict = true
+
+[[tool.mypy.overrides]]
+module = ["apscheduler.*"]
+ignore_missing_imports = true

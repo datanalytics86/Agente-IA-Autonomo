@@ -109,9 +109,7 @@ def job_scout(ctx: JobContext) -> int:
     room = settings.scout_daily_limit - already
     hits = ctx.ports.places.search(commune, category, room)
     known = {
-        lead.place_id
-        for lead in LeadRepository(ctx.session).list(limit=5000)
-        if lead.place_id
+        lead.place_id for lead in LeadRepository(ctx.session).list(limit=5000) if lead.place_id
     }
     created = 0
     for hit in hits:

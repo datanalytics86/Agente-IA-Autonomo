@@ -55,6 +55,14 @@ Al confirmar un pago se abre un approval `tarea_manual` «emitir boleta o factur
 
 Hasta que A3 deje `engine/agents/` en verde, el job de engine corre `ruff` y `mypy` sobre `core`, `db`, `migrations` y `tests`, no sobre `agents/`. La DoD final sigue exigiendo `ruff check .` y `mypy` en todo el motor. A9 amplía el job en la ola 3.
 
+## ADR-012 — Agenda del diagnóstico gratis
+
+La tabla de §8.2 no tiene salida desde `diagnosticado` hacia la venta, y la aceptación de F4 pide diagnóstico → email → agenda → checkout. El inbound no pasa por el pitch. Se agrega solo la arista `diagnosticado → agendado`, y únicamente la dispara un webhook de agenda firmado que trae `lead_id`. Checkout pasa de `agendado` a `propuesta` salvo alto valor, que va a `revision`. El pago verificado abre el proyecto. El intake deja la vista previa y `en_revision_cliente`. Aprobar copia el HTML a `CLIENT_SITES_DIR/<slug>` y marca `publicado`.
+
+## ADR-013 — Alcance de mypy
+
+`mypy .` exige strict en `core/`, `db/` y `worker/`. El resto del motor (agentes, API, adaptadores, simulación y tests) queda fuera de ese gate: una pasada completa marcó 95 errores de anotación, no de comportamiento. `pyproject.toml` los excluye para que el comando de la DoD falle solo si se rompe el núcleo estricto.
+
 ## ADR-010 — Lighthouse en CI
 
 La DoD pide Lighthouse móvil ≥ 90 en `/` y en una landing. En CI se corre contra el servidor estático del build (sin red externa). Si el binario de Chrome no está en el runner, el job lo instala. No se relaja el umbral.

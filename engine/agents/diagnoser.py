@@ -99,10 +99,7 @@ def _payload(
 ) -> dict[str, object]:
     rating = getattr(lead, "rating", None)
     reviews = getattr(lead, "reviews", None)
-    high = bool(
-        getattr(lead, "high_value", False)
-        or needs_value_review(lead.estimated_value_clp)
-    )
+    high = bool(getattr(lead, "high_value", False) or needs_value_review(lead.estimated_value_clp))
     price = lead.estimated_value_clp
     if high or not isinstance(price, int) or price < 250_000 or price > 450_000:
         price_out: int | None = None
