@@ -1,0 +1,808 @@
+openapi: 3.0.3
+info:
+  title: Agencia API
+  version: 0.1.0
+  description: >
+    Borrador F0. F2 lo regenera desde FastAPI y el CI compara el resultado
+    con este archivo. JSON en snake_case. Errores con el esquema Error.
+servers:
+  - url: http://localhost
+tags:
+  - name: public
+  - name: webhooks
+  - name: admin
+  - name: internal
+paths:
+  /healthz:
+    get:
+      tags: [public]
+      summary: Proceso vivo
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: {type: string, example: ok}
+  /readyz:
+    get:
+      tags: [public]
+      summary: Base de datos alcanzable
+      responses:
+        "200": {description: listo}
+        "503": {description: no listo, $ref: "#/components/responses/Error"}
+  /api/public/paquetes:
+    get:
+      tags: [public]
+      responses:
+        "200":
+          description: paquetes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Package"}
+  /api/public/diagnostico:
+    post:
+      tags: [public]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/DiagnosticoIn"}
+      responses:
+        "202":
+          description: aceptado
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Accepted"}
+        "422": {$ref: "#/components/responses/Error"}
+  /api/public/contacto:
+    post:
+      tags: [public]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ContactoIn"}
+      responses:
+        "202":
+          description: aceptado
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Accepted"}
+  /api/public/checkout:
+    post:
+      tags: [public]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CheckoutIn"}
+      responses:
+        "201":
+          description: preferencia
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CheckoutOut"}
+  /api/public/baja:
+    get:
+      tags: [public]
+      parameters:
+        - $ref: "#/components/parameters/Token"
+      responses:
+        "200": {description: página o confirmación de baja}
+    post:
+      tags: [public]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: {type: string}
+      responses:
+        "200": {description: suprimido}
+  /u/{token}:
+    post:
+      tags: [public]
+      parameters:
+        - $ref: "#/components/parameters/Token"
+      responses:
+        "200": {description: one-click RFC 8058}
+  /api/public/derechos:
+    post:
+      tags: [public]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/DerechosIn"}
+      responses:
+        "202":
+          description: solicitud registrada
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Accepted"}
+  /demo/{token}:
+    get:
+      tags: [public]
+      parameters:
+        - $ref: "#/components/parameters/Token"
+      responses:
+        "200":
+          description: HTML de la landing demo. Header X-Robots-Tag noindex, nofollow
+        "410": {description: expirada}
+  /api/public/proyecto/{token}:
+    get:
+      tags: [public]
+      parameters:
+        - $ref: "#/components/parameters/Token"
+      responses:
+        "200":
+          description: portal
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ProjectPublic"}
+  /api/public/proyecto/{token}/intake:
+    post:
+      tags: [public]
+      parameters:
+        - $ref: "#/components/parameters/Token"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: true}
+      responses:
+        "200": {description: intake guardado}
+  /api/public/proyecto/{token}/feedback:
+    post:
+      tags: [public]
+      parameters:
+        - $ref: "#/components/parameters/Token"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: {type: string}
+      responses:
+        "202": {description: ronda registrada}
+  /api/public/proyecto/{token}/aprobar:
+    post:
+      tags: [public]
+      parameters:
+        - $ref: "#/components/parameters/Token"
+      responses:
+        "200": {description: proyecto aprobado}
+  /api/internal/domain-check:
+    get:
+      tags: [internal]
+      parameters:
+        - name: domain
+          in: query
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: dominio autorizado}
+        "404": {description: Caddy no debe emitir certificado}
+  /webhooks/mercadopago:
+    post:
+      tags: [webhooks]
+      responses:
+        "200": {description: aceptado}
+        "401": {$ref: "#/components/responses/Error"}
+  /webhooks/calcom:
+    post:
+      tags: [webhooks]
+      responses:
+        "200": {description: aceptado}
+        "401": {$ref: "#/components/responses/Error"}
+  /webhooks/calendly:
+    post:
+      tags: [webhooks]
+      responses:
+        "200": {description: aceptado}
+        "401": {$ref: "#/components/responses/Error"}
+  /webhooks/email:
+    post:
+      tags: [webhooks]
+      responses:
+        "200": {description: aceptado}
+        "401": {$ref: "#/components/responses/Error"}
+  /webhooks/meta:
+    get:
+      tags: [webhooks]
+      parameters:
+        - {name: hub.mode, in: query, schema: {type: string}}
+        - {name: hub.verify_token, in: query, schema: {type: string}}
+        - {name: hub.challenge, in: query, schema: {type: string}}
+      responses:
+        "200": {description: challenge en texto}
+    post:
+      tags: [webhooks]
+      responses:
+        "200": {description: aceptado}
+        "401": {$ref: "#/components/responses/Error"}
+  /api/auth/login:
+    post:
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: {type: string, format: email}
+                password: {type: string}
+      responses:
+        "200":
+          description: cookie de sesión
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/User"}
+        "401": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
+  /api/auth/logout:
+    post:
+      tags: [admin]
+      responses:
+        "204": {description: sesión cerrada}
+  /api/auth/me:
+    get:
+      tags: [admin]
+      responses:
+        "200":
+          description: usuario
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/User"}
+        "401": {$ref: "#/components/responses/Error"}
+  /api/leads:
+    get:
+      tags: [admin]
+      parameters:
+        - {name: status, in: query, schema: {type: string}}
+        - {name: q, in: query, schema: {type: string}}
+        - {name: page, in: query, schema: {type: integer, default: 1}}
+        - {name: page_size, in: query, schema: {type: integer, default: 20}}
+      responses:
+        "200":
+          description: página
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/LeadPage"}
+  /api/leads/{id}:
+    get:
+      tags: [admin]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses:
+        "200":
+          description: detalle
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/LeadDetail"}
+    patch:
+      tags: [admin]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/LeadPatch"}
+      responses:
+        "200":
+          description: actualizado
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Lead"}
+  /api/leads/{id}/transition:
+    post:
+      tags: [admin]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to, reason]
+              properties:
+                to: {type: string}
+                reason: {type: string}
+      responses:
+        "200":
+          description: transicionado
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Lead"}
+        "409": {$ref: "#/components/responses/Error"}
+  /api/approvals:
+    get:
+      tags: [admin]
+      parameters:
+        - {name: status, in: query, schema: {type: string, default: pending}}
+      responses:
+        "200":
+          description: lista
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Approval"}
+  /api/approvals/{id}/approve:
+    post:
+      tags: [admin]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses:
+        "200": {description: aprobado. El lead vuelve a paused_from}
+  /api/approvals/{id}/reject:
+    post:
+      tags: [admin]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: {type: string}
+      responses:
+        "200": {description: rechazado}
+  /api/approvals/{id}/edit:
+    post:
+      tags: [admin]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                body_text: {type: string}
+                subject: {type: string}
+      responses:
+        "200": {description: editado y devuelto al Checker}
+  /api/messages:
+    get:
+      tags: [admin]
+      parameters:
+        - {name: lead_id, in: query, schema: {type: string}}
+      responses:
+        "200":
+          description: mensajes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Message"}
+  /api/manual-queue:
+    get:
+      tags: [admin]
+      responses:
+        "200":
+          description: cola IG/LinkedIn
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Message"}
+  /api/manual-queue/{id}/mark-sent:
+    post:
+      tags: [admin]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses:
+        "200": {description: marcado manual_sent}
+  /api/conversations:
+    get:
+      tags: [admin]
+      responses:
+        "200":
+          description: hilos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Thread"}
+  /api/conversations/{id}/reply:
+    post:
+      tags: [admin]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body_text]
+              properties:
+                body_text: {type: string}
+      responses:
+        "202": {description: pasa por el Checker}
+  /api/agents:
+    get:
+      tags: [admin]
+      responses:
+        "200":
+          description: estado real y prompts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/AgentStatus"}
+  /api/actions/{name}:
+    post:
+      tags: [admin]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: {type: string, enum: [scout, cycle, followups, digest]}
+      responses:
+        "202": {description: job encolado}
+  /api/events:
+    get:
+      tags: [admin]
+      parameters:
+        - {name: level, in: query, schema: {type: string}}
+        - {name: agent, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, default: 100}}
+      responses:
+        "200":
+          description: eventos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Event"}
+  /api/events/stream:
+    get:
+      tags: [admin]
+      responses:
+        "200":
+          description: SSE text/event-stream
+  /api/metrics:
+    get:
+      tags: [admin]
+      responses:
+        "200":
+          description: KPIs
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Metrics"}
+  /api/orders:
+    get:
+      tags: [admin]
+      responses:
+        "200":
+          description: pedidos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Order"}
+  /api/projects:
+    get:
+      tags: [admin]
+      responses:
+        "200":
+          description: proyectos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Project"}
+  /api/projects/{id}:
+    patch:
+      tags: [admin]
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      requestBody:
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: true}
+      responses:
+        "200": {description: actualizado}
+  /api/settings:
+    get:
+      tags: [admin]
+      responses:
+        "200":
+          description: settings
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Settings"}
+    put:
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/Settings"}
+      responses:
+        "200": {description: guardado}
+  /api/compliance/suppression:
+    get:
+      tags: [admin]
+      responses:
+        "200": {description: hashes, sin valores en claro}
+    post:
+      tags: [admin]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, value, reason]
+              properties:
+                kind: {type: string}
+                value: {type: string}
+                reason: {type: string}
+      responses:
+        "201": {description: agregado}
+    delete:
+      tags: [admin]
+      parameters:
+        - {name: id, in: query, required: true, schema: {type: string}}
+      responses:
+        "204": {description: borrado solo por humano}
+  /api/compliance/data-requests:
+    get:
+      tags: [admin]
+      responses:
+        "200": {description: solicitudes}
+    patch:
+      tags: [admin]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, status]
+              properties:
+                id: {type: string}
+                status: {type: string}
+      responses:
+        "200": {description: actualizada}
+  /api/meta/categories:
+    get:
+      tags: [admin]
+      responses:
+        "200": {description: 15 rubros}
+  /api/meta/statuses:
+    get:
+      tags: [admin]
+      responses:
+        "200": {description: estados y transiciones}
+components:
+  parameters:
+    Token:
+      name: token
+      in: path
+      required: true
+      schema: {type: string}
+  responses:
+    Error:
+      description: error
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: {type: string}
+            message: {type: string}
+            details: {type: object, additionalProperties: true}
+    Accepted:
+      type: object
+      required: [id, status]
+      properties:
+        id: {type: string}
+        status: {type: string}
+    Package:
+      type: object
+      required: [code, name, price_clp, revisions]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        price_clp: {type: integer, nullable: true}
+        revisions: {type: integer}
+        includes: {type: array, items: {type: string}}
+    DiagnosticoIn:
+      type: object
+      required: [business, email, commune, category, consent, consent_text]
+      properties:
+        business: {type: string}
+        website_url: {type: string, nullable: true}
+        email: {type: string, format: email}
+        commune: {type: string}
+        category: {type: string}
+        consent: {type: boolean}
+        consent_text: {type: string}
+        honeypot: {type: string}
+        turnstile_token: {type: string}
+    ContactoIn:
+      type: object
+      required: [name, email, message, consent]
+      properties:
+        name: {type: string}
+        email: {type: string, format: email}
+        message: {type: string}
+        consent: {type: boolean}
+        honeypot: {type: string}
+        turnstile_token: {type: string}
+    DerechosIn:
+      type: object
+      required: [kind, email, details]
+      properties:
+        kind: {type: string}
+        email: {type: string, format: email}
+        details: {type: string}
+        honeypot: {type: string}
+        turnstile_token: {type: string}
+    CheckoutIn:
+      type: object
+      required: [package_code]
+      properties:
+        package_code: {type: string}
+        lead_id: {type: string, nullable: true}
+    CheckoutOut:
+      type: object
+      required: [order_id, checkout_url]
+      properties:
+        order_id: {type: string}
+        checkout_url: {type: string}
+    User:
+      type: object
+      required: [email]
+      properties:
+        email: {type: string}
+    Lead:
+      type: object
+      required: [id, business, category, commune, status, source]
+      properties:
+        id: {type: string}
+        business: {type: string}
+        category: {type: string}
+        city: {type: string}
+        commune: {type: string}
+        status: {type: string}
+        source: {type: string}
+        estimated_value_clp: {type: integer}
+        high_value: {type: boolean}
+        opportunity_score: {type: integer}
+        paused_from: {type: string, nullable: true}
+    LeadPatch:
+      type: object
+      properties:
+        tone: {type: string}
+        next_action_at: {type: string, format: date-time, nullable: true}
+    LeadPage:
+      type: object
+      required: [items, page, page_size, total]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/Lead"}}
+        page: {type: integer}
+        page_size: {type: integer}
+        total: {type: integer}
+    LeadDetail:
+      allOf:
+        - $ref: "#/components/schemas/Lead"
+        - type: object
+          properties:
+            timeline: {type: array, items: {type: object}}
+            messages: {type: array, items: {$ref: "#/components/schemas/Message"}}
+            artifacts: {type: array, items: {type: object}}
+            website_audit: {type: object, nullable: true}
+            diagnosis: {type: object, nullable: true}
+    Message:
+      type: object
+      required: [id, channel, direction, status]
+      properties:
+        id: {type: string}
+        lead_id: {type: string}
+        channel: {type: string}
+        direction: {type: string}
+        status: {type: string}
+        subject: {type: string, nullable: true}
+        body_text: {type: string}
+        check_result: {type: object, nullable: true}
+    Approval:
+      type: object
+      required: [id, lead_id, kind, status]
+      properties:
+        id: {type: string}
+        lead_id: {type: string}
+        kind: {type: string}
+        status: {type: string}
+        payload: {type: object}
+    Thread:
+      type: object
+      required: [id, lead_id]
+      properties:
+        id: {type: string}
+        lead_id: {type: string}
+        last_message: {type: string}
+    AgentStatus:
+      type: object
+      required: [name, prompt_version]
+      properties:
+        name: {type: string}
+        prompt_name: {type: string}
+        prompt_version: {type: string}
+        prompt_markdown: {type: string}
+        last_run_at: {type: string, format: date-time, nullable: true}
+        last_error: {type: string, nullable: true}
+    Event:
+      type: object
+      required: [id, ts, agent, level, message]
+      properties:
+        id: {type: string}
+        ts: {type: string, format: date-time}
+        agent: {type: string}
+        level: {type: string}
+        message: {type: string}
+        lead_id: {type: string, nullable: true}
+    Metrics:
+      type: object
+      required: [revenue_clp, llm_cost_usd]
+      properties:
+        revenue_clp: {type: integer}
+        llm_cost_usd: {type: number}
+        tokens_today: {type: integer}
+        response_rate_by_channel: {type: object, additionalProperties: {type: number}}
+        funnel: {type: object, additionalProperties: {type: integer}}
+        pipeline: {type: object, additionalProperties: {type: integer}}
+        quotas: {type: object, additionalProperties: true}
+    Order:
+      type: object
+      required: [id, status, total_clp]
+      properties:
+        id: {type: string}
+        lead_id: {type: string}
+        package_code: {type: string}
+        status: {type: string}
+        total_clp: {type: integer}
+    Project:
+      type: object
+      required: [id, status]
+      properties:
+        id: {type: string}
+        status: {type: string}
+        revisions_used: {type: integer}
+        max_revisions: {type: integer}
+        domain: {type: string, nullable: true}
+        deploy_url: {type: string, nullable: true}
+    ProjectPublic:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string}
+        business: {type: string}
+        revisions_used: {type: integer}
+        max_revisions: {type: integer}
+        preview_url: {type: string, nullable: true}
+    Settings:
+      type: object
+      required: [kill_switch, app_mode]
+      properties:
+        kill_switch: {type: boolean}
+        app_mode: {type: string, readOnly: true}
+        quotas: {type: object, additionalProperties: true}
+        prices: {type: object, additionalProperties: true}
+        hitl_response_rate_by_channel: {type: object, additionalProperties: {type: number}}

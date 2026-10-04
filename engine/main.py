@@ -181,6 +181,37 @@ def cmd_prompts() -> int:
     return 0
 
 
+# Modos nuevos: el módulo lo implementa su dueño. A0 no deja que nadie más edite este archivo.
+EXTRA_MODES: dict[str, tuple[str, str]] = {
+    "migrate-json": ("db.migrate_json", "main"),
+    "seed": ("db.seed", "main"),
+    "api": ("api.cli", "main"),
+    "export-openapi": ("api.cli", "export_openapi"),
+    "create-admin": ("api.cli", "create_admin"),
+    "worker": ("worker.cli", "main"),
+    "simulate": ("simulation.cli", "main"),
+}
+
+
+def _load_extra(mode: str):
+    import importlib
+    import inspect
+
+    module_name, func_name = EXTRA_MODES[mode]
+    try:
+        module = importlib.import_module(module_name)
+        return getattr(module, func_name), inspect.signature(getattr(module, func_name))
+    except (ImportError, AttributeError):
+        def _missing(**_kwargs: object) -> int:
+            console.print(
+                f"[yellow]Modo {mode} todavía no está implementado "
+                f"({module_name}.{func_name}).[/yellow]"
+            )
+            return 2
+
+        return _missing, inspect.signature(_missing)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="main.py",
@@ -188,10 +219,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        choices=["demo", "status", "scout", "cycle", "prompts"],
+        choices=["demo", "status", "scout", "cycle", "prompts", *EXTRA_MODES.keys()],
         default="demo",
         help="Modo de ejecución (default: demo)",
     )
+    parser.add_argument("--days", type=int, default=14, help="Días de simulación")
+    parser.add_argument("--seed", type=int, default=42, help="Semilla de simulación")
     return parser
 
 
@@ -206,6 +239,14 @@ def main(argv: list[str] | None = None) -> int:
         "prompts": cmd_prompts,
     }
     try:
+        if args.mode in EXTRA_MODES:
+            fn, signature = _load_extra(args.mode)
+            kwargs: dict[str, int] = {}
+            if "days" in signature.parameters:
+                kwargs["days"] = args.days
+            if "seed" in signature.parameters:
+                kwargs["seed"] = args.seed
+            return fn(**kwargs)
         return handlers[args.mode]()
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrumpido[/yellow]")
