@@ -1,0 +1,20 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  title="Volviste del pago"
+  description="El regreso desde el checkout no confirma el pago. La confirmación llega por la notificación del proveedor."
+  noindex
+  jsonLd={false}
+>
+  <h1 class="text-4xl font-semibold tracking-tight">Volviste del checkout</h1>
+  <p class="mt-4 max-w-2xl text-muted">
+    Esta página no confirma el cobro. El pago queda registrado cuando el proveedor lo notifica a nuestro sistema, no porque hayas llegado aquí.
+    Si se aprueba, seguimos con el intake del proyecto. La boleta o factura se emite aparte.
+  </p>
+  <dl id="pago-retorno" class="mt-6 max-w-xl text-sm" hidden></dl>
+  <p class="mt-8">
+    <a class="text-accent underline-offset-4 hover:underline" href="/paquetes">Volver a paquetes</a>
+  </p>
+</Base>
