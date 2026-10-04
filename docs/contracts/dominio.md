@@ -32,7 +32,7 @@ transition(lead, to, *, actor, reason) -> Lead
 
 `actor` ∈ `agente` | `humano` | `sistema` | `webhook`.
 
-La función valida la arista, escribe `lead_events` y un `events` de nivel `info`, y actualiza `updated_at`. Si la arista no existe, lanza `TransitionError` y no persiste. Desde `revision`, el destino debe ser exactamente `paused_from` (o `perdido` / `opt_out`).
+La función valida la arista, escribe `lead_events` y un `events` de nivel `info`, y actualiza `updated_at`. Si la arista no existe, lanza `TransitionError` y no persiste. Desde `revision`, el caller pasa el token `paused_from` (la función lo resuelve al estado guardado) o `perdido` / `opt_out`. Pedir el nombre concreto del estado, por ejemplo `enviado`, se rechaza. Si el mensaje fue editado, el servicio de aprobación lo devuelve a `checking` antes de llamar a `transition`.
 
 | Desde | Hacia |
 |---|---|

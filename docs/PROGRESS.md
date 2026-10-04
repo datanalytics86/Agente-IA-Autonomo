@@ -1,6 +1,6 @@
 # PROGRESS — Autonomía 04-10-2026
 
-Rama: `grok/autonomia-041026` · Última actualización: 2026-10-04 16:30 America/Santiago · Ola actual: 1
+Rama: `grok/autonomia-041026` · Última actualización: 2026-10-04 18:10 America/Santiago · Ola actual: 2
 
 ## Estado de la DoD
 
@@ -32,18 +32,18 @@ Web, en `apps/web`:
 | F0-03 | Contratos §6.3 | A0 | ✅ | 0d89efa | `docs/contracts/` |
 | F0-04 | Tablero | A0 | ✅ | 0d89efa | este archivo |
 | F0-05 | DECISIONES y GO_LIVE | A0 | ✅ | 0d89efa | `docs/DECISIONES.md`, `docs/GO_LIVE.md` |
-| F1-01 | pyproject + requirements | A1 | ☐ | | |
-| F1-02 | core/config.py | A1 | ☐ | | H6 H9 H20 |
-| F1-03 | modelos, Alembic, repos | A1 | ☐ | | |
-| F1-04 | transition() única | A1 | ☐ | | H4 H5 |
-| F1-05 | migrate-json | A1 | ☐ | | H1 H2 H3 |
+| F1-01 | pyproject + requirements | A1 | ✅ | 7ede130 | ruff, mypy y pytest del núcleo |
+| F1-02 | core/config.py | A1 | ✅ | 8ed6259 | alias GROK_API_KEY; agentes aún no lo consumen |
+| F1-03 | modelos, Alembic, repos | A1 | ✅ | fc72ffb | revisión 2fb1d83b32e1 |
+| F1-04 | transition() única | A1 | ✅ | 8ed6259 | token paused_from; agents/ sigue asignando status |
+| F1-05 | migrate-json | A1 | ✅ | fc72ffb | JSON corrupto sale 1 y no se reescribe |
 | F1-06 | agentes sobre repositorios, demo verde | A3 | ☐ | | |
 | F1-07 | código muerto, H16 H17 H18 H19 | A3 | ☐ | | |
 | F1-08 | Jinja2 autoescape | A3 | ☐ | | H7 H8 H9 H10 |
 | F1-09 | high-value solo en rubros plausibles | A3 | ☐ | | H12 |
-| F1-10 | tests y cobertura ≥ 80 % | A1 A3 A4 | ☐ | | |
-| F1-11 | CI | A9 | ☐ | | |
-| F1-12 | READMEs | A10 | ☐ | | H28 H29 |
+| F1-10 | tests y cobertura ≥ 80 % | A1 A3 A4 | ⏳ | | núcleo verde; falta agents y worker |
+| F1-11 | CI | A9 | ✅ | 84a1202 | sin job Docker; ruff de agents espera a A3 |
+| F1-12 | READMEs | A10 | ✅ | 4ae5920 | 0 coincidencias de T14 Gen 2 |
 | F2-01 | FastAPI health, CORS, errores | A2 | ☐ | | |
 | F2-02 | auth admin | A2 | ☐ | | H27 |
 | F2-03 | endpoints admin y SSE | A2 | ☐ | | |
@@ -120,6 +120,14 @@ Web, en `apps/web`:
 
 Ninguno. La spec vivía solo en `claude/ecstatic-mayer-8tna8e` (`0dfe69e`). La rama de trabajo sale de `main` (`19b678b`) y el archivo entra en el primer commit de esta rama.
 
+## Ola 1
+
+Integrada en `473f209`. Suite del motor, en `engine/` con el venv: `ruff check` 0, `ruff format --check` 0, `mypy core db` 0, `pytest -q` 131 passed. `python main.py --mode prompts` exit 0.
+
+`agents/base.py` todavía traga JSON inválido y asigna `.status`. Lo cierra A3 al pasar el pipeline a los repositorios. La ruta nueva (`migrate-json`, `transition`) ya no lo hace.
+
+Docker no está instalado en esta máquina: `docker compose config` no se ejecutó.
+
 ## Próxima acción exacta
 
-Ola 1 en paralelo: A1 núcleo y BD, A8 compliance, A9 harness y CI, A10 READMEs. Al cerrar, suite de lo que ya exista y rebase a esta rama.
+Ola 2 en worktrees separados: A2 API, A3 agentes, A4 worker, A5 canales, A6 dashboard, A7 sitio.

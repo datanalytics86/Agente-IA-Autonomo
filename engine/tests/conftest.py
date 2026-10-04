@@ -77,9 +77,7 @@ def block_network(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
             _reject(host or repr(address))
         return real_connect_ex(self, address)  # type: ignore[arg-type]
 
-    def create_connection(
-        address: object, *args: object, **kwargs: object
-    ) -> socket.socket:
+    def create_connection(address: object, *args: object, **kwargs: object) -> socket.socket:
         host = _host_from_address(address)
         if host is None or not _allows(host):
             _reject(host or repr(address))

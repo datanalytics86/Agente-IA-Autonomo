@@ -39,6 +39,7 @@ htmlcov/
 coverage.xml
 playwright-report/
 test-results/
+infra/backups/
 
 # Compat rutas legacy
 state/leads.json

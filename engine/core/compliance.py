@@ -16,9 +16,7 @@ from urllib.parse import urlparse
 from pydantic import BaseModel
 
 # Invisibles, guion blando y marcas bidireccionales no deben partir una palabra.
-_INVISIBLE_RE = re.compile(
-    r"[\u00ad\u200b-\u200f\u2060\u2066-\u2069\u202a-\u202e\ufeff]"
-)
+_INVISIBLE_RE = re.compile(r"[\u00ad\u200b-\u200f\u2060\u2066-\u2069\u202a-\u202e\ufeff]")
 _KINDS = frozenset({"email", "domain", "phone", "instagram", "linkedin"})
 
 # El punto es separador de miles en es-CL. Por debajo de 100.000 no se trata
@@ -28,12 +26,8 @@ _PRICE_MARKED_RE = re.compile(
     r"|(\d{1,3}(?:\.\d{3})+|\d{4,8})(?!\d)\s*(?:clp|pesos)"
 )
 _PRICE_DOTTED_RE = re.compile(r"(?<!\d)(\d{1,3}(?:\.\d{3})+)(?!\d)")
-_EMAIL_RE = re.compile(
-    r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b"
-)
-_PHONE_RE = re.compile(
-    r"(?<!\d)(?:\+?56[\s.\-]*)?9[\s.\-]*\d{4}[\s.\-]*\d{4}(?!\d)"
-)
+_EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b")
+_PHONE_RE = re.compile(r"(?<!\d)(?:\+?56[\s.\-]*)?9[\s.\-]*\d{4}[\s.\-]*\d{4}(?!\d)")
 _URL_RE = re.compile(r"(?i)(?:https?://[^\s<>\"']+|//[^\s<>\"']+)")
 _OPT_OUT_PHRASES = (
     "no me escriban",
@@ -264,14 +258,10 @@ def _coerce_settings(settings: Settings | Mapping[str, Any] | None) -> Settings:
     return Settings(
         agency_name=str(settings.get("agency_name") or ""),
         price_min_clp=(
-            _as_int(settings.get("price_min_clp"))
-            if "price_min_clp" in present
-            else 250_000
+            _as_int(settings.get("price_min_clp")) if "price_min_clp" in present else 250_000
         ),
         price_max_clp=(
-            _as_int(settings.get("price_max_clp"))
-            if "price_max_clp" in present
-            else 450_000
+            _as_int(settings.get("price_max_clp")) if "price_max_clp" in present else 450_000
         ),
         public_base_url=str(settings.get("public_base_url") or ""),
         agency_email=str(settings.get("agency_email") or ""),
