@@ -24,6 +24,24 @@ class InboundMail(BaseModel):
     subject: str
     text: str
     in_reply_to: str | None = None
+    intent: str = ""
+
+    @property
+    def from_email(self) -> str:
+        return bare_address(self.from_addr)
+
+    @property
+    def body(self) -> str:
+        return self.text
+
+
+def bare_address(value: str) -> str:
+    text = value.strip()
+    start = text.rfind("<")
+    end = text.rfind(">")
+    if start != -1 and end > start:
+        text = text[start + 1 : end]
+    return text.strip().lower()
 
 
 class TransactionalEmail(Protocol):

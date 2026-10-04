@@ -64,6 +64,8 @@ from api.services import (
     transition_from_admin,
     write_settings,
 )
+from core.config import get_settings
+from worker.wiring import channel_status
 
 router = APIRouter(
     tags=["admin"],
@@ -165,7 +167,11 @@ def reply(id: str, payload: ReplyIn, session: Db) -> dict[str, str]:
 
 @router.get("/api/agents", response_model=list[AgentStatus])
 def agents(session: Db) -> list[dict[str, Any]]:
-    return agent_rows(session)
+    rows = agent_rows(session)
+    channels = channel_status(get_settings())
+    for row in rows:
+        row["channels"] = channels
+    return rows
 
 
 @router.post("/api/actions/{name}", status_code=202)
