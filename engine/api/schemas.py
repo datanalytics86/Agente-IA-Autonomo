@@ -249,6 +249,7 @@ class AgentStatus(BaseModel):
     prompt_markdown: str
     last_run_at: str | None = None
     last_error: str | None = None
+    channels: dict[str, str] = Field(default_factory=dict)
 
 
 class EventOut(BaseModel):

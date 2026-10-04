@@ -1,14 +1,13 @@
 """Dependencias de request y el protocolo de pagos.
 
-El adaptador real de Mercado Pago es de A5 (`integrations.payments`).
-Si no está, o no hay token, o el proceso está en demo/dry-run, se usa
-el fake local. No abre red ni cobra.
+El checkout llama `integrations.payments.build_payments`. En prod con
+`MP_ACCESS_TOKEN` y sin dry-run esa fábrica devuelve `MercadoPagoProvider`.
+En demo, dry-run o sin token se conserva el proveedor local (remember/webhook).
 """
 
 from __future__ import annotations
 
 import hmac
-import importlib
 import secrets
 from collections.abc import Iterator, Mapping
 from typing import Annotated, Protocol
@@ -104,19 +103,11 @@ class LocalPaymentProvider:
 
 
 def build_payment_provider(settings: Settings) -> PaymentProvider:
-    needs_fake = (
-        settings.app_mode == "demo" or settings.dry_run or not settings.mp_access_token.strip()
-    )
-    if not needs_fake:
-        try:
-            module = importlib.import_module("integrations.payments")
-            factory = getattr(module, "build_payment_provider", None)
-        except ImportError:
-            factory = None
-        if factory is not None:
-            built = factory(settings)
-            if built is not None:
-                return built
+    from integrations.payments import MercadoPagoProvider, build_payments
+
+    built = build_payments(settings)
+    if isinstance(built, MercadoPagoProvider):
+        return built
     return LocalPaymentProvider(settings.public_base_url)
 
 

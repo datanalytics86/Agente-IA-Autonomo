@@ -67,6 +67,7 @@ def parse_rfc822(raw: bytes) -> InboundMail:
         subject=str(message["Subject"] or ""),
         text=text.strip(),
         in_reply_to=str(message["In-Reply-To"]) if message["In-Reply-To"] else None,
+        intent="",
     )
 
 
