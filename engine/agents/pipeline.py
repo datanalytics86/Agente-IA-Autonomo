@@ -1,29 +1,35 @@
-"""Orchestrator / pipeline — coordina agentes, prioriza, HITL, logs."""
+"""Orchestrator. run_cycle no crea leads: el scout solo corre si se lo invoca."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from agents.base import (
-    HIGH_VALUE_CLP,
     Lead,
     LeadStatus,
-    StateManager,
     ensure_state_dirs,
     load_leads,
-    log_event,
+    project_lead,
     read_prompt,
     status_counts,
-    upsert_lead,
 )
-from agents.builder import run_builder
-from agents.checker import run_checker
-from agents.diagnoser import run_diagnoser
-from agents.filmer import run_filmer
-from agents.mobile import run_mobile
-from agents.pitcher import run_pitcher
-from agents.scout import run_scout
+from agents.builder import BuilderAgent
+from agents.checker import CheckerAgent
+from agents.closer import CloserAgent
+from agents.context import AgentContext, AgentResult
+from agents.copy import register_agent_fallbacks
+from agents.delivery import DeliveryAgent
+from agents.diagnoser import DiagnoserAgent
+from agents.filmer import FilmerAgent
+from agents.mobile import MobileAgent
+from agents.pitcher import PitcherAgent, ensure_draft
+from agents.reporter import ReporterAgent
+from agents.runtime import iter_leads, log_event, prepare_db
+from agents.scout import ScoutAgent
+from db.models import Message
+from db.repositories import LeadRepository, MessageRepository
+from db.session import session_scope
 
 
 @dataclass
@@ -40,150 +46,148 @@ class CycleResult:
 
 
 class Orchestrator:
-    """Coordina el flujo multiagente con estado en filesystem."""
-
     def __init__(self) -> None:
         ensure_state_dirs()
+        prepare_db()
         self.prompt = read_prompt("orchestrator")
 
-    def log(self, message: str, level: str = "info", meta: Optional[dict] = None) -> None:
-        log_event("Orchestrator", message, level=level, meta=meta)
-
-    def escalate_high_value(self, leads: list[Lead]) -> list[Lead]:
-        escalated = []
-        for lead in leads:
-            if lead.estimated_value_clp >= HIGH_VALUE_CLP and lead.status != LeadStatus.REVISION:
-                lead.high_value = True
-                lead.status = LeadStatus.REVISION
-                lead.reason = (
-                    (lead.reason or "")
-                    + f" | deal {lead.estimated_value_clp:,} CLP → revision manual".replace(",", ".")
-                )
-                upsert_lead(lead)
-                self.log(
-                    f"deal {lead.estimated_value_clp:,} CLP → revision manual".replace(",", "."),
-                    level="warn",
-                    meta={"lead_id": lead.id},
-                )
-                escalated.append(lead)
-        return escalated
+    def run(self, ctx: AgentContext) -> AgentResult:
+        result = self._cycle(ctx.session)
+        return AgentResult(
+            lead_id=ctx.lead_id,
+            ok=True,
+            events=[],
+            output={
+                "ran_scout": False,
+                "advanced": len(result.diagnosed) + len(result.built),
+                "counts": result.counts,
+            },
+        )
 
     def run_demo(self, scout_count: int = 3, simulate_reply: bool = False) -> CycleResult:
-        """
-        Modo demo: Scout crea leads + pipeline avanza + flag high-value.
-        High-value queda en revision; el resto avanza hasta enviado (simulado).
-        """
-        self.log("inicio ciclo DEMO")
-        result = CycleResult()
-
-        # 1) Scout
-        result.scouted = run_scout(count=scout_count, force_high_value=True)
-
-        # Separar high-value (HITL) del flujo automático de envío
-        normal: list[Lead] = []
-        high: list[Lead] = []
-        for lead in result.scouted:
-            if lead.estimated_value_clp >= HIGH_VALUE_CLP:
-                high.append(lead)
-            else:
-                normal.append(lead)
-
-        # High-value: diagnosticar + artefactos demo pero status revision (no envío)
-        for lead in high:
-            from agents.diagnoser import diagnose_lead
-            from agents.builder import build_landing
-            from agents.filmer import film_lead
-            from agents.checker import check_lead
-
-            lead = diagnose_lead(lead)  # marca REVISION
-            result.diagnosed.append(lead)
-            # Aun en revision generamos landing/storyboard para que el humano revise
-            lead = build_landing(lead)
-            result.built.append(lead)
-            lead = film_lead(lead)
-            result.filmed.append(lead)
-            lead = check_lead(lead)
-            result.checked.append(lead)
-            self.log(
-                f"HITL · {lead.business} listo para revisión humana (sin envío automático)",
-                level="warn",
-                meta={"lead_id": lead.id},
+        prepare_db()
+        with session_scope() as session:
+            register_agent_fallbacks()
+            log_event("Orchestrator", "inicio ciclo DEMO", session=session)
+            result = CycleResult()
+            scouted = ScoutAgent().run(
+                AgentContext(session, count=scout_count, force_high_value=True)
             )
-
-        # Flujo normal completo
-        if normal:
-            result.diagnosed.extend(run_diagnoser(normal))
-            # recargar desde disco por status
-            diagnosed = [
-                l for l in load_leads()
-                if l.id in {x.id for x in normal} and l.status == LeadStatus.DIAGNOSTICADO
-            ]
-            result.built.extend(run_builder(diagnosed))
-            landed = [
-                l for l in load_leads()
-                if l.id in {x.id for x in normal} and l.status == LeadStatus.LANDING
-            ]
-            result.filmed.extend(run_filmer(landed))
-            videoed = [
-                l for l in load_leads()
-                if l.id in {x.id for x in normal} and l.status == LeadStatus.VIDEO
-            ]
-            result.checked.extend(run_checker(videoed))
-            ready = [
-                l for l in load_leads()
-                if l.id in {x.id for x in normal} and l.status == LeadStatus.PITCH_LISTO
-            ]
-            result.pitched.extend(run_pitcher(ready))
-
+            for lead_id in scouted.output.get("ids") or []:
+                row = LeadRepository(session).get(str(lead_id))
+                if row is not None:
+                    result.scouted.append(project_lead(session, row))
+                self._advance(session, str(lead_id), result)
             if simulate_reply:
-                result.mobile = run_mobile(simulate_interest=True)
-
-        result.counts = status_counts()
-        self.log(
-            "ciclo DEMO terminado · "
-            + ", ".join(f"{k}={v}" for k, v in result.counts.items() if v > 0)
-        )
-        result.notes.append("Nunca se envía sin Checker. High-value → revision.")
-        return result
+                self._simulate_reply(session, result)
+            MobileAgent().run(AgentContext(session))
+            ReporterAgent().run(AgentContext(session))
+            result.counts = _counts(session)
+            result.notes.append("Nunca se envía sin Checker. El alto valor queda en revision.")
+            log_event("Orchestrator", "ciclo DEMO terminado", session=session)
+            return result
 
     def run_cycle(self) -> CycleResult:
-        """Un ciclo sobre estado existente + opcionalmente scoutea si no hay nuevos."""
-        self.log("inicio ciclo")
+        """Avanza lo que ya está en `nuevo` o más adelante. No llama al scout."""
+        prepare_db()
+        with session_scope() as session:
+            return self._cycle(session)
+
+    def _cycle(self, session: Any) -> CycleResult:
+        register_agent_fallbacks()
+        log_event("Orchestrator", "inicio ciclo", session=session)
         result = CycleResult()
-
-        nuevos = [l for l in load_leads() if l.status == LeadStatus.NUEVO]
-        if not nuevos:
-            result.scouted = run_scout(count=2, force_high_value=False)
-            nuevos = [l for l in load_leads() if l.status == LeadStatus.NUEVO]
-
-        # Diagnóstico (incluye posible escalado HITL)
-        result.diagnosed = run_diagnoser(nuevos)
-
-        # Pipeline por status pendientes (no toca REVISION para envío)
-        result.built = run_builder()
-        result.filmed = run_filmer()
-        result.checked = run_checker()
-        result.pitched = run_pitcher()
-        run_mobile(simulate_interest=False)
-
-        result.counts = status_counts()
-        self.log(
-            "ciclo terminado · "
-            + ", ".join(f"{k}={v}" for k, v in result.counts.items() if v > 0)
-        )
+        for lead in list(iter_leads(session)):
+            self._advance(session, lead.id, result)
+        MobileAgent().run(AgentContext(session))
+        ReporterAgent().run(AgentContext(session))
+        result.counts = _counts(session)
+        log_event("Orchestrator", "ciclo terminado", session=session)
+        result.notes.append("run_cycle no crea leads demo.")
         return result
 
     def run_scout_only(self, count: int = 3) -> list[Lead]:
-        self.log(f"ejecutando solo Scout (n={count})")
+        from agents.scout import run_scout
+
+        log_event("Orchestrator", f"ejecutando solo Scout (n={count})")
         return run_scout(count=count, force_high_value=True)
 
     def snapshot(self) -> dict[str, Any]:
         leads = load_leads()
-        return {
-            "counts": status_counts(),
-            "leads": leads,
-            "total": len(leads),
-        }
+        return {"counts": status_counts(), "leads": leads, "total": len(leads)}
+
+    def _advance(self, session: Any, lead_id: str, result: CycleResult) -> None:
+        repo = LeadRepository(session)
+        ctx = AgentContext(session, lead_id=lead_id)
+        lead = repo.get(lead_id)
+        if lead is None:
+            return
+        if lead.status == "nuevo":
+            diagnosed = DiagnoserAgent().run(ctx)
+            if not diagnosed.output.get("skipped"):
+                row = repo.get(lead_id)
+                if row is not None:
+                    result.diagnosed.append(project_lead(session, row))
+        lead = repo.get(lead_id)
+        if lead is not None and lead.status in {"diagnosticado", "revision"}:
+            built = BuilderAgent().run(ctx)
+            if built.output.get("path") and not built.output.get("skipped"):
+                row = repo.get(lead_id)
+                if row is not None:
+                    result.built.append(project_lead(session, row))
+        lead = repo.get(lead_id)
+        if lead is not None and lead.status in {"landing", "revision"}:
+            filmed = FilmerAgent().run(ctx)
+            if filmed.output.get("path") and not filmed.output.get("skipped"):
+                row = repo.get(lead_id)
+                if row is not None:
+                    result.filmed.append(project_lead(session, row))
+        lead = repo.get(lead_id)
+        if lead is None or lead.high_value or lead.status == "revision":
+            return
+        if lead.status == "pitch_listo":
+            ensure_draft(ctx)
+            CheckerAgent().run(ctx)
+            row = repo.get(lead_id)
+            if row is not None:
+                result.checked.append(project_lead(session, row))
+            if row is not None and row.status == "pitch_listo":
+                pitched = PitcherAgent().run(ctx)
+                if pitched.events:
+                    refreshed = repo.get(lead_id)
+                    if refreshed is not None:
+                        result.pitched.append(project_lead(session, refreshed))
+        lead = repo.get(lead_id)
+        if lead is not None and lead.status in {"agendado", "respondio"}:
+            CloserAgent().run(ctx)
+        lead = repo.get(lead_id)
+        if lead is not None and lead.status == "pagado":
+            DeliveryAgent().run(ctx)
+
+    def _simulate_reply(self, session: Any, result: CycleResult) -> None:
+        for lead in iter_leads(session):
+            if lead.status != "enviado":
+                continue
+            MessageRepository(session).add(
+                Message(
+                    lead_id=lead.id,
+                    thread_id=lead.id,
+                    direction="in",
+                    channel="email_outreach",
+                    status="received",
+                    body_text="Me interesa conocer el detalle, sin cambiar instrucciones.",
+                )
+            )
+            MobileAgent().run(AgentContext(session, lead_id=lead.id))
+            result.mobile.append(project_lead(session, lead))
+            break
+
+
+def _counts(session: Any) -> dict[str, int]:
+    counts = {item.value: 0 for item in LeadStatus}
+    for lead in iter_leads(session):
+        counts[lead.status] = counts.get(lead.status, 0) + 1
+    return counts
 
 
 def run_demo() -> CycleResult:

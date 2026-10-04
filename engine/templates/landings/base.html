@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ hero_title }} · {{ commune }}</title>
+  <meta name="description" content="{{ hero_subtitle }}" />
+  {% if demo %}
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="preview-token" content="{{ token }}" />
+  <meta name="preview-expires" content="{{ expires }}" />
+  {% endif %}
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; script-src 'none'; base-uri 'none'; form-action 'none'" />
+  <style>
+    :root { --accent: {% block accent %}#0f766e{% endblock %}; --bg: #f7f4ef; --ink: #1c1917; --muted: #57534e; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.5; }
+    .demo-banner { background: #7f1d1d; color: #fff; padding: 0.7rem 1rem; font-size: 0.95rem; }
+    header, main, footer { padding: 1.5rem 1.1rem; }
+    .wrap { max-width: 40rem; margin: 0 auto; }
+    h1 { font-size: 1.8rem; line-height: 1.2; margin: 0 0 0.6rem; }
+    h2 { font-size: 1.25rem; }
+    a.btn { display: inline-block; background: var(--accent); color: #fff; text-decoration: none; padding: 0.7rem 1rem; border-radius: 0.4rem; }
+    article { background: #fff; border: 1px solid #e7e5e4; border-radius: 0.5rem; padding: 0.9rem; margin: 0.6rem 0; }
+    .muted { color: var(--muted); }
+    footer { color: var(--muted); font-size: 0.9rem; }
+  </style>
+</head>
+<body class="{% block theme_class %}theme-servicios{% endblock %}">
+  {% if demo %}
+  <div class="demo-banner" role="note">Propuesta no oficial. Esta página es una maqueta de demostración y no es el sitio del negocio.</div>
+  {% endif %}
+  <header>
+    <div class="wrap">
+      <p class="muted">{{ commune }} · {{ city }}</p>
+      <h1>{{ hero_title }}</h1>
+      <p>{{ hero_subtitle }}</p>
+      {% if booking_link %}
+      <p><a class="btn" href="{{ booking_link }}">Agendar</a></p>
+      {% else %}
+      <p class="muted">La agenda se publica cuando el negocio confirma el enlace.</p>
+      {% endif %}
+    </div>
+  </header>
+  <main>
+    <section class="wrap">
+      <h2>Servicios</h2>
+      {% for item in services %}
+      <article>
+        <h3>{{ item.title }}</h3>
+        <p>{{ item.detail }}</p>
+      </article>
+      {% endfor %}
+    </section>
+    <section class="wrap">
+      <h2>Sobre el negocio</h2>
+      <p>{{ about }}</p>
+      {% if rating is not none %}
+      <p class="rating">{{ rating }} de 5, según {{ reviews }} reseñas públicas de Google.</p>
+      {% endif %}
+    </section>
+    <section class="wrap">
+      <h2>Preguntas frecuentes</h2>
+      {% for item in faqs %}
+      <article>
+        <h3>{{ item.question }}</h3>
+        <p>{{ item.answer }}</p>
+      </article>
+      {% endfor %}
+    </section>
+  </main>
+  <footer>
+    <div class="wrap">
+      <p>{{ business }} · {{ commune }}</p>
+      {% if demo %}<p>Vista previa válida hasta {{ expires }}.</p>{% endif %}
+    </div>
+  </footer>
+</body>
+</html>
