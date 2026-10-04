@@ -4,9 +4,9 @@ Rama: `grok/autonomia-041026` · Última actualización: 2026-10-04 18:45 Americ
 
 ## Estado de la DoD
 
-A ✅ · B ✅ · C ✅ · D ⛔ · E ✅ · F ✅ · G ⏳
+A ✅ · B ✅ · C ✅ · D ⛔ · E ✅ · F ✅ · G ✅
 
-D está en ⛔ porque `docker` no es un comando en esta máquina. El detalle y la salida están en `docs/INFORME_FINAL.md`. G queda ⏳ hasta el push y el PR.
+D está en ⛔ porque `docker` no es un comando en esta máquina. El detalle y la salida están en `docs/INFORME_FINAL.md`. La rama está en origin y el PR es https://github.com/datanalytics86/Agente-IA-Autonomo/pull/2.
 
 ## Línea base F0-02 (commit de partida `19b678b`, Python 3.12.10, Node 22.23.2)
 
@@ -130,4 +130,4 @@ La marca de alto valor del demo de partida era un bug de presentación: la colum
 
 ## Próxima acción exacta
 
-Push de `grok/autonomia-041026` y PR hacia `main` con `docs/INFORME_FINAL.md` como descripción. El hash del cierre de código es `e0868d6`.
+Instalar Docker, correr `docker compose -f infra/docker-compose.yml up -d --build` y pegar el `healthz`. El PR ya está abierto: https://github.com/datanalytics86/Agente-IA-Autonomo/pull/2.
