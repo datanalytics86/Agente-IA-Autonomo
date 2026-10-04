@@ -1,0 +1,44 @@
+# Sitio público en /. /api, /webhooks, /demo y /u van a la api.
+# /admin va al dashboard estático (servicio web).
+# X-Robots-Tag solo en /demo, no en el resto del sitio.
+
+{
+	admin off
+	auto_https off
+}
+
+:80 {
+	encode gzip
+
+	@demo path /demo /demo/*
+	handle @demo {
+		header X-Robots-Tag "noindex, nofollow"
+		reverse_proxy api:8000
+	}
+
+	@api path /api /api/*
+	handle @api {
+		reverse_proxy api:8000
+	}
+
+	@webhooks path /webhooks /webhooks/*
+	handle @webhooks {
+		reverse_proxy api:8000
+	}
+
+	@ficha path /u /u/*
+	handle @ficha {
+		reverse_proxy api:8000
+	}
+
+	@admin path /admin /admin/*
+	handle @admin {
+		reverse_proxy web:80
+	}
+
+	handle {
+		root * /srv/site
+		try_files {path} /index.html
+		file_server
+	}
+}

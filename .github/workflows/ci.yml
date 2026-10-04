@@ -1,0 +1,175 @@
+# CI de la ola 1. Sin job de Docker: la imagen es un esqueleto y se
+# valida en local con `docker compose config` solo si Docker está instalado.
+# Sin pyproject no hay mypy (ADR-011). ruff sobre agents/ queda para la ola 3.
+
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: engine/requirements.txt
+
+      - name: Instalar dependencias
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          if [ -f engine/pyproject.toml ]; then
+            python -m pip install -e "./engine[dev]"
+          else
+            python -m pip install -r engine/requirements.txt pytest ruff
+          fi
+
+      - name: Lint, tipos, tests o smoke del CLI
+        run: |
+          set -euo pipefail
+          if [ -f pyproject.toml ]; then
+            ruff check core db migrations tests
+            ruff format --check core db migrations tests
+            mypy_targets=()
+            if [ -d core ]; then
+              mypy_targets+=(core)
+            fi
+            if [ -d db ]; then
+              mypy_targets+=(db)
+            fi
+            if [ "${#mypy_targets[@]}" -gt 0 ]; then
+              mypy "${mypy_targets[@]}"
+            else
+              echo "core/ y db/ no existen; no se corre mypy."
+            fi
+            pytest -q
+          else
+            echo "Sin pyproject.toml: no se corre mypy ni ruff sobre agents/."
+            PYTHONPATH=. python main.py --mode prompts
+            PYTHONPATH=. python -m pytest -q tests/test_smoke_cli.py
+          fi
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Instalar
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Tests solo si el script test existe y no es el placeholder
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("fs");
+          const { spawnSync } = require("child_process");
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const test = pkg.scripts && pkg.scripts.test;
+          if (!test) {
+            console.log("apps/web no tiene script test; no se inventa uno.");
+            process.exit(0);
+          }
+          if (String(test).includes("no test specified")) {
+            console.log("script test es el placeholder de npm; se omite.");
+            process.exit(0);
+          }
+          const result = spawnSync("npm", ["test"], { stdio: "inherit" });
+          process.exit(result.status === null ? 1 : result.status);
+          NODE
+
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        if: hashFiles('apps/site/package.json') != ''
+        with:
+          node-version: "22"
+
+      - uses: actions/cache@v4
+        if: hashFiles('apps/site/package-lock.json') != ''
+        with:
+          path: ~/.npm
+          key: npm-site-${{ runner.os }}-${{ hashFiles('apps/site/package-lock.json') }}
+
+      - name: Construir el sitio solo si existe el paquete
+        run: |
+          set -euo pipefail
+          if [ ! -f apps/site/package.json ]; then
+            echo "apps/site/package.json no existe (lo crea A7). No se construye el sitio."
+            exit 0
+          fi
+          cd apps/site
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+          npm run build
+
+  openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar PyYAML
+        run: python -m pip install pyyaml
+
+      - name: Exigir paths del contrato
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+
+          import yaml
+
+          doc = yaml.safe_load(
+              Path("docs/contracts/openapi.yaml").read_text(encoding="utf-8")
+          )
+          paths = (doc or {}).get("paths") or {}
+          required = [
+              "/healthz",
+              "/api/auth/login",
+              "/webhooks/mercadopago",
+              "/api/public/diagnostico",
+          ]
+          missing = [item for item in required if item not in paths]
+          if missing:
+              print("Faltan paths:", ", ".join(missing), file=sys.stderr)
+              sys.exit(1)
+          print("openapi ok:", ", ".join(required))
+          PY
