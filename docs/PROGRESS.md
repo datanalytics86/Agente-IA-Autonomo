@@ -27,11 +27,11 @@ Web, en `apps/web`:
 
 | ID | Tarea | Agente | Estado | Commit | Evidencia |
 |----|-------|--------|--------|--------|-----------|
-| F0-01 | Crear rama desde main | A0 | ✅ | | `grok/autonomia-041026` en `19b678b` |
-| F0-02 | Línea base §2.2 | A0 | ✅ | | tablas de esta sección |
-| F0-03 | Contratos §6.3 | A0 | ✅ | | `docs/contracts/` |
-| F0-04 | Tablero | A0 | ✅ | | este archivo |
-| F0-05 | DECISIONES y GO_LIVE | A0 | ✅ | | `docs/DECISIONES.md`, `docs/GO_LIVE.md` |
+| F0-01 | Crear rama desde main | A0 | ✅ | 0d89efa | `grok/autonomia-041026` sobre `19b678b` |
+| F0-02 | Línea base §2.2 | A0 | ✅ | 0d89efa | tablas de esta sección |
+| F0-03 | Contratos §6.3 | A0 | ✅ | 0d89efa | `docs/contracts/` |
+| F0-04 | Tablero | A0 | ✅ | 0d89efa | este archivo |
+| F0-05 | DECISIONES y GO_LIVE | A0 | ✅ | 0d89efa | `docs/DECISIONES.md`, `docs/GO_LIVE.md` |
 | F1-01 | pyproject + requirements | A1 | ☐ | | |
 | F1-02 | core/config.py | A1 | ☐ | | H6 H9 H20 |
 | F1-03 | modelos, Alembic, repos | A1 | ☐ | | |

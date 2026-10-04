@@ -51,6 +51,10 @@ Nombre, razón social, RUT, email y dirección quedan vacíos. Textos legales us
 
 Al confirmar un pago se abre un approval `tarea_manual` «emitir boleta o factura en el SII». No hay integración con el SII en esta versión.
 
+## ADR-011 — CI de la ola 1
+
+Hasta que A3 deje `engine/agents/` en verde, el job de engine corre `ruff` y `mypy` sobre `core`, `db`, `migrations` y `tests`, no sobre `agents/`. La DoD final sigue exigiendo `ruff check .` y `mypy` en todo el motor. A9 amplía el job en la ola 3.
+
 ## ADR-010 — Lighthouse en CI
 
 La DoD pide Lighthouse móvil ≥ 90 en `/` y en una landing. En CI se corre contra el servidor estático del build (sin red externa). Si el binario de Chrome no está en el runner, el job lo instala. No se relaja el umbral.
