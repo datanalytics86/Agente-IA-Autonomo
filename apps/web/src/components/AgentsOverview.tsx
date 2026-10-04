@@ -1,77 +1,55 @@
+import { useQuery } from '@tanstack/react-query'
+import { fetchAgents } from '../api/endpoints'
 import { cn } from '../lib/cn'
-import type { AgentRuntimeStatus } from '../lib/types'
-import { useAgencyStore } from '../store/useAgencyStore'
-
-const STATUS_STYLES: Record<
-  AgentRuntimeStatus,
-  { label: string; dot: string; chip: string }
-> = {
-  idle: {
-    label: 'Idle',
-    dot: 'bg-zinc-400',
-    chip: 'bg-zinc-500/10 text-zinc-300 ring-zinc-500/20',
-  },
-  running: {
-    label: 'Running',
-    dot: 'bg-accent animate-pulse',
-    chip: 'bg-accent/10 text-accent ring-accent/25',
-  },
-  waiting: {
-    label: 'Waiting',
-    dot: 'bg-amber-400',
-    chip: 'bg-amber-500/10 text-amber-300 ring-amber-500/25',
-  },
-  offline: {
-    label: 'Offline',
-    dot: 'bg-zinc-600',
-    chip: 'bg-zinc-800 text-zinc-500 ring-white/5',
-  },
-}
+import { formatTs } from '../lib/format'
+import { cardClass } from '../lib/ui'
+import { QueryState } from './QueryState'
 
 export function AgentsOverview({ compact = false }: { compact?: boolean }) {
-  const agents = useAgencyStore((s) => s.agents)
+  const query = useQuery({ queryKey: ['agents'], queryFn: fetchAgents })
 
   return (
-    <div className="rounded-2xl border border-white/5 bg-elevated p-4 shadow-card sm:p-5">
+    <section className={cardClass}>
       <div className="mb-4 flex items-end justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-zinc-100">Agentes</h2>
-          <p className="text-xs text-zinc-500">Orchestrator + 7 especialistas</p>
+          <p className="text-xs text-zinc-500">Estado, último run y error desde /api/agents</p>
         </div>
-        <p className="text-[11px] text-zinc-500">{agents.length} activos en stack</p>
+        {query.data && <p className="text-[11px] text-zinc-500">{query.data.length}</p>}
       </div>
-      <div
-        className={cn(
-          'grid gap-2',
-          compact ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4',
-        )}
+      <QueryState
+        isPending={query.isPending}
+        error={query.error}
+        isEmpty={query.data?.length === 0}
+        empty="La API no devolvió agentes"
       >
-        {agents.map((a) => {
-          const st = STATUS_STYLES[a.status]
-          return (
-            <div
-              key={a.name}
-              className="rounded-xl border border-white/5 bg-surface/60 p-3"
-            >
+        <div
+          className={cn(
+            'grid gap-2',
+            compact ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3',
+          )}
+        >
+          {(query.data ?? []).map((agent) => (
+            <article key={agent.name} className="min-w-0 rounded-xl border border-white/5 bg-surface/60 p-3">
               <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-medium text-zinc-100">{a.name}</p>
-                <span
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1',
-                    st.chip,
-                  )}
-                >
-                  <span className={cn('h-1.5 w-1.5 rounded-full', st.dot)} />
-                  {st.label}
-                </span>
+                <p className="text-sm font-medium text-zinc-100">{agent.name}</p>
+                <span className="shrink-0 text-[10px] text-zinc-500">{agent.prompt_version}</span>
               </div>
-              {!compact && (
-                <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">{a.role}</p>
+              <p className="mt-1 text-xs text-zinc-500">
+                {agent.last_run_at ? formatTs(agent.last_run_at) : 'Sin última ejecución'}
+              </p>
+              {!compact && agent.prompt_name && (
+                <p className="mt-1 text-xs text-zinc-500">{agent.prompt_name}</p>
               )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
+              {agent.last_error ? (
+                <p className="mt-2 break-words text-xs text-rose-300">{agent.last_error}</p>
+              ) : (
+                <p className="mt-2 text-xs text-zinc-500">Sin error reportado</p>
+              )}
+            </article>
+          ))}
+        </div>
+      </QueryState>
+    </section>
   )
 }
