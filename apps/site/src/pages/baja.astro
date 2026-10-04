@@ -1,0 +1,50 @@
+---
+import Base from '../layouts/Base.astro';
+import Identity from '../components/Identity.astro';
+---
+
+<Base
+  title="Baja"
+  description="Pide que no te enviemos más publicidad. Ley 19.496, artículo 28 B. El formulario avisa a la API de baja."
+>
+  <article class="max-w-3xl">
+    <h1 class="text-4xl font-semibold tracking-tight">Baja de publicidad</h1>
+    <p class="mt-4 text-muted">
+      La Ley 19.496, artículo 28 B, obliga a decir quién envía el correo y a dar una dirección válida para no recibir más.
+      Esta página es esa dirección. El remitente es el que figura abajo. Pedida la baja, no se vuelve a enviar publicidad.
+    </p>
+    <div class="mt-6">
+      <Identity />
+    </div>
+    <p class="mt-6 text-sm text-muted">
+      El enlace de un clic que va en el correo apunta a /u/ seguido del token. Si prefieres confirmarlo aquí, envía el mismo token.
+      No pedimos otro dato.
+    </p>
+
+    <p id="baja-ok" class="mt-8 text-lg font-semibold text-accent" hidden>
+      Registramos la baja. No enviaremos más publicidad a ese contacto.
+    </p>
+    <p id="baja-estado" class="mt-4 text-sm text-muted" role="status"></p>
+
+    <form id="baja-form" class="relative mt-8 grid max-w-xl gap-4">
+      <div class="hp" aria-hidden="true">
+        <label for="baja-honeypot">No completar</label>
+        <input id="baja-honeypot" name="honeypot" type="text" tabindex="-1" autocomplete="off" />
+      </div>
+      <label class="grid gap-2 text-sm">
+        Token del enlace
+        <input
+          class="rounded-lg border border-white/15 bg-surface px-3 py-3 text-base"
+          name="token"
+          required
+          minlength="8"
+          maxlength="80"
+          autocomplete="off"
+        />
+      </label>
+      <button class="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-surface" type="submit">
+        Confirmar baja
+      </button>
+    </form>
+  </article>
+</Base>

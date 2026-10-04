@@ -1,0 +1,61 @@
+---
+import Base from '../layouts/Base.astro';
+import { packages } from '../data/packages';
+---
+
+<Base
+  title="Paquetes"
+  description="Esencial 250.000 CLP, Pro 350.000 CLP, Premium 450.000 CLP. Multi sede a cotizar. La tabla se actualiza si la API responde."
+>
+  <h1 class="text-4xl font-semibold tracking-tight">Paquetes</h1>
+  <p class="mt-4 max-w-2xl text-muted">
+    Estos son los precios publicados por defecto. Si la API de paquetes responde, la tabla se actualiza con ese resultado.
+    El navegador no envía un monto: el precio lo fija el servidor al crear el pago.
+  </p>
+  <p id="paquetes-estado" class="mt-4 text-sm text-muted" role="status"></p>
+
+  <div class="mt-8 overflow-x-auto">
+    <table data-packages class="w-full min-w-[40rem] border-collapse text-left text-sm">
+      <caption class="sr-only">Paquetes, precios en CLP y qué incluye cada uno</caption>
+      <thead>
+        <tr class="border-b border-white/15 text-muted">
+          <th class="py-3 pr-4 font-medium" scope="col">Paquete</th>
+          <th class="py-3 pr-4 font-medium" scope="col">Precio</th>
+          <th class="py-3 pr-4 font-medium" scope="col">Revisiones</th>
+          <th class="py-3 pr-4 font-medium" scope="col">Incluye</th>
+          <th class="py-3 font-medium" scope="col">Checkout</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          packages.map((item) => (
+            <tr data-package-row={item.code} class="border-b border-white/10 align-top">
+              <th class="py-4 pr-4 font-semibold" scope="row" data-package-name>
+                {item.name}
+              </th>
+              <td class="py-4 pr-4 text-accent" data-package-price>
+                {item.priceLabel}
+              </td>
+              <td class="py-4 pr-4">{item.revisions}</td>
+              <td class="py-4 pr-4">
+                <ul data-package-includes class="grid gap-1">
+                  {item.includes.map((line) => (
+                    <li>{line}</li>
+                  ))}
+                </ul>
+              </td>
+              <td class="py-4">
+                <a class="text-accent underline-offset-4 hover:underline" href={`/checkout/${item.code}`}>
+                  {item.priceClp === null ? 'Cotizar' : 'Pagar'}
+                </a>
+              </td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="mt-6 max-w-2xl text-sm text-muted">
+    Anticipo 50 %. Saldo antes de publicar. IVA 19 % incluido por defecto. Multi sede queda a cotizar y no se cobra sola.
+  </p>
+</Base>

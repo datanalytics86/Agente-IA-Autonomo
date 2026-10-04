@@ -1,0 +1,30 @@
+---
+import { IDENTITY_PLACEHOLDER, agency, isConfigured } from '../data/agency';
+
+const payload: Record<string, unknown> = {
+  '@context': 'https://schema.org',
+  '@type': 'ProfessionalService',
+  name: isConfigured(agency.name) ? agency.name : IDENTITY_PLACEHOLDER,
+  description: 'Diseño y publicación de landings para pymes locales en Chile.',
+  areaServed: 'CL',
+  serviceType: 'Landing page para pymes',
+  makesOffer: [
+    { '@type': 'Offer', name: 'Landing esencial', price: '250000', priceCurrency: 'CLP' },
+    { '@type': 'Offer', name: 'Landing pro', price: '350000', priceCurrency: 'CLP' },
+    { '@type': 'Offer', name: 'Landing premium', price: '450000', priceCurrency: 'CLP' },
+    { '@type': 'Offer', name: 'Multi sede', description: 'a cotizar' },
+  ],
+};
+
+if (Astro.site) payload.url = Astro.site.href;
+if (isConfigured(agency.address)) {
+  payload.address = {
+    '@type': 'PostalAddress',
+    streetAddress: agency.address,
+  };
+}
+
+const json = JSON.stringify(payload).replace(/</g, '\\u003c');
+---
+
+<script type="application/ld+json" is:inline set:html={json} />

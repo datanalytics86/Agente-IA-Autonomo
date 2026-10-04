@@ -1,0 +1,184 @@
+---
+import Base from '../layouts/Base.astro';
+import Wireframe from '../components/Wireframe.astro';
+import { faq } from '../data/faq';
+import { packages } from '../data/packages';
+import { portfolio } from '../data/portfolio';
+import { rubros } from '../data/rubros';
+
+const steps = [
+  {
+    title: 'Diagnóstico',
+    text: 'Dejas el negocio, la comuna, el rubro y el correo, y aceptas un texto de consentimiento con versión. El informe no sale en la página: te llegará el informe por email. No obliga a comprar.',
+  },
+  {
+    title: 'Paquete y pago',
+    text: 'Esencial, Pro o Premium tienen precio publicado. Multi sede es a cotizar. El anticipo es 50 % y el saldo se paga antes de publicar. La tarjeta la pide el proveedor, no esta página.',
+  },
+  {
+    title: 'Publicación',
+    text: 'Envías los datos reales, revisas la vista previa y usas las rondas del paquete. Se publica en tu dominio o en un subdominio. No inventamos textos ni fotos.',
+  },
+];
+---
+
+<Base
+  title="Landings para pymes locales"
+  description="Landing clara para una pyme en Chile: diagnóstico por email, tres precios publicados y uno a cotizar. Sin testimonios inventados."
+>
+  <section class="max-w-3xl">
+    <p class="text-sm font-semibold uppercase tracking-widest text-accent">Presencia web</p>
+    <h1 class="mt-3 text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+      Una landing clara para tu pyme, con tus datos reales.
+    </h1>
+    <p class="mt-5 text-lg text-muted">
+      Decimos qué haces, dónde estás y cómo te contactan. Sin opiniones inventadas y sin prometer ventas.
+      El diagnóstico de tu sitio es gratis y llega por correo. Si te sirve, hay tres paquetes con precio y uno a cotizar.
+    </p>
+    <div class="mt-8 flex flex-wrap gap-3">
+      <a
+        class="inline-flex rounded-full bg-accent px-5 py-3 text-sm font-semibold text-surface hover:bg-accent-soft"
+        href="/diagnostico-gratis"
+      >
+        Pedir diagnóstico gratis
+      </a>
+      <a
+        class="inline-flex rounded-full border border-white/20 px-5 py-3 text-sm font-semibold text-ink hover:border-accent"
+        href="/agendar"
+      >
+        Agendar
+      </a>
+    </div>
+  </section>
+
+  <section id="como-funciona" class="mt-16">
+    <h2 class="text-2xl font-semibold">Cómo funciona</h2>
+    <ol class="mt-6 grid gap-4 md:grid-cols-3">
+      {
+        steps.map((step, index) => (
+          <li class="rounded-2xl border border-white/10 bg-elevated p-5 shadow-card">
+            <p class="text-3xl font-semibold text-accent">{index + 1}</p>
+            <h3 class="mt-3 text-lg font-semibold">{step.title}</h3>
+            <p class="mt-2 text-sm text-muted">{step.text}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  <section class="mt-16" aria-labelledby="paquetes-home">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <h2 id="paquetes-home" class="text-2xl font-semibold">Paquetes</h2>
+      <a class="text-sm text-accent underline-offset-4 hover:underline" href="/paquetes">Ver la tabla</a>
+    </div>
+    <p class="mt-2 max-w-2xl text-sm text-muted">
+      Precios en CLP, IVA incluido por defecto. Anticipo 50 %. El saldo se paga antes de publicar.
+    </p>
+    <ul class="mt-6 grid gap-4 md:grid-cols-2">
+      {
+        packages.map((item) => (
+          <li class="flex flex-col rounded-2xl border border-white/10 bg-elevated p-5 shadow-card">
+            <h3 class="text-lg font-semibold">{item.name}</h3>
+            <p class="mt-2 text-2xl font-semibold text-accent">{item.priceLabel}</p>
+            <p class="mt-2 text-sm text-muted">{item.summary}</p>
+            <ul class="mt-4 grid flex-1 gap-2 text-sm">
+              {item.includes.map((line) => (
+                <li>{line}</li>
+              ))}
+            </ul>
+            <a
+              class="mt-5 inline-flex justify-center rounded-full border border-white/15 px-4 py-2 text-sm font-semibold hover:border-accent"
+              href={`/checkout/${item.code}`}
+            >
+              {item.priceClp === null ? 'Pedir cotización' : 'Ir al checkout'}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section class="mt-16" aria-labelledby="portafolio">
+    <h2 id="portafolio" class="text-2xl font-semibold">Ejemplos propios</h2>
+    <p class="mt-2 max-w-2xl text-sm text-muted">
+      Son bosquejos nuestros para mostrar la estructura. No son clientes, no son negocios reales y no son demos de prospectos.
+    </p>
+    <ul class="mt-6 grid gap-4 lg:grid-cols-3">
+      {
+        portfolio.map((example) => (
+          <li class="rounded-2xl border border-white/10 bg-elevated p-5 shadow-card">
+            <p class="text-xs font-semibold uppercase tracking-widest text-accent">Ejemplo ficticio propio</p>
+            <h3 class="mt-2 text-lg font-semibold">{example.title}</h3>
+            <div class="mt-4">
+              <Wireframe variant={example.variant} />
+            </div>
+            <p class="mt-4 text-sm text-muted">{example.summary}</p>
+            <ul class="mt-3 grid gap-1 text-sm">
+              {example.points.map((point) => (
+                <li>{point}</li>
+              ))}
+            </ul>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section class="mt-16" aria-labelledby="testimonios-titulo">
+    <h2 id="testimonios-titulo" class="text-2xl font-semibold">Testimonios</h2>
+    <p class="mt-4 max-w-2xl text-lg">aún no publicamos testimonios</p>
+    <p class="mt-2 max-w-2xl text-sm text-muted">
+      Cuando un cliente acepte por escrito que citemos su experiencia, irá aquí con su nombre y su rubro. Hasta entonces la sección queda vacía.
+    </p>
+  </section>
+
+  <section class="mt-16" aria-labelledby="faq-titulo">
+    <h2 id="faq-titulo" class="text-2xl font-semibold">Preguntas frecuentes</h2>
+    <div class="mt-4 divide-y divide-white/10 border-y border-white/10">
+      {
+        faq.map((item) => (
+          <details class="py-4">
+            <summary class="cursor-pointer text-base font-semibold">{item.question}</summary>
+            <p class="mt-3 max-w-3xl text-sm text-muted">{item.answer}</p>
+          </details>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="mt-16" aria-labelledby="rubros-home">
+    <h2 id="rubros-home" class="text-2xl font-semibold">Rubros</h2>
+    <p class="mt-2 max-w-2xl text-sm text-muted">
+      Cada rubro tiene una página con un criterio propio. No hay páginas por comuna.
+    </p>
+    <ul class="mt-4 flex flex-wrap gap-2">
+      {
+        rubros.map((rubro) => (
+          <li>
+            <a
+              class="inline-flex rounded-full border border-white/15 px-3 py-2 text-sm hover:border-accent"
+              href={`/rubros/${rubro.slug}`}
+            >
+              {rubro.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section class="mt-16 rounded-2xl border border-accent/30 bg-elevated p-6 shadow-card">
+    <h2 class="text-2xl font-semibold">Siguiente paso</h2>
+    <p class="mt-2 max-w-2xl text-sm text-muted">
+      Pide el informe o mira si la agenda ya está configurada. Ninguno de los dos cobra.
+    </p>
+    <div class="mt-5 flex flex-wrap gap-3">
+      <a class="inline-flex rounded-full bg-accent px-5 py-3 text-sm font-semibold text-surface" href="/diagnostico-gratis">
+        Pedir diagnóstico gratis
+      </a>
+      <a class="inline-flex rounded-full border border-white/20 px-5 py-3 text-sm font-semibold" href="/agendar">
+        Agendar
+      </a>
+    </div>
+  </section>
+</Base>

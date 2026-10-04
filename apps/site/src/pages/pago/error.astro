@@ -1,0 +1,20 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  title="Pago no completado"
+  description="El pago no se completó. Esta página no hizo un cobro."
+  noindex
+  jsonLd={false}
+>
+  <h1 class="text-4xl font-semibold tracking-tight">El pago no se completó</h1>
+  <p class="mt-4 max-w-2xl text-muted">
+    No se hizo un cobro desde esta página. Puedes volver a paquetes y, si quieres, intentar el checkout de nuevo.
+    Si el proveedor igual notificara un pago, manda ese aviso y no este regreso.
+  </p>
+  <p class="mt-8 flex flex-wrap gap-4">
+    <a class="text-accent underline-offset-4 hover:underline" href="/paquetes">Volver a paquetes</a>
+    <a class="text-accent underline-offset-4 hover:underline" href="/diagnostico-gratis">Pedir diagnóstico</a>
+  </p>
+</Base>

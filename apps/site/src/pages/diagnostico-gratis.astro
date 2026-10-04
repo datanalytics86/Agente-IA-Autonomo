@@ -1,0 +1,95 @@
+---
+import Base from '../layouts/Base.astro';
+import { DIAGNOSTICO_CONSENT_TEXT } from '../data/consent';
+import { rubros } from '../data/rubros';
+---
+
+<Base
+  title="Diagnóstico gratis"
+  description="Pide un diagnóstico de presencia web. Te llegará el informe por email. El consentimiento va con un texto versionado."
+>
+  <h1 class="text-4xl font-semibold tracking-tight">Diagnóstico gratis</h1>
+  <p class="mt-4 max-w-2xl text-muted">
+    Cuéntanos el negocio. Revisamos la presencia web que ya es pública y te escribimos el informe.
+    No es una obligación de compra y no guardamos la tarjeta de nadie.
+  </p>
+
+  <p id="diagnostico-ok" class="mt-8 text-xl font-semibold text-accent" hidden>
+    te llegará el informe por email
+  </p>
+  <p id="diagnostico-estado" class="mt-4 text-sm text-muted" role="status"></p>
+
+  <form
+    id="diagnostico"
+    class="relative mt-8 grid max-w-xl gap-5"
+    data-consent={DIAGNOSTICO_CONSENT_TEXT}
+  >
+    <div class="hp" aria-hidden="true">
+      <label for="honeypot">No completar</label>
+      <input id="honeypot" name="honeypot" type="text" tabindex="-1" autocomplete="off" />
+    </div>
+
+    <label class="grid gap-2 text-sm">
+      Nombre del negocio
+      <input
+        class="rounded-lg border border-white/15 bg-surface px-3 py-3 text-base"
+        name="business"
+        required
+        maxlength="160"
+        autocomplete="organization"
+      />
+    </label>
+
+    <label class="grid gap-2 text-sm">
+      Sitio web, si tienes (opcional)
+      <input
+        class="rounded-lg border border-white/15 bg-surface px-3 py-3 text-base"
+        name="website_url"
+        type="url"
+        maxlength="300"
+        placeholder="https://"
+        autocomplete="url"
+      />
+    </label>
+
+    <label class="grid gap-2 text-sm">
+      Correo
+      <input
+        class="rounded-lg border border-white/15 bg-surface px-3 py-3 text-base"
+        name="email"
+        type="email"
+        required
+        maxlength="160"
+        autocomplete="email"
+      />
+    </label>
+
+    <label class="grid gap-2 text-sm">
+      Comuna
+      <input
+        class="rounded-lg border border-white/15 bg-surface px-3 py-3 text-base"
+        name="commune"
+        required
+        maxlength="80"
+        autocomplete="address-level2"
+      />
+    </label>
+
+    <label class="grid gap-2 text-sm">
+      Rubro
+      <select class="rounded-lg border border-white/15 bg-surface px-3 py-3 text-base" name="category" required>
+        <option value="">Elige un rubro</option>
+        {rubros.map((rubro) => <option value={rubro.slug}>{rubro.label}</option>)}
+      </select>
+    </label>
+
+    <label class="flex items-start gap-3 text-sm">
+      <input class="mt-1 h-5 w-5 accent-accent" name="consent" type="checkbox" required />
+      <span>{DIAGNOSTICO_CONSENT_TEXT}</span>
+    </label>
+
+    <button class="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-surface" type="submit">
+      Pedir el informe
+    </button>
+  </form>
+</Base>
