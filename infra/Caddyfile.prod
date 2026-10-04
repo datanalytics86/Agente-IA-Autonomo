@@ -1,10 +1,10 @@
-# Demo y CI, solo HTTP. TLS y on-demand de clientes: Caddyfile.prod.
-# SITE_DOMAIN y ADMIN_DOMAIN llegan por el entorno del contenedor.
-# /healthz y /readyz van a la API. El sitio estático no puede taparlos.
+# Producción. SITE_DOMAIN es obligatorio. ADMIN_DOMAIN solo excluye ese host
+# del árbol de clientes: el dashboard sigue en /admin.
+# Los demás hosts piden certificado on-demand contra la API y se sirven
+# desde /srv/clients/<host>.
 
 {
 	admin off
-	auto_https off
 	on_demand_tls {
 		ask http://api:8000/api/internal/domain-check
 		interval 2m
@@ -12,9 +12,10 @@
 	}
 }
 
-:80 {
+{$SITE_DOMAIN} {
 	encode gzip
 	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
 		X-Frame-Options DENY
@@ -24,18 +25,6 @@
 	}
 
 	redir /admin /admin/ 308
-
-	@clients {
-		not host {$SITE_DOMAIN:localhost}
-		not host {$ADMIN_DOMAIN:localhost}
-		not host localhost
-		not host 127.0.0.1
-	}
-	handle @clients {
-		root * /srv/clients/{http.request.host}
-		try_files {path} {path}/index.html
-		file_server
-	}
 
 	@health path /healthz /readyz
 	handle @health {
@@ -75,5 +64,32 @@
 		root * /srv/site
 		try_files {path} {path}/index.html /index.html
 		file_server
+	}
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		-Server
+	}
+	@not_main {
+		not host {$SITE_DOMAIN}
+		not host {$ADMIN_DOMAIN:admin.invalid}
+	}
+	handle @not_main {
+		root * /srv/clients/{http.request.host}
+		try_files {path} {path}/index.html
+		file_server
+	}
+	handle {
+		respond 404
 	}
 }
