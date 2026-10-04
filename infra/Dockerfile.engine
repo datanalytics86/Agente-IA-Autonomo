@@ -1,0 +1,44 @@
+# Esqueleto multi-stage del motor. Contexto de build: la raíz del repo
+# (`docker compose -f infra/docker-compose.yml`). No copia secretos:
+# `.dockerignore` deja fuera `.env`, y esta imagen borra cualquier `.env`
+# que hubiera colado en `engine/`.
+#
+# CMD documentado (servicio api):
+#   python main.py --mode api
+# El servicio worker lo sustituye por:
+#   python main.py --mode worker
+# Esos modos pueden salir con código 2 mientras no exista el paquete.
+# Defaults de demo, sin envíos: APP_MODE=demo, DRY_RUN=true, OUTREACH_ENABLED=false.
+
+FROM python:3.12-slim AS deps
+
+WORKDIR /src
+COPY engine/ /src/engine/
+RUN mkdir -p /opt/py \
+    && if [ -f /src/engine/requirements.txt ]; then \
+         pip install --no-cache-dir --prefix=/opt/py -r /src/engine/requirements.txt; \
+       else \
+         echo "engine/requirements.txt no existe; imagen sin deps de terceros."; \
+       fi
+
+FROM python:3.12-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    APP_MODE=demo \
+    DRY_RUN=true \
+    OUTREACH_ENABLED=false
+
+WORKDIR /app
+COPY --from=deps /opt/py /usr/local
+COPY --from=deps /src/engine/ /app/
+RUN rm -f /app/.env /app/.env.local /app/.env.production \
+    && useradd --create-home --uid 10001 app \
+    && chown -R app:app /app
+USER app
+
+EXPOSE 8000
+
+# Servicio api. El worker no usa este CMD.
+CMD ["python", "main.py", "--mode", "api"]

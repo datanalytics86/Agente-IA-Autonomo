@@ -1,0 +1,78 @@
+# Demo local. Sin envíos: DRY_RUN=true y OUTREACH_ENABLED=false.
+# La clave de Postgres es solo de esta demo, no de producción.
+# No hay job de CI que construya esta imagen.
+
+name: agencia
+
+x-engine-env: &engine-env
+  APP_MODE: ${APP_MODE:-demo}
+  DRY_RUN: ${DRY_RUN:-true}
+  OUTREACH_ENABLED: ${OUTREACH_ENABLED:-false}
+  DATABASE_URL: ${DATABASE_URL:-postgresql://agencia:agencia@db:5432/agencia}
+  TZ: ${TZ:-America/Santiago}
+  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost}
+  ADMIN_BASE_URL: ${ADMIN_BASE_URL:-http://localhost/admin}
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-agencia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agencia}
+      POSTGRES_DB: ${POSTGRES_DB:-agencia}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.engine
+    # Alias, no merge key: Compose v2 (Go) no siempre acepta `<<`.
+    environment: *engine-env
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8000"
+
+  worker:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.engine
+    environment: *engine-env
+    # El Dockerfile documenta el CMD de la api. El worker lo sustituye.
+    command: ["python", "main.py", "--mode", "worker"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    image: nginx:alpine
+    volumes:
+      - ../apps/web/dist:/usr/share/nginx/html:ro
+
+  caddy:
+    image: caddy:2
+    depends_on:
+      - api
+      - web
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./site-root:/srv/site:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
