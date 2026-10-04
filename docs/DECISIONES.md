@@ -61,7 +61,7 @@ La tabla de §8.2 no tiene salida desde `diagnosticado` hacia la venta, y la ace
 
 ## ADR-013 — Alcance de mypy
 
-`mypy .` exige strict en `core/`, `db/` y `worker/`. El resto del motor (agentes, API, adaptadores, simulación y tests) queda fuera de ese gate: una pasada completa marcó 95 errores de anotación, no de comportamiento. `pyproject.toml` los excluye para que el comando de la DoD falle solo si se rompe el núcleo estricto.
+Reemplazado en la ronda 2 (`33fc67f`, integrado en `f750250`). `mypy .` revisa todo el motor. Quedan fuera solo `tests/` y `migrations/`. Strict sigue limitado a `core/`, `db/` y `worker/`, declarado flag por flag: en mypy 2.4 un `strict = true` dentro de un override enciende el modo estricto de todo el proyecto. `warn_redundant_casts` es global. El único `ignore_missing_imports` es `apscheduler.*`. En el árbol con wiring de producción: `Success: no issues found in 104 source files`.
 
 ## ADR-010 — Lighthouse en CI
 
