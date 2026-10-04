@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title }}</title>
+</head>
+<body>
+  <h1>{{ title }}</h1>
+  <p>{{ business }} · {{ commune }}</p>
+  <h2>Alcance</h2>
+  <ul>
+    {% for item in scope %}
+    <li>{{ item }}</li>
+    {% endfor %}
+  </ul>
+  <p>Plazo: {{ timeline }}</p>
+  <p>Revisiones incluidas: {{ revisions }}</p>
+  <p>Precio: ${{ price_label }} CLP{% if includes_iva %} (IVA incluido){% else %} más IVA{% endif %}.</p>
+  <p>Anticipo: {{ deposit_percent }} %.</p>
+</body>
+</html>

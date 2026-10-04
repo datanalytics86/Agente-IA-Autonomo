@@ -1,0 +1,19 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  title="Pago pendiente"
+  description="El pago quedó pendiente. No hace falta pagar de nuevo hasta conocer el resultado."
+  noindex
+  jsonLd={false}
+>
+  <h1 class="text-4xl font-semibold tracking-tight">Pago pendiente</h1>
+  <p class="mt-4 max-w-2xl text-muted">
+    El proveedor dejó el pago pendiente. No confirmamos el cobro en esta página y no hace falta que pagues otra vez hasta saber el resultado.
+    Cuando el proveedor notifique la aprobación o el rechazo, el pedido sigue ese estado.
+  </p>
+  <p class="mt-8">
+    <a class="text-accent underline-offset-4 hover:underline" href="/paquetes">Volver a paquetes</a>
+  </p>
+</Base>

@@ -1,0 +1,63 @@
+---
+import Base from '../layouts/Base.astro';
+import Identity from '../components/Identity.astro';
+---
+
+<Base
+  title="Privacidad"
+  description="Tratamiento de datos del sitio según la Ley 21.719 y la Ley 19.628. Identidad con marcador hasta que esté configurada."
+>
+  <article class="max-w-3xl">
+    <h1 class="text-4xl font-semibold tracking-tight">Privacidad</h1>
+    <p class="mt-4 text-muted">
+      Este texto no reemplaza una revisión de abogado. Describe lo que este sitio hace con los datos que tú entregas.
+    </p>
+
+    <h2 class="mt-10 text-2xl font-semibold">Responsable</h2>
+    <div class="mt-4">
+      <Identity />
+    </div>
+
+    <h2 class="mt-10 text-2xl font-semibold">Qué datos pedimos</h2>
+    <p class="mt-3 text-muted">
+      En el diagnóstico: nombre del negocio, correo, comuna, rubro y, si la indicas, la URL. En derechos: el tipo de solicitud, el correo y el detalle.
+      En la baja: el token del enlace. No pedimos clave tributaria, tarjeta ni documentos de identidad en estos formularios.
+    </p>
+
+    <h2 class="mt-10 text-2xl font-semibold">Para qué</h2>
+    <p class="mt-3 text-muted">
+      El diagnóstico se usa para armar el informe y enviártelo. La solicitud de derechos se usa para responderla. La baja se usa para dejar de enviar publicidad.
+      No compramos listas ni adivinamos correos.
+    </p>
+
+    <h2 class="mt-10 text-2xl font-semibold">Base de licitud</h2>
+    <p class="mt-3 text-muted">
+      Lo que envías en este sitio se trata con tu consentimiento, en el texto versionado del formulario. La prospección a negocios, cuando existe, se apoya en interés legítimo y está documentada aparte.
+      Hasta el 1 de diciembre de 2026 rige la Ley 19.628. Desde esa fecha también la Ley 21.719. El sitio se escribe para cumplir ambas.
+    </p>
+
+    <h2 class="mt-10 text-2xl font-semibold">Cuánto tiempo</h2>
+    <p class="mt-3 text-muted">
+      Un prospecto sin interacción se anonimiza a los 120 días. El registro necesario para respetar una baja se conserva, como huella, para no volver a escribir.
+    </p>
+
+    <h2 class="mt-10 text-2xl font-semibold">Tus derechos</h2>
+    <p class="mt-3 text-muted">
+      Puedes pedir acceso, rectificación, supresión, oposición, portabilidad y bloqueo en la página
+      <a class="text-accent underline-offset-4 hover:underline" href="/derechos">Derechos</a>.
+      El plazo de respuesta es el de la ley vigente. No inventamos un número de días en esta página.
+    </p>
+
+    <h2 class="mt-10 text-2xl font-semibold">Cookies</h2>
+    <p class="mt-3 text-muted">
+      Este sitio no instala cookies de terceros ni analítica con cookies. No cargamos píxeles de seguimiento.
+      Si más adelante la página Agendar muestra un calendario, ese calendario es de otro proveedor y solo se carga cuando el enlace está configurado.
+    </p>
+
+    <h2 class="mt-10 text-2xl font-semibold">Quién más interviene</h2>
+    <p class="mt-3 text-muted">
+      El pago, cuando lo inicias, lo toma el proveedor de pagos en su página. El correo del informe lo envía el canal transaccional configurado.
+      No vendemos los datos del formulario.
+    </p>
+  </article>
+</Base>

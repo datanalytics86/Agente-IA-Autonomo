@@ -1,0 +1,19 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base
+  title="Página no encontrada"
+  description="Esa ruta no existe en el sitio."
+  noindex
+  jsonLd={false}
+>
+  <h1 class="text-4xl font-semibold tracking-tight">No encontramos esa página</h1>
+  <p class="mt-4 max-w-xl text-muted">
+    El enlace no coincide con una página publicada. No hay fichas por comuna.
+  </p>
+  <p class="mt-8 flex flex-wrap gap-4">
+    <a class="text-accent underline-offset-4 hover:underline" href="/">Ir al inicio</a>
+    <a class="text-accent underline-offset-4 hover:underline" href="/paquetes">Ver paquetes</a>
+  </p>
+</Base>

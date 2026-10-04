@@ -1,0 +1,54 @@
+---
+import Base from '../layouts/Base.astro';
+import Identity from '../components/Identity.astro';
+---
+
+<Base
+  title="Términos"
+  description="Condiciones de las landings: precios, anticipo, revisiones y Ley 19.496 artículo 28 B. Sin resultados garantizados."
+>
+  <article class="max-w-3xl">
+    <h1 class="text-4xl font-semibold tracking-tight">Términos</h1>
+    <p class="mt-4 text-muted">
+      Estas condiciones no reemplazan asesoría legal. El servicio se rige por la ley chilena. No fijamos una ciudad de tribunales porque la dirección de la agencia aún no está publicada.
+    </p>
+
+    <h2 class="mt-10 text-2xl font-semibold">Quién ofrece</h2>
+    <div class="mt-4">
+      <Identity />
+    </div>
+
+    <h2 class="mt-10 text-2xl font-semibold">Qué se contrata</h2>
+    <p class="mt-3 text-muted">
+      Una landing para una pyme: páginas con la información que el cliente entrega, publicadas en su dominio o en un subdominio.
+      No se contrata un resultado de ventas, de posicionamiento ni de reservas.
+    </p>
+
+    <h2 class="mt-10 text-2xl font-semibold">Precios</h2>
+    <p class="mt-3 text-muted">
+      Esencial: 250.000 CLP, una revisión. Pro: 350.000 CLP, dos revisiones, video de 12 segundos, formulario y WhatsApp del cliente.
+      Premium: 450.000 CLP, tres revisiones, más SEO local básico y schema.org con datos reales.
+      Multi sede es a cotizar. Por defecto los precios incluyen IVA de 19 %. El anticipo es 50 % y el saldo se paga antes de publicar.
+    </p>
+
+    <h2 class="mt-10 text-2xl font-semibold">Pago y documento tributario</h2>
+    <p class="mt-3 text-muted">
+      El checkout de esta web no guarda la tarjeta. Redirige al proveedor si la API entrega un enlace. Cada venta requiere boleta o factura.
+      Emitirla es una tarea aparte: esta página no la descarga ni la simula.
+    </p>
+
+    <h2 class="mt-10 text-2xl font-semibold">Qué no hacemos</h2>
+    <p class="mt-3 text-muted">
+      No inventamos testimonios, logos, cifras ni urgencias. No publicamos fotos del negocio tomadas de terceros.
+      Una propuesta de diseño para un prospecto, si existe, lleva un aviso de que no es un sitio oficial, no se indexa y vence a los 30 días, o antes si el negocio lo pide.
+    </p>
+
+    <h2 class="mt-10 text-2xl font-semibold">Comunicaciones</h2>
+    <p class="mt-3 text-muted">
+      La Ley 19.496, artículo 28 B, exige que un correo promocional indique la materia, la identidad del remitente y una dirección válida para pedir que no se envíen más.
+      Esa dirección es la página <a class="text-accent underline-offset-4 hover:underline" href="/baja">Baja</a>.
+      Pedida la baja, no se vuelve a enviar publicidad. Los datos personales se explican en
+      <a class="text-accent underline-offset-4 hover:underline" href="/privacidad">Privacidad</a>.
+    </p>
+  </article>
+</Base>

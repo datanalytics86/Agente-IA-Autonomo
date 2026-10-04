@@ -1,0 +1,31 @@
+---
+import { IDENTITY_PLACEHOLDER, agency, isConfigured } from '../data/agency';
+
+const address = isConfigured(agency.address) ? agency.address : IDENTITY_PLACEHOLDER;
+---
+
+<dl class="grid gap-3 text-sm sm:grid-cols-2">
+  <div>
+    <dt class="text-muted">Nombre</dt>
+    <dd>{agency.name}</dd>
+  </div>
+  <div>
+    <dt class="text-muted">Razón social</dt>
+    <dd>{agency.legalName}</dd>
+  </div>
+  <div>
+    <dt class="text-muted">RUT</dt>
+    <dd>{agency.rut}</dd>
+  </div>
+  <div>
+    <dt class="text-muted">Dirección</dt>
+    <dd>{address}</dd>
+  </div>
+  <div class="sm:col-span-2">
+    <dt class="text-muted">Correo</dt>
+    <dd>{agency.email}</dd>
+  </div>
+</dl>
+<p class="mt-4 text-sm text-muted">
+  Lo que aparece como {IDENTITY_PLACEHOLDER} es un marcador. No es un nombre comercial, un RUT ni una dirección.
+</p>

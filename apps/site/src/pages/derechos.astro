@@ -1,0 +1,59 @@
+---
+import Base from '../layouts/Base.astro';
+import Identity from '../components/Identity.astro';
+
+const kinds = [
+  { value: 'acceso', label: 'Acceso' },
+  { value: 'rectificacion', label: 'Rectificación' },
+  { value: 'supresion', label: 'Supresión' },
+  { value: 'oposicion', label: 'Oposición' },
+  { value: 'portabilidad', label: 'Portabilidad' },
+  { value: 'bloqueo', label: 'Bloqueo' },
+];
+---
+
+<Base
+  title="Derechos"
+  description="Solicitud de acceso, rectificación, supresión, oposición, portabilidad o bloqueo. Ley 21.719 y Ley 19.628."
+>
+  <article class="max-w-3xl">
+    <h1 class="text-4xl font-semibold tracking-tight">Derechos sobre tus datos</h1>
+    <p class="mt-4 text-muted">
+      Puedes pedir acceso, rectificación, supresión, oposición, portabilidad o bloqueo. La Ley 19.628 sigue vigente y la Ley 21.719 entra el 1 de diciembre de 2026.
+      Usamos el correo solo para responder la solicitud. El plazo es el de la ley vigente.
+    </p>
+    <div class="mt-6">
+      <Identity />
+    </div>
+
+    <p id="derechos-ok" class="mt-8 text-lg font-semibold text-accent" hidden>
+      Recibimos la solicitud. Te responderemos al correo indicado, dentro del plazo de la ley vigente.
+    </p>
+    <p id="derechos-estado" class="mt-4 text-sm text-muted" role="status"></p>
+
+    <form id="derechos-form" class="relative mt-8 grid max-w-xl gap-4">
+      <div class="hp" aria-hidden="true">
+        <label for="derechos-honeypot">No completar</label>
+        <input id="derechos-honeypot" name="honeypot" type="text" tabindex="-1" autocomplete="off" />
+      </div>
+      <label class="grid gap-2 text-sm">
+        Derecho
+        <select class="rounded-lg border border-white/15 bg-surface px-3 py-3 text-base" name="kind" required>
+          <option value="">Elige</option>
+          {kinds.map((kind) => <option value={kind.value}>{kind.label}</option>)}
+        </select>
+      </label>
+      <label class="grid gap-2 text-sm">
+        Correo
+        <input class="rounded-lg border border-white/15 bg-surface px-3 py-3 text-base" name="email" type="email" required maxlength="160" autocomplete="email" />
+      </label>
+      <label class="grid gap-2 text-sm">
+        Detalle
+        <textarea class="min-h-32 rounded-lg border border-white/15 bg-surface px-3 py-3 text-base" name="details" required maxlength="4000"></textarea>
+      </label>
+      <button class="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-surface" type="submit">
+        Enviar solicitud
+      </button>
+    </form>
+  </article>
+</Base>

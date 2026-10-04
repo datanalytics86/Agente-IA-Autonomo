@@ -1,0 +1,87 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agencia-engine"
+version = "0.1.0"
+description = "Motor de la agencia: núcleo, API, agentes, worker y adaptadores"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.5",
+    "pydantic-settings>=2.4",
+    "python-dotenv>=1.0",
+    "rich>=13.7",
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "apscheduler>=3.10",
+    "httpx>=0.27",
+    "jinja2>=3.1",
+    "holidays>=0.57",
+    "argon2-cffi>=23.1",
+    "itsdangerous>=2.2",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "respx",
+    "time-machine",
+    "ruff",
+    "mypy",
+    "pip-audit",
+]
+
+[tool.setuptools.packages.find]
+include = [
+    "core*",
+    "db*",
+    "api*",
+    "agents*",
+    "integrations*",
+    "worker*",
+    "simulation*",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = [".", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "agents",
+    "api",
+    "core",
+    "db",
+    "integrations",
+    "simulation",
+    "worker",
+]
+
+[tool.mypy]
+python_version = "3.11"
+plugins = ["pydantic.mypy"]
+mypy_path = "."
+namespace_packages = false
+warn_unused_configs = true
+exclude = "(^|[/\\\\])(agents|api|integrations|simulation|tests|migrations)[/\\\\]|(^|[/\\\\])main\\.py$"
+
+[[tool.mypy.overrides]]
+module = ["core", "core.*", "db", "db.*", "worker", "worker.*"]
+strict = true
+
+[[tool.mypy.overrides]]
+module = ["apscheduler.*"]
+ignore_missing_imports = true
