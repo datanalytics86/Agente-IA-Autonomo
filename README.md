@@ -6,9 +6,23 @@ Monorepo para vender landings a pymes en Chile. Tres piezas:
 - `apps/web/` — panel React. Lee la API con cookie de sesión. No inventa leads ni ingresos.
 - `apps/site/` — sitio público en Astro: diagnóstico, precios, checkout y portal del cliente.
 
-`infra/` tiene Docker Compose y Caddy. Los contratos están en `docs/contracts/`. La operación está en `docs/RUNBOOK.md` y el checklist del dueño en `docs/GO_LIVE.md`.
+`infra/` tiene Docker Compose y Caddy. Los contratos están en `docs/contracts/`. La operación está en `docs/RUNBOOK.md`, el checklist del dueño en `docs/GO_LIVE.md` y el VPS en `docs/DEPLOY_VPS.md`.
 
-Sin credenciales el sistema queda en demo: no envía, no cobra y no manda mensajes directos de Instagram ni de LinkedIn. Esos dos canales quedan en una bandeja para envío manual. El nombre, el RUT y la dirección de la agencia no van en el código: el sitio muestra `[datos de la agencia]` hasta que el dueño los pone en el entorno.
+Demo y CI usan solo el compose base, con `infra/.env.ci`:
+
+```bash
+docker compose -f infra/docker-compose.yml --env-file infra/.env.ci up -d --build --wait
+```
+
+Producción usa los dos archivos y el `.env` de la raíz (no se commitea):
+
+```bash
+docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml --env-file .env up -d --build
+```
+
+En ese stack la raíz es el sitio. El panel no está ahí: es `/admin/` (Vite `base: '/admin/'`, router `basepath: '/admin'`). `GET /healthz` es JSON `{"status":"ok"}` de la API, no HTML. El worker no sirve HTTP; su healthcheck es el archivo `/tmp/worker-ready`.
+
+Sin credenciales el sistema queda en demo: no envía, no cobra y no manda mensajes directos de Instagram ni de LinkedIn. Esos dos canales quedan en una bandeja para envío manual. WhatsApp no se usa en frío. El nombre, el RUT y la dirección de la agencia no van en el código: el sitio muestra `[datos de la agencia]` hasta que el dueño los pone en el entorno.
 
 ## Modos del motor
 
@@ -70,6 +84,6 @@ El panel abre http://localhost:8080. El sitio, en `apps/site`, usa `npm run dev`
 ## Reglas que el código no cruza
 
 - Precio publicado del paquete: 250.000 a 450.000 CLP. Un deal de 2.800.000 CLP o más, o una tasa de respuesta bajo el umbral configurado, para en revisión humana.
-- Outreach real solo con las tres condiciones: `APP_MODE=prod`, `OUTREACH_ENABLED=true` y `settings_kv.kill_switch=true`, más la credencial del canal. El default es demo, dry-run, outreach apagado y kill switch en falso.
-- WhatsApp no se usa en frío. Instagram y LinkedIn no se automatizan.
+- Outreach real solo con las cuatro condiciones a la vez: `APP_MODE=prod`, `OUTREACH_ENABLED=true`, `settings_kv.kill_switch=true` y la credencial del canal. `DRY_RUN=true` bloquea el socket aunque esas cuatro pasen. El default es demo, dry-run, outreach apagado y kill switch en falso (detenido).
+- WhatsApp no se usa en frío. Instagram y LinkedIn en frío quedan en la bandeja manual.
 - No hay cobro real en demo. El checkout falso dice que no se hizo ningún cobro.
