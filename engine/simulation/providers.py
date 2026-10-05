@@ -150,6 +150,7 @@ def _hit(
         opportunity_score=score,
         scenario=role,
         unsafe_text=raw,
+        email_source_url=f"http://localhost/ficha/sim-{index:04d}" if email else None,
     )
 
 
@@ -199,6 +200,7 @@ class FakeInbound:
     def __init__(self, world: World) -> None:
         self.world = world
         self._seen: set[str] = set()
+        self._blank_sent = False
 
     def poll(self) -> list[InboundMail]:
         mails: list[InboundMail] = []
@@ -206,6 +208,16 @@ class FakeInbound:
             if record.message_id in self._seen or record.status != "sent":
                 continue
             self._seen.add(record.message_id)
+            if record.role == "silencio" and not self._blank_sent:
+                self._blank_sent = True
+                mails.append(
+                    InboundMail(
+                        from_email=record.to,
+                        body="Recibí el correo.",
+                        intent="",
+                    )
+                )
+                continue
             intent = _intent(record.role, self.world.rng)
             if intent is None:
                 continue
@@ -250,21 +262,21 @@ class FakeBooking:
         return f"{base}/agendar?lead_id={lead_id}"
 
     def poll(self) -> list[BookingEvent]:
+        # Repetible: accept_signed_event reclama el id aunque la transición no aplique.
         from datetime import UTC, datetime
 
-        events: list[BookingEvent] = []
-        for lead_id in self._linked:
-            if lead_id in self._done:
-                continue
-            self._done.add(lead_id)
-            events.append(
-                BookingEvent(
-                    lead_id=lead_id,
-                    start=datetime(2026, 3, 2, 15, 0, tzinfo=UTC),
-                    provider_event_id=f"cal-{lead_id}",
-                )
+        return [
+            BookingEvent(
+                lead_id=lead_id,
+                start=datetime(2026, 3, 2, 15, 0, tzinfo=UTC),
+                provider_event_id=f"cal-{lead_id}",
             )
-        return events
+            for lead_id in self._linked
+            if lead_id not in self._done
+        ]
+
+    def acknowledge(self, lead_id: str) -> None:
+        self._done.add(lead_id)
 
 
 class FakePayments:

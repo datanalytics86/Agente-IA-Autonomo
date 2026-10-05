@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import random
 import socket
 from collections.abc import Callable
@@ -12,10 +13,12 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
-from core.config import ENGINE_DIR, REPO_ROOT, reset_settings
-from db.models import Base
-from db.repositories import DataRequestRepository, SettingsRepository
+from agents.copy import diagnosis_fallback
+from core.config import ENGINE_DIR, REPO_ROOT, get_settings, reset_settings
+from db.models import Base, Lead
+from db.repositories import DataRequestRepository, LeadRepository, SettingsRepository
 from db.session import reset_engine
+from simulation.gates import apply_bookings, drive_sales, sync_outreach
 from simulation.providers import (
     FakeBooking,
     FakeInbound,
@@ -46,6 +49,7 @@ _ORDER = (
     "inbound_poll",
     "response_rate_guard",
     "pipeline_tick",
+    "diagnostico_gratis",
     "postventa",
     "metrics_rollup",
     "outreach_send",
@@ -73,7 +77,31 @@ def run_simulation(
 ) -> int:
     if days < 1:
         raise ValueError("days debe ser >= 1")
+    previous_agency = os.environ.get("AGENCY_NAME")
+    os.environ["AGENCY_NAME"] = "[datos de la agencia]"
     reset_settings()
+    try:
+        return _run(
+            days,
+            seed,
+            report_path=report_path,
+            database_url=database_url,
+        )
+    finally:
+        if previous_agency is None:
+            os.environ.pop("AGENCY_NAME", None)
+        else:
+            os.environ["AGENCY_NAME"] = previous_agency
+        reset_settings()
+
+
+def _run(
+    days: int,
+    seed: int,
+    *,
+    report_path: Path | None,
+    database_url: str | None,
+) -> int:
     start = SIM_START_LOCAL.astimezone(UTC)
     end = (SIM_START_LOCAL + timedelta(days=days)).astimezone(UTC)
     url = database_url or _default_database()
@@ -97,8 +125,15 @@ def run_simulation(
                 rng=world.rng,
                 ports=ports,
             )
-            for name in _due(clock.now(), session):
+            sync_outreach(session, world)
+            due = _due(clock.now(), session)
+            for name in due:
+                if name == "pipeline_tick":
+                    apply_bookings(session, ports)
                 execute(name, JOBS[name], ctx)
+                if name == "inbound_poll":
+                    apply_bookings(session, ports)
+            drive_sales(session, ports)
             session.commit()
             nxt = _next_moment(session, clock.now(), end)
             if nxt >= end:
@@ -158,11 +193,48 @@ def _ports(world: World) -> Ports:
 
 def _bootstrap(session: Session, clock: FakeClock) -> None:
     SettingsRepository(session).put("kill_switch", True, updated_by="simulacion")
+    _diagnostico_lead(session, clock)
     DataRequestRepository(session).add(
         kind="acceso",
         requester_email="persona@ejemplo.cl",
         details="simulación",
         due_at=clock.now() + timedelta(days=2),
+    )
+
+
+def _diagnostico_lead(session: Session, clock: FakeClock) -> None:
+    settings = get_settings()
+    diagnosis = diagnosis_fallback(
+        {
+            "business": "Consulta Diagnóstico",
+            "commune": "Providencia",
+            "category": "cafeteria",
+            "agency_name": settings.agency_name,
+            "has_website": False,
+            "tone": "tu",
+            "price_clp": 350_000,
+            "public_base_url": settings.public_base_url,
+        }
+    )
+    LeadRepository(session).add(
+        Lead(
+            id="lead_diag_sim",
+            source="inbound_diagnostico",
+            business="Consulta Diagnóstico",
+            category="cafeteria",
+            city="Santiago",
+            commune="Providencia",
+            opportunity_score=40,
+            estimated_value_clp=350_000,
+            high_value=False,
+            tone="tu",
+            status="diagnosticado",
+            contact_email="consulta@diagnostico-ejemplo.cl",
+            contact_email_source_url="http://localhost/diagnostico-gratis",
+            diagnosis=diagnosis.model_dump(),
+            created_at=clock.now(),
+            updated_at=clock.now(),
+        )
     )
 
 
@@ -174,6 +246,7 @@ def _due(now: datetime, session: Session) -> list[str]:
             names.append("inbound_poll")
         if local.minute % 10 == 0:
             names.append("pipeline_tick")
+            names.append("diagnostico_gratis")
         if local.minute == 0:
             names.append("response_rate_guard")
         for hour, minute, name, pred in _CRONS:

@@ -2,7 +2,7 @@
 
 Ubuntu 22.04, 24.04 o 26.04, 64 bits. Los comandos de Compose se corren en la raíz del clon. El `.env` vive ahí y no se commitea (`.gitignore` ya ignora `.env`).
 
-Este archivo no afirma que el smoke de Docker esté verde. La evidencia del stack de demo es el job `compose-smoke` de CI, y al escribir esto no hay una corrida verde del commit `922434a`.
+La evidencia del stack de demo es el job `compose-smoke` de CI. La corrida verde es https://github.com/datanalytics86/Agente-IA-Autonomo/actions/runs/37247682028 sobre el commit `00190b0`. En esta máquina no está el comando `docker`.
 
 ## 1. Docker
 

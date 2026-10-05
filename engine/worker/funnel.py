@@ -18,6 +18,7 @@ from agents.filmer import FilmerAgent
 from agents.mobile import MobileAgent
 from agents.pitcher import PitcherAgent, ensure_draft
 from agents.reporter import ReporterAgent
+from agents.runtime import add_business_days
 from core.compliance import check_rules
 from core.config import get_settings
 from core.errors import DuplicateLeadError
@@ -180,6 +181,7 @@ def _lead_from_hit(ctx: JobContext, hit: PlaceHit) -> Lead:
         rating=hit.rating,
         reviews=hit.user_rating_count,
         contact_email=hit.email,
+        contact_email_source_url=hit.email_source_url if hit.email else None,
         instagram_handle=hit.instagram_handle,
         linkedin_url=hit.linkedin_url,
         phone_public=hit.phone_public,
@@ -307,12 +309,15 @@ def _pitch(ctx: JobContext, lead: Lead, agent_ctx: AgentContext, seen: set[str])
         lead.next_action_at = next_window_open(ctx.clock.now())
         LeadRepository(ctx.session).save(lead)
         return
+    if not _outreach_room(ctx):
+        return
     _fill_pitch_fallback(ctx, lead)
     ensure_draft(agent_ctx)
     if not _budget_open(ctx, "checker", lead.id, seen):
         return
     CheckerAgent().run(agent_ctx)
     PitcherAgent().run(agent_ctx)
+    _stamp_simulated_send(ctx, lead.id)
     _stamp_schedule(ctx, lead.id)
 
 
@@ -331,6 +336,29 @@ def _fill_pitch_fallback(ctx: JobContext, lead: Lead) -> None:
     diagnosis["pitch_body"] = text
     diagnosis["pitch_source"] = "copywriter"
     lead.diagnosis = diagnosis
+    LeadRepository(ctx.session).save(lead)
+
+
+def _outreach_room(ctx: JobContext) -> bool:
+    """El demo no salta el cupo ni la pausa del canal. El fin de semana deja cola."""
+    from worker.sending import _sent_today, channel_paused, daily_limit
+
+    if channel_paused(ctx.session, "email_outreach"):
+        return False
+    return len(_sent_today(ctx.session, ctx.clock.now())) < daily_limit(ctx.session)
+
+
+def _stamp_simulated_send(ctx: JobContext, lead_id: str) -> None:
+    """El demo marca el envío con el reloj de pared. La simulación usa el reloj del job."""
+    when = ctx.clock.now()
+    for message in MessageRepository(ctx.session).list(lead_id=lead_id, limit=20):
+        if message.direction != "out" or message.sequence_step != 1 or message.status != "sent":
+            continue
+        patch_fields(ctx.session, message, sent_at=when)
+    lead = LeadRepository(ctx.session).get(lead_id)
+    if lead is None or lead.status != "enviado":
+        return
+    lead.next_action_at = add_business_days(when, get_settings().followup_1_business_days)
     LeadRepository(ctx.session).save(lead)
 
 
