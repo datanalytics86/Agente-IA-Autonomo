@@ -7,8 +7,6 @@
 	admin off
 	on_demand_tls {
 		ask http://api:8000/api/internal/domain-check
-		interval 2m
-		burst 5
 	}
 }
 

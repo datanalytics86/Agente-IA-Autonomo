@@ -215,6 +215,10 @@ jobs:
           docker compose -f infra/docker-compose.yml --env-file infra/.env.ci up -d --build --wait
           python infra/scripts/smoke.py
 
+      - name: Logs del stack si el smoke falló
+        if: failure()
+        run: docker compose -f infra/docker-compose.yml --env-file infra/.env.ci logs --no-color --tail 200
+
       - name: Bajar el stack
         if: always()
         run: docker compose -f infra/docker-compose.yml --env-file infra/.env.ci down -v

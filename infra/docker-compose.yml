@@ -125,6 +125,13 @@ services:
         condition: service_healthy
     ports:
       - "80:80"
+    # La imagen no trae healthcheck. Este pide /healthz por el proxy.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 18
+      start_period: 10s
     volumes:
       - client_sites:/srv/clients
       - caddy_data:/data
