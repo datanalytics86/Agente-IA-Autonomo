@@ -71,7 +71,15 @@ from db.repositories import (
     _start_of_local_day,
 )
 from integrations.email.base import build_transactional_email
-from integrations.hosting.base import copy_site, project_slug, resolve_sites_dir
+from integrations.email.resend_mail import FakeTransactional
+from integrations.hosting.base import (
+    CaddyHosting,
+    FakeHosting,
+    build_hosting,
+    project_slug,
+    resolve_sites_dir,
+)
+from integrations.payments import build_payments
 
 _RIGHTS = frozenset(
     {"acceso", "rectificacion", "supresion", "oposicion", "portabilidad", "bloqueo"}
@@ -216,14 +224,36 @@ def preview_html(session: Session, token: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _production_html(project: Project) -> Path | None:
+    raw = project.intake
+    if not isinstance(raw, dict):
+        return None
+    value = raw.get("production_path")
+    if not isinstance(value, str) or not value:
+        return None
+    path = Path(value)
+    return path if path.is_file() else None
+
+
 def _publish_project(project: Project, lead: Lead | None) -> Path:
-    source = _preview_dir(project.portal_token)
     if lead is None:
         raise ApiError(404, "not_found", "el proyecto no tiene lead")
-    if not (source / "index.html").is_file():
+    source = _preview_dir(project.portal_token)
+    produced = _production_html(project)
+    if produced is not None:
+        source.mkdir(parents=True, exist_ok=True)
+        (source / "index.html").write_text(produced.read_text(encoding="utf-8"), encoding="utf-8")
+    elif not (source / "index.html").is_file():
         _write_preview(project, lead)
+    settings = get_settings()
     slug = project_slug(lead.business)
-    return copy_site(resolve_sites_dir(get_settings()), slug, source)
+    sites = resolve_sites_dir(settings)
+    hosting = build_hosting(settings)
+    if isinstance(hosting, CaddyHosting):
+        return Path(hosting.publish(slug, source, None))
+    if isinstance(hosting, FakeHosting):
+        hosting.publish(slug, source, None)
+    return Path(CaddyHosting(sites).publish(slug, source, None))
 
 
 def _send_diagnostico_mail(session: Session, lead: Lead, email: str) -> None:
@@ -533,17 +563,85 @@ def save_feedback(session: Session, token: str, text: str) -> dict[str, str]:
     return {"id": project.id, "status": "fuera_de_alcance"}
 
 
-def approve_project_public(session: Session, token: str) -> dict[str, str]:
-    project = project_by_token(session, token)
-    lead = session.get(Lead, project.lead_id)
-    if lead is not None and lead.status == "en_revision_cliente":
-        transition_lead(
-            session,
-            lead,
-            "entregado",
-            actor="humano",
-            reason="el cliente aprobó el proyecto",
+def _has_balance(order: Order) -> bool:
+    deposit = order.total_clp * order.deposit_percent // 100
+    return deposit < order.total_clp
+
+
+def _open_balance(
+    session: Session,
+    project: Project,
+    lead: Lead,
+    order: Order,
+) -> dict[str, str]:
+    intake = dict(project.intake) if isinstance(project.intake, dict) else {}
+    if intake.get("client_approved") is True:
+        return {"id": project.id, "status": "saldo_pendiente"}
+    deposit = order.total_clp * order.deposit_percent // 100
+    balance = order.total_clp - deposit
+    preference = build_payments(get_settings()).create_preference(
+        order.id,
+        f"Saldo {lead.business}",
+        balance,
+    )
+    session.execute(
+        update(Order)
+        .where(Order.id == order.id)
+        .values(
+            checkout_url=preference.checkout_url,
+            provider_preference_id=preference.preference_id,
         )
+    )
+    intake["client_approved"] = True
+    intake["balance_due_clp"] = balance
+    session.execute(update(Project).where(Project.id == project.id).values(intake=intake))
+    session.flush()
+    return {"id": project.id, "status": "saldo_pendiente"}
+
+
+def _send_delivery_mail(session: Session, lead: Lead, deploy_url: str) -> None:
+    email = lead.contact_email
+    if not email:
+        return
+    subject = f"Sitio listo: {lead.business}"
+    text = f"El sitio de {lead.business} quedó publicado. Puedes verlo en {deploy_url}."
+    body = f"<p>{html.escape(text)}</p>"
+    result = FakeTransactional(get_settings()).send(
+        email,
+        subject,
+        text,
+        body,
+        {},
+        consent=True,
+        kind="entrega",
+    )
+    sent = result.status == "sent"
+    session.add(
+        Message(
+            lead_id=lead.id,
+            thread_id=lead.id,
+            direction="out",
+            channel="email_tx",
+            status="sent" if sent else "failed",
+            subject=subject,
+            body_text=text,
+            body_html=body,
+            provider_message_id=f"entrega-{lead.id}" if sent else None,
+            sent_at=datetime.now(UTC) if sent else None,
+        )
+    )
+
+
+def _finish_publication(
+    session: Session,
+    project: Project,
+    lead: Lead,
+    *,
+    actor: str,
+    reason: str,
+) -> dict[str, str]:
+    if lead.status == "en_revision_cliente":
+        transition_lead(session, lead, "entregado", actor=actor, reason=reason)
     published = _publish_project(project, lead)
     current = dict(project.intake) if isinstance(project.intake, dict) else {}
     current["published_path"] = str(published)
@@ -552,13 +650,33 @@ def approve_project_public(session: Session, token: str) -> dict[str, str]:
         .where(Project.id == project.id)
         .values(
             status="publicado",
-            deploy_url=_preview_url(project.portal_token),
+            deploy_url=str(published),
             delivered_at=datetime.now(UTC),
             intake=current,
         )
     )
+    _send_delivery_mail(session, lead, str(published))
     session.flush()
     return {"id": project.id, "status": "publicado"}
+
+
+def approve_project_public(session: Session, token: str) -> dict[str, str]:
+    project = project_by_token(session, token)
+    lead = session.get(Lead, project.lead_id)
+    if lead is None or lead.status != "en_revision_cliente":
+        raise ApiError(409, "conflict", "el cliente todavía no puede aprobar")
+    order = session.get(Order, project.order_id)
+    if order is not None and order.status != "paid":
+        if order.status == "deposit_paid" and _has_balance(order):
+            return _open_balance(session, project, lead, order)
+        raise ApiError(409, "conflict", "el pago no está completo")
+    return _finish_publication(
+        session,
+        project,
+        lead,
+        actor="humano",
+        reason="el cliente aprobó el proyecto",
+    )
 
 
 def domain_authorized(session: Session, domain: str) -> bool:
@@ -639,6 +757,73 @@ def accept_signed_event(
     return {"ok": True, "duplicate": False}
 
 
+def _expected_amounts(order: Order) -> list[int]:
+    deposit = order.total_clp * order.deposit_percent // 100
+    balance = order.total_clp - deposit
+    if order.status == "deposit_paid":
+        return [balance] if balance > 0 else []
+    amounts: list[int] = []
+    if 0 < deposit < order.total_clp:
+        amounts.append(deposit)
+    amounts.append(order.total_clp)
+    return amounts
+
+
+def _payment_kind(order: Order, amount: int) -> str | None:
+    deposit = order.total_clp * order.deposit_percent // 100
+    balance = order.total_clp - deposit
+    if order.status == "paid":
+        return None
+    if order.status == "deposit_paid":
+        if balance > 0 and amount == balance:
+            return "balance"
+        return None
+    if amount == order.total_clp:
+        return "full"
+    if 0 < deposit < order.total_clp and amount == deposit:
+        return "deposit"
+    return None
+
+
+def _start_production_from_payment(session: Session, order: Order) -> None:
+    project = session.scalar(select(Project).where(Project.order_id == order.id))
+    if project is None:
+        session.add(
+            Project(
+                order_id=order.id,
+                lead_id=order.lead_id,
+                status="intake_pendiente",
+                revisions_used=0,
+                max_revisions=revisions_for(order.package_code),
+            )
+        )
+    lead = session.get(Lead, order.lead_id)
+    if lead is not None and lead.status == "propuesta":
+        transition_lead(
+            session,
+            lead,
+            "pagado",
+            actor="webhook",
+            reason="pago verificado en el proveedor",
+        )
+    pending_task = session.scalar(
+        select(Approval.id).where(
+            Approval.lead_id == order.lead_id,
+            Approval.kind == "tarea_manual",
+            Approval.status == "pending",
+        )
+    )
+    if pending_task is None:
+        session.add(
+            Approval(
+                lead_id=order.lead_id,
+                kind="tarea_manual",
+                payload={"note": "emitir documento tributario", "order_id": order.id},
+                status="pending",
+            )
+        )
+
+
 def apply_payment(session: Session, fact: PaymentFact) -> dict[str, Any]:
     existing = session.scalar(
         select(Payment).where(Payment.provider_payment_id == fact.provider_payment_id)
@@ -684,43 +869,54 @@ def apply_payment(session: Session, fact: PaymentFact) -> dict[str, Any]:
     if not _claim_webhook(session, "mercadopago", fact.provider_payment_id):
         return {"ok": True, "duplicate": True, "payment_id": payment.id, "order_id": order.id}
     if fact.status in _PAID:
-        session.execute(update(Order).where(Order.id == order.id).values(status="paid"))
-        project = session.scalar(select(Project).where(Project.order_id == order.id))
-        if project is None:
-            session.add(
-                Project(
-                    order_id=order.id,
-                    lead_id=order.lead_id,
-                    status="intake_pendiente",
-                    revisions_used=0,
-                    max_revisions=revisions_for(order.package_code),
-                )
-            )
-        lead = session.get(Lead, order.lead_id)
-        if lead is not None and lead.status == "propuesta":
-            transition_lead(
-                session,
-                lead,
-                "pagado",
-                actor="webhook",
-                reason="pago verificado en el proveedor",
-            )
-        pending_task = session.scalar(
-            select(Approval.id).where(
-                Approval.lead_id == order.lead_id,
-                Approval.kind == "tarea_manual",
-                Approval.status == "pending",
-            )
-        )
-        if pending_task is None:
+        kind = _payment_kind(order, fact.amount_clp)
+        if kind is None:
             session.add(
                 Approval(
                     lead_id=order.lead_id,
-                    kind="tarea_manual",
-                    payload={"note": "emitir documento tributario", "order_id": order.id},
+                    kind="compliance",
+                    payload={
+                        "reason": "monto pagado distinto al esperado",
+                        "amount_clp": fact.amount_clp,
+                        "expected_clp": _expected_amounts(order),
+                        "order_id": order.id,
+                    },
                     status="pending",
                 )
             )
+        elif kind == "balance":
+            session.execute(update(Order).where(Order.id == order.id).values(status="paid"))
+            session.flush()
+            session.refresh(order)
+            project = session.scalar(select(Project).where(Project.order_id == order.id))
+            lead = session.get(Lead, order.lead_id)
+            if project is not None:
+                session.refresh(project)
+            if lead is not None:
+                session.refresh(lead)
+            intake = project.intake if project is not None else None
+            if (
+                project is not None
+                and lead is not None
+                and isinstance(intake, dict)
+                and intake.get("client_approved") is True
+            ):
+                _finish_publication(
+                    session,
+                    project,
+                    lead,
+                    actor="webhook",
+                    reason="saldo pagado tras la aprobación del cliente",
+                )
+        else:
+            session.execute(
+                update(Order)
+                .where(Order.id == order.id)
+                .values(status="paid" if kind == "full" else "deposit_paid")
+            )
+            _start_production_from_payment(session, order)
+            session.flush()
+            session.refresh(order)
     session.flush()
     return {"ok": True, "duplicate": False, "payment_id": payment.id, "order_id": order.id}
 

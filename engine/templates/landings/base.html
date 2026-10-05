@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ hero_title }} · {{ commune }}</title>
   <meta name="description" content="{{ hero_subtitle }}" />
-  {% if demo %}
+  {% if demo or preview %}
   <meta name="robots" content="noindex, nofollow" />
+  {% endif %}
+  {% if demo %}
   <meta name="preview-token" content="{{ token }}" />
   <meta name="preview-expires" content="{{ expires }}" />
   {% endif %}
@@ -59,6 +61,17 @@
       <p class="rating">{{ rating }} de 5, según {{ reviews }} reseñas públicas de Google.</p>
       {% endif %}
     </section>
+    {% if intake_items %}
+    <section class="wrap">
+      <h2>Datos del negocio</h2>
+      {% for item in intake_items %}
+      <article>
+        <h3>{{ item.title }}</h3>
+        <p>{{ item.detail }}</p>
+      </article>
+      {% endfor %}
+    </section>
+    {% endif %}
     <section class="wrap">
       <h2>Preguntas frecuentes</h2>
       {% for item in faqs %}

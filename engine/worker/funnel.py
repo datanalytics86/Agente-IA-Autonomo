@@ -1,54 +1,61 @@
-"""Scout y avance de embudo. Un paso de estado por lead y por tick."""
+"""Scout y avance de embudo. El tick invoca los mismos agentes que el demo."""
 
 from __future__ import annotations
 
-from datetime import timedelta
+from dataclasses import dataclass
 from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from agents.builder import BuilderAgent
+from agents.checker import CheckerAgent
+from agents.closer import CloserAgent
+from agents.context import AgentContext
+from agents.delivery import DeliveryAgent
+from agents.diagnoser import DiagnoserAgent
+from agents.filmer import FilmerAgent
+from agents.mobile import MobileAgent
+from agents.pitcher import PitcherAgent, ensure_draft
+from agents.reporter import ReporterAgent
 from core.compliance import check_rules
 from core.config import get_settings
 from core.errors import DuplicateLeadError
 from core.hitl import needs_value_review
 from core.states import transition
-from db.models import Artifact, Lead, LlmCall, Message, Order, Payment, Project
+from db.models import Lead, Message
 from db.repositories import (
-    ArtifactRepository,
     EventRepository,
     LeadRepository,
     LlmCallRepository,
     MessageRepository,
     OrderRepository,
-    PaymentRepository,
-    ProjectRepository,
     SettingsRepository,
 )
 from worker.approvals import ensure_approval
-from worker.copywriter import MANUAL_CHANNELS, checker_settings, offer_price_clp, outreach_parts
+from worker.copywriter import checker_settings, outreach_parts
 from worker.persist import patch_fields
 from worker.ports import JobContext, PlaceHit
-from worker.schedule import local_date, next_window_open
+from worker.schedule import in_send_window, local_date, next_window_open
 
 _CHAINS = ("mcdonald", "starbucks", "burger king", "kfc", "subway", "papa john")
 _USTED = frozenset({"clinica-dental", "optica", "abogados", "estudio-contable"})
-_PIPELINE_STATUSES = (
-    "diagnosticado",
-    "landing",
-    "video",
-    "pitch_listo",
-    "respondio",
-    "agendado",
-    "propuesta",
-    "pagado",
-    "en_produccion",
-    "en_revision_cliente",
+_ACTIVE = frozenset(
+    {
+        "nuevo",
+        "diagnosticado",
+        "revision",
+        "landing",
+        "video",
+        "pitch_listo",
+        "respondio",
+        "agendado",
+        "propuesta",
+        "pagado",
+        "en_produccion",
+        "en_revision_cliente",
+    }
 )
-_PACKAGE = {
-    "code": "landing_pro",
-    "revisions": 2,
-}
 
 
 def _counter(session: Session, key: str) -> int:
@@ -66,13 +73,6 @@ def _put_counter(session: Session, key: str, value: int, *, who: str) -> None:
 def _is_chain(name: str) -> bool:
     folded = name.casefold()
     return any(token in folded for token in _CHAINS)
-
-
-def _video_enabled(session: Session) -> bool:
-    stored = SettingsRepository(session).get("video_enabled")
-    if isinstance(stored, bool):
-        return stored
-    return get_settings().video_enabled
 
 
 def _compliance_settings() -> dict[str, object]:
@@ -192,189 +192,184 @@ def _lead_from_hit(ctx: JobContext, hit: PlaceHit) -> Lead:
     )
 
 
+@dataclass
+class _Tick:
+    moved: int = 0
+    diagnosed: int = 0
+
+
 def job_pipeline(ctx: JobContext) -> int:
-    diagnosed: set[str] = set()
-    moved = _diagnose(ctx, diagnosed)
-    rows = list(
-        ctx.session.scalars(
-            select(Lead)
-            .where(Lead.status.in_(_PIPELINE_STATUSES), Lead.source != "sistema")
-            .order_by(Lead.opportunity_score.desc(), Lead.business.asc(), Lead.id.asc())
-        ).all()
-    )
-    for lead in rows:
-        if lead.id in diagnosed:
-            continue
-        if _one_step(ctx, lead):
-            moved += 1
-    return moved
-
-
-def _diagnose(ctx: JobContext, diagnosed: set[str]) -> int:
+    """Una pasada por lead, en el mismo orden que Orchestrator._advance."""
     settings = get_settings()
     day = local_date(ctx.clock.now()).isoformat()
     key = f"diagnose_count:{day}"
     already = _counter(ctx.session, key)
     room = settings.diagnose_daily_limit - already
-    if room <= 0:
-        return 0
-    leads = list(
+    seen: set[str] = set()
+    moved = 0
+    diagnosed = 0
+    rows = list(
         ctx.session.scalars(
             select(Lead)
-            .where(Lead.status == "nuevo", Lead.source != "sistema")
+            .where(Lead.status.in_(_ACTIVE), Lead.source != "sistema")
             .order_by(Lead.opportunity_score.desc(), Lead.business.asc(), Lead.id.asc())
-            .limit(room)
         ).all()
     )
-    done = 0
-    for lead in leads:
-        if not _charge_llm(ctx, lead.id, "diagnoser"):
-            break
-        transition(ctx.session, lead, "diagnosticado", actor="agente", reason="diagnóstico")
-        lead.diagnosis = {
-            "markdown": f"Diagnóstico de {lead.business} en {lead.commune}.",
-            "diagnosed_at": ctx.clock.now().isoformat(),
-        }
-        diagnosed.add(lead.id)
-        done += 1
-    if done:
-        _put_counter(ctx.session, key, already + done, who="pipeline_tick")
-    return done
+    for lead in rows:
+        tick = _advance(ctx, lead.id, room - diagnosed, seen)
+        moved += tick.moved
+        diagnosed += tick.diagnosed
+    if diagnosed:
+        _put_counter(ctx.session, key, already + diagnosed, who="pipeline_tick")
+    MobileAgent().run(AgentContext(ctx.session))
+    if _budget_open(ctx, "reporter", None, seen):
+        ReporterAgent().run(AgentContext(ctx.session))
+    return moved
 
 
-def _charge_llm(ctx: JobContext, lead_id: str, agent: str) -> bool:
-    repo = LlmCallRepository(ctx.session)
-    budget = Decimal(str(get_settings().llm_daily_budget_usd))
-    if repo.spend_today_usd(now=ctx.clock.now()) >= budget:
+def _budget_open(ctx: JobContext, agent: str, lead_id: str | None, seen: set[str]) -> bool:
+    spent = LlmCallRepository(ctx.session).spend_today_usd(now=ctx.clock.now())
+    limit = Decimal(str(get_settings().llm_daily_budget_usd))
+    if spent < limit:
+        return True
+    if agent not in seen:
+        seen.add(agent)
         EventRepository(ctx.session).append(
-            agent=agent,
+            agent="pipeline",
             level="warn",
             message="presupuesto LLM del día agotado",
             lead_id=lead_id,
             ts=ctx.clock.now(),
         )
-        return False
-    repo.add(
-        LlmCall(
-            agent=agent,
-            model=get_settings().llm_model,
-            prompt_name=agent,
-            prompt_version="worker-1",
-            tokens_in=120,
-            tokens_out=40,
-            cost_usd=Decimal("0.001"),
-            latency_ms=1,
-            ok=True,
-            lead_id=lead_id,
-            ts=ctx.clock.now(),
-        )
-    )
-    return True
-
-
-def _one_step(ctx: JobContext, lead: Lead) -> bool:
-    status = lead.status
-    if status == "diagnosticado":
-        _ensure_artifact(ctx, lead, "landing_demo", f"output/demo/{lead.id}.html")
-        transition(ctx.session, lead, "landing", actor="agente", reason="landing demo")
-        return True
-    if status == "landing":
-        if _video_enabled(ctx.session):
-            _ensure_artifact(ctx, lead, "storyboard", f"output/story/{lead.id}.md")
-            transition(ctx.session, lead, "video", actor="agente", reason="storyboard")
-            return True
-        return _enter_pitch(ctx, lead)
-    if status == "video":
-        return _enter_pitch(ctx, lead)
-    if status == "pitch_listo":
-        return False
-    if status == "respondio":
-        return _maybe_book(ctx, lead)
-    if status == "agendado":
-        return _open_proposal(ctx, lead)
-    if status == "propuesta":
-        return _collect_payment(ctx, lead)
-    if status == "pagado":
-        return _start_production(ctx, lead)
-    if status == "en_produccion":
-        _touch_project(ctx, lead, "en_revision_cliente")
-        transition(
-            ctx.session,
-            lead,
-            "en_revision_cliente",
-            actor="agente",
-            reason="preview lista",
-        )
-        return True
-    if status == "en_revision_cliente":
-        _touch_project(ctx, lead, "aprobado", delivered=True)
-        transition(ctx.session, lead, "entregado", actor="agente", reason="cliente aprueba")
-        return True
     return False
 
 
-def _ensure_artifact(ctx: JobContext, lead: Lead, kind: str, path: str) -> None:
-    current = ArtifactRepository(ctx.session).list(lead_id=lead.id, limit=20)
-    if any(item.kind == kind for item in current):
+def _reload(ctx: JobContext, lead_id: str, current: Lead) -> Lead:
+    fresh = LeadRepository(ctx.session).get(lead_id)
+    return fresh if fresh is not None else current
+
+
+def _finish(ctx: JobContext, lead_id: str, before: str, diagnosed: int) -> _Tick:
+    lead = LeadRepository(ctx.session).get(lead_id)
+    moved = 1 if lead is not None and lead.status != before else 0
+    return _Tick(moved=moved, diagnosed=diagnosed)
+
+
+def _advance(ctx: JobContext, lead_id: str, room: int, seen: set[str]) -> _Tick:
+    repo = LeadRepository(ctx.session)
+    lead = repo.get(lead_id)
+    if lead is None or lead.status not in _ACTIVE:
+        return _Tick()
+    before = lead.status
+    diagnosed = 0
+    agent_ctx = AgentContext(ctx.session, lead_id=lead_id)
+    if lead.status == "nuevo":
+        if room <= 0 or not _budget_open(ctx, "diagnoser", lead.id, seen):
+            return _Tick()
+        DiagnoserAgent().run(agent_ctx)
+        lead = _reload(ctx, lead_id, lead)
+        if lead.status != "nuevo":
+            diagnosed = 1
+    if lead.status in {"diagnosticado", "revision"}:
+        if not _budget_open(ctx, "builder", lead.id, seen):
+            return _finish(ctx, lead_id, before, diagnosed)
+        BuilderAgent().run(agent_ctx)
+        lead = _reload(ctx, lead_id, lead)
+    if lead.status in {"landing", "revision"}:
+        if not _budget_open(ctx, "filmer", lead.id, seen):
+            return _finish(ctx, lead_id, before, diagnosed)
+        FilmerAgent().run(agent_ctx)
+        lead = _reload(ctx, lead_id, lead)
+    if lead.high_value or lead.status == "revision":
+        return _finish(ctx, lead_id, before, diagnosed)
+    if lead.status == "pitch_listo":
+        _pitch(ctx, lead, agent_ctx, seen)
+        lead = _reload(ctx, lead_id, lead)
+    if lead.status in {"agendado", "respondio"}:
+        if not _budget_open(ctx, "closer", lead.id, seen):
+            return _finish(ctx, lead_id, before, diagnosed)
+        CloserAgent().run(agent_ctx)
+        _attach_deposit(ctx, lead.id)
+        lead = _reload(ctx, lead_id, lead)
+    if lead.status == "pagado":
+        if not _budget_open(ctx, "delivery", lead.id, seen):
+            return _finish(ctx, lead_id, before, diagnosed)
+        DeliveryAgent().run(agent_ctx)
+        lead = _reload(ctx, lead_id, lead)
+    if lead.status in {"en_produccion", "en_revision_cliente"}:
+        if _budget_open(ctx, "builder", lead.id, seen):
+            BuilderAgent().run(agent_ctx)
+    return _finish(ctx, lead_id, before, diagnosed)
+
+
+def _pitch(ctx: JobContext, lead: Lead, agent_ctx: AgentContext, seen: set[str]) -> None:
+    if not in_send_window(ctx.clock.now()):
+        lead.next_action_at = next_window_open(ctx.clock.now())
+        LeadRepository(ctx.session).save(lead)
         return
-    expires = None
-    if kind == "landing_demo":
-        expires = ctx.clock.now() + timedelta(days=get_settings().demo_ttl_days)
-    ArtifactRepository(ctx.session).add(
-        Artifact(
-            lead_id=lead.id,
-            kind=kind,
-            version=1,
-            path=path,
-            expires_at=expires,
-            meta={"lead_id": lead.id},
-        )
-    )
-
-
-def _enter_pitch(ctx: JobContext, lead: Lead) -> bool:
-    if needs_value_review(lead.estimated_value_clp) or lead.high_value:
-        transition(ctx.session, lead, "revision", actor="agente", reason="deal alto valor")
-        ensure_approval(
-            ctx.session,
-            lead_id=lead.id,
-            kind="deal_alto_valor",
-            payload={"estimated_value_clp": lead.estimated_value_clp},
-        )
-        return True
-    _queue_messages(ctx, lead)
-    transition(ctx.session, lead, "pitch_listo", actor="agente", reason="pitch revisado")
-    return True
-
-
-def _queue_messages(ctx: JobContext, lead: Lead) -> None:
-    existing = MessageRepository(ctx.session).list(lead_id=lead.id, limit=20)
-    if any(item.sequence_step == 1 and item.direction == "out" for item in existing):
+    _fill_pitch_fallback(ctx, lead)
+    ensure_draft(agent_ctx)
+    if not _budget_open(ctx, "checker", lead.id, seen):
         return
-    scheduled = next_window_open(ctx.clock.now())
-    subject, text, body_html = outreach_parts(
+    CheckerAgent().run(agent_ctx)
+    PitcherAgent().run(agent_ctx)
+    _stamp_schedule(ctx, lead.id)
+
+
+def _fill_pitch_fallback(ctx: JobContext, lead: Lead) -> None:
+    raw = lead.diagnosis
+    diagnosis: dict[str, object] = dict(raw) if isinstance(raw, dict) else {}
+    body = diagnosis.get("pitch_body")
+    if isinstance(body, str) and body.strip():
+        return
+    subject, text, _html = outreach_parts(
         business=lead.business,
         commune=lead.commune,
         step=1,
     )
-    if lead.contact_email:
-        queue_outbound(
-            ctx,
-            lead,
-            channel="email_outreach",
-            subject=subject,
-            text=text,
-            body_html=body_html,
-            step=1,
-            scheduled=scheduled,
-        )
-    if lead.instagram_handle:
-        _add_manual(ctx, lead, "instagram", text, scheduled)
-    if lead.linkedin_url:
-        _add_manual(ctx, lead, "linkedin", text, scheduled)
-    if lead.phone_public and not lead.contact_email:
-        _add_manual(ctx, lead, "whatsapp", text, scheduled)
-    lead.next_action_at = scheduled
+    diagnosis["pitch_subject"] = subject
+    diagnosis["pitch_body"] = text
+    diagnosis["pitch_source"] = "copywriter"
+    lead.diagnosis = diagnosis
+    LeadRepository(ctx.session).save(lead)
+
+
+def _stamp_schedule(ctx: JobContext, lead_id: str) -> None:
+    when = ctx.clock.now()
+    if not in_send_window(when):
+        when = next_window_open(when)
+    for message in MessageRepository(ctx.session).list(lead_id=lead_id, limit=20):
+        if message.direction != "out" or message.sequence_step != 1:
+            continue
+        if message.status == "queued" and message.scheduled_at is None:
+            patch_fields(ctx.session, message, scheduled_at=when)
+
+
+def _preference_is_local() -> bool:
+    settings = get_settings()
+    return bool(
+        settings.app_mode == "demo" or settings.dry_run or not settings.mp_access_token.strip()
+    )
+
+
+def _attach_deposit(ctx: JobContext, lead_id: str) -> None:
+    if not _preference_is_local():
+        return
+    orders = OrderRepository(ctx.session).list(lead_id=lead_id, limit=5)
+    if not orders or orders[0].checkout_url:
+        return
+    order = orders[0]
+    deposit = order.total_clp * order.deposit_percent // 100
+    amount = deposit if deposit > 0 else order.total_clp
+    lead = LeadRepository(ctx.session).get(lead_id)
+    business = lead.business if lead is not None else lead_id
+    pref = ctx.ports.payments.create_preference(order.id, f"Anticipo {business}", amount)
+    patch_fields(
+        ctx.session,
+        order,
+        checkout_url=pref.url,
+        provider_preference_id=pref.preference_id,
+    )
 
 
 def _review(
@@ -442,154 +437,3 @@ def queue_outbound(
             created_at=ctx.clock.now(),
         )
     )
-
-
-def _add_manual(ctx: JobContext, lead: Lead, channel: str, text: str, scheduled: object) -> None:
-    if channel not in MANUAL_CHANNELS:
-        return
-    MessageRepository(ctx.session).add(
-        Message(
-            lead_id=lead.id,
-            thread_id=lead.id,
-            direction="out",
-            channel=channel,
-            sequence_step=1,
-            status="manual_pending",
-            subject=None,
-            body_text=text[:400],
-            check_result={"approved": False, "reasons": ["canal manual"]},
-            scheduled_at=scheduled,
-            created_at=ctx.clock.now(),
-        )
-    )
-
-
-def _latest_intent(ctx: JobContext, lead: Lead) -> str | None:
-    rows = MessageRepository(ctx.session).list(lead_id=lead.id, limit=50)
-    inbound = [row for row in rows if row.direction == "in" and row.intent]
-    if not inbound:
-        return None
-    return inbound[-1].intent
-
-
-def _maybe_book(ctx: JobContext, lead: Lead) -> bool:
-    intent = _latest_intent(ctx, lead)
-    if intent not in {"interesado", "agendar"}:
-        return False
-    link = ctx.ports.bookings.link_for(lead.id)
-    events = ctx.ports.bookings.poll()
-    matched = [item for item in events if item.lead_id == lead.id]
-    diagnosis = dict(lead.diagnosis or {})
-    diagnosis["booking_link"] = link
-    lead.diagnosis = diagnosis
-    if not matched:
-        return False
-    transition(ctx.session, lead, "agendado", actor="agente", reason="agenda confirmada")
-    return True
-
-
-def _split_iva(total: int) -> tuple[int, int, int]:
-    if get_settings().prices_include_iva:
-        net = round(total / 1.19)
-        return net, total - net, total
-    iva = round(total * 0.19)
-    return total, iva, total + iva
-
-
-def _open_proposal(ctx: JobContext, lead: Lead) -> bool:
-    orders = OrderRepository(ctx.session).list(lead_id=lead.id, limit=5)
-    if not orders:
-        total_price = offer_price_clp()
-        net, iva, total = _split_iva(total_price)
-        order = OrderRepository(ctx.session).add(
-            Order(
-                lead_id=lead.id,
-                package_code=_PACKAGE["code"],
-                amount_clp=net,
-                iva_clp=iva,
-                total_clp=total,
-                deposit_percent=get_settings().deposit_percent,
-                status="pending",
-                created_at=ctx.clock.now(),
-            )
-        )
-        deposit = total * get_settings().deposit_percent // 100
-        pref = ctx.ports.payments.create_preference(
-            order.id,
-            f"Anticipo {lead.business}",
-            deposit,
-        )
-        patch_fields(
-            ctx.session,
-            order,
-            checkout_url=pref.url,
-            provider_preference_id=pref.preference_id,
-        )
-        _ensure_artifact(ctx, lead, "propuesta", f"output/propuesta/{lead.id}.html")
-    transition(ctx.session, lead, "propuesta", actor="agente", reason="propuesta emitida")
-    return True
-
-
-def _collect_payment(ctx: JobContext, lead: Lead) -> bool:
-    orders = OrderRepository(ctx.session).list(lead_id=lead.id, limit=5)
-    if not orders:
-        return False
-    order = orders[0]
-    facts = [item for item in ctx.ports.payments.poll() if item.order_id == order.id]
-    if not facts or facts[0].status not in {"approved", "paid"}:
-        return False
-    fact = facts[0]
-    PaymentRepository(ctx.session).add(
-        Payment(
-            order_id=order.id,
-            provider="mercadopago",
-            provider_payment_id=fact.provider_payment_id,
-            status=fact.status,
-            amount_clp=fact.amount_clp,
-            raw={"source": "simulacion"},
-            received_at=ctx.clock.now(),
-        )
-    )
-    patch_fields(ctx.session, order, status="deposit_paid")
-    transition(ctx.session, lead, "pagado", actor="webhook", reason="pago aprobado")
-    return True
-
-
-def _project_for(ctx: JobContext, lead: Lead) -> Project | None:
-    rows = ProjectRepository(ctx.session).list(lead_id=lead.id, limit=5)
-    return rows[0] if rows else None
-
-
-def _start_production(ctx: JobContext, lead: Lead) -> bool:
-    orders = OrderRepository(ctx.session).list(lead_id=lead.id, limit=5)
-    if not orders:
-        return False
-    if _project_for(ctx, lead) is None:
-        ProjectRepository(ctx.session).add(
-            Project(
-                order_id=orders[0].id,
-                lead_id=lead.id,
-                status="en_produccion",
-                revisions_used=0,
-                max_revisions=_PACKAGE["revisions"],
-                delivered_at=None,
-            )
-        )
-    transition(ctx.session, lead, "en_produccion", actor="agente", reason="inicio de producción")
-    return True
-
-
-def _touch_project(
-    ctx: JobContext,
-    lead: Lead,
-    project_status: str,
-    *,
-    delivered: bool = False,
-) -> None:
-    project = _project_for(ctx, lead)
-    if project is None:
-        return
-    fields: dict[str, object] = {"status": project_status}
-    if delivered:
-        fields["delivered_at"] = ctx.clock.now()
-    patch_fields(ctx.session, project, **fields)
