@@ -6,6 +6,8 @@ en menos de 2 minutos: `metrics_rollup` solo lee y escribe un setting.
 
 from __future__ import annotations
 
+import pathlib
+
 
 def _prime() -> None:
     from worker.scheduler import run_job
@@ -15,6 +17,10 @@ def _prime() -> None:
 
 def main() -> int:
     _prime()
+    # `up --wait` no acepta un servicio sin healthcheck. El de la imagen
+    # pega a /healthz, y este proceso no escucha. El archivo aparece solo
+    # después del primer job_run.
+    pathlib.Path("/tmp/worker-ready").write_text("ok", encoding="utf-8")
     from worker.cli import main as worker_main
 
     return worker_main()

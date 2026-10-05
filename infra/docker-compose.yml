@@ -94,8 +94,20 @@ services:
         condition: service_healthy
       migrate:
         condition: service_healthy
+    # La imagen chequea /healthz. El worker no sirve HTTP: este check
+    # pasa cuando worker_entry ya dejó /tmp/worker-ready.
     healthcheck:
-      disable: true
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import pathlib,sys; sys.exit(0 if pathlib.Path('/tmp/worker-ready').is_file() else 1)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 25s
     init: true
     restart: unless-stopped
 
