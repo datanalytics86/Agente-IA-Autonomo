@@ -12,7 +12,7 @@ from agents.schemas import DiagnosisOutput
 from core.config import get_settings
 from core.hitl import needs_value_review
 from core.states import transition
-from db.models import Approval
+from db.models import Approval, Lead
 from db.repositories import ApprovalRepository, LeadRepository
 from integrations.llm.base import build_llm
 
@@ -95,7 +95,7 @@ class DiagnoserAgent:
 
 
 def _payload(
-    lead: object, agency_name: str, public_base_url: str, agency_email: str
+    lead: Lead, agency_name: str, public_base_url: str, agency_email: str
 ) -> dict[str, object]:
     rating = getattr(lead, "rating", None)
     reviews = getattr(lead, "reviews", None)

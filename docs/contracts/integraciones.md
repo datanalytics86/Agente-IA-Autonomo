@@ -129,3 +129,27 @@ Los artefactos viven en disco (`engine/output/`). `storage.LocalStorage.put/get`
 ## Fakes de simulación
 
 `engine/simulation/providers.py` reutiliza las mismas clases Fake con un RNG `random.Random(seed)` y el reloj inyectado. Distribución inbound por defecto, sobre envíos entregados: 6 % interesado, 3 % pregunta de precio, 2 % opt-out, 1 % agendar, 1 % fuera de oficina, 1 % prompt-injection, resto silencio. Rebotes 3 %.
+
+## Worker — `engine/worker/wiring.py` (ronda 2)
+
+Una sola fábrica. El scheduler y la API no eligen adaptadores por su cuenta.
+
+```python
+def build_ports(settings: Settings) -> Ports: ...
+```
+
+`Ports` sigue siendo el de `engine/worker/ports.py`: `places`, `outreach`, `inbound`, `judge`, `bookings`, `payments`, `notifier`.
+
+| Modo | Qué devuelve |
+|---|---|
+| `APP_MODE=demo` o tests | Los puertos de `engine/worker/testing_ports.py` (hoy `defaults.py`: `EmptySource`, `GuardedOutreach`, `EmptyInbound`, `LocalBooking`, `LocalPayments`, `LogNotifier`). Solo ahí. |
+| `APP_MODE=prod` con credencial del canal | El adaptador real de `integrations/`: `GooglePlacesSource`, `SmtpOutreach`, `ImapPoller`, `CalComBooking` o `CalendlyBooking`, `MercadoPagoProvider`, notifier por email a `NOTIFY_EMAIL` y Telegram si hay token. |
+| `APP_MODE=prod` sin credencial | `DisabledPlaces`, `DisabledOutreach`, `DisabledInbound`, `DisabledBooking`, `DisabledPayments`, `DisabledNotifier`. No son `Empty*` ni `Local*`. La primera vez del día escriben un evento `warn` (`canal deshabilitado: falta X`) y no abren sockets. |
+
+Reglas:
+
+- `SmtpOutreach.send` evalúa el triple candado dentro del adaptador. Candado cerrado: `SendResult(status="blocked")` y cero sockets. Candado abierto: entrega al transporte SMTP. El mensaje lleva `List-Unsubscribe`, `List-Unsubscribe-Post` y `Reply-To` del buzón IMAP. Sin píxel.
+- `ImapPoller.poll` devuelve `InboundMail` con `intent=""`. La clasificación la hace Mobile en `apply_inbound`, no el adaptador.
+- `api/deps.py` llama `integrations.payments.build_payments`. En prod con `MP_ACCESS_TOKEN` el proveedor es `MercadoPagoProvider`. En demo o dry-run es el proveedor local.
+- `/api/agents` expone cada canal como `real`, `deshabilitado: falta X` o `dry_run`.
+- La simulación usa los mismos agentes y las mismas clases reales, con transporte fake (`respx`, SMTP/IMAP fake, `FakeLlm`). No usa el segundo pipeline de `funnel.py`.

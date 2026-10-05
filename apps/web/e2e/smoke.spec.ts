@@ -11,4 +11,5 @@ test('el HTML del build contiene el título del dashboard', () => {
   test.skip(!existsSync(distIndex), 'corre después de npm run build')
   const html = readFileSync(distIndex, 'utf8')
   expect(html).toContain(`<title>${DASHBOARD_TITLE}</title>`)
+  expect(html).toMatch(/\/admin\/assets\//)
 })

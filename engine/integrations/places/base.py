@@ -112,6 +112,18 @@ class PlaceHit(BaseModel):
     types: list[str] = Field(default_factory=list)
     google_maps_uri: str | None = None
     national_phone_number: str | None = None
+    # El puerto del worker lee estos campos. Places no los trae: quedan vacíos, no se inventan.
+    commune: str = ""
+    city: str = ""
+    category: str = ""
+    email: str | None = None
+    instagram_handle: str | None = None
+    linkedin_url: str | None = None
+    phone_public: str | None = None
+    estimated_value_clp: int = 0
+    opportunity_score: int = 0
+    scenario: str = ""
+    unsafe_text: str = ""
 
 
 class LeadSource(Protocol):
@@ -178,14 +190,18 @@ class GooglePlacesSource:
         client: httpx.Client | None = None,
         min_rating: float = 4.0,
         min_reviews: int = 15,
+        suspend_network: bool = False,
     ) -> None:
         self.api_key = api_key
         self.min_rating = min_rating
         self.min_reviews = min_reviews
+        self.suspend_network = suspend_network
         self._client = client
         self._owns = client is None
 
     def search(self, commune: str, category_slug: str, limit: int) -> list[PlaceHit]:
+        if self.suspend_network:
+            return []
         label = CATEGORY_LABELS.get(category_slug, category_slug)
         client = self._client or httpx.Client(timeout=15.0)
         try:
@@ -215,7 +231,15 @@ class GooglePlacesSource:
                 continue
             if not accepts(hit, min_rating=self.min_rating, min_reviews=self.min_reviews):
                 continue
-            hits.append(hit)
+            hits.append(
+                hit.model_copy(
+                    update={
+                        "commune": commune,
+                        "category": category_slug,
+                        "phone_public": hit.national_phone_number,
+                    }
+                )
+            )
             if len(hits) >= limit:
                 break
         return hits
@@ -229,7 +253,8 @@ def _parse_place(raw: object) -> PlaceHit | None:
     name = display.get("text") if isinstance(display, dict) else None
     if not isinstance(place_id, str) or not isinstance(name, str) or not name.strip():
         return None
-    types = raw.get("types") if isinstance(raw.get("types"), list) else []
+    raw_types = raw.get("types")
+    types = raw_types if isinstance(raw_types, list) else []
     return PlaceHit(
         place_id=place_id,
         name=name.strip(),

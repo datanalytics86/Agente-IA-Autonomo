@@ -1,0 +1,93 @@
+# Producción. SITE_DOMAIN es obligatorio. ADMIN_DOMAIN solo excluye ese host
+# del árbol de clientes: el dashboard sigue en /admin.
+# Los demás hosts piden certificado on-demand contra la API y se sirven
+# desde /srv/clients/<host>.
+
+{
+	admin off
+	on_demand_tls {
+		ask http://api:8000/api/internal/domain-check
+	}
+}
+
+{$SITE_DOMAIN} {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		-Server
+	}
+
+	redir /admin /admin/ 308
+
+	@health path /healthz /readyz
+	handle @health {
+		reverse_proxy api:8000
+	}
+
+	@demo path /demo /demo/*
+	handle @demo {
+		header X-Robots-Tag "noindex, nofollow"
+		reverse_proxy api:8000
+	}
+
+	@api path /api /api/*
+	handle @api {
+		reverse_proxy api:8000
+	}
+
+	@webhooks path /webhooks /webhooks/*
+	handle @webhooks {
+		reverse_proxy api:8000
+	}
+
+	@ficha path /u /u/*
+	handle @ficha {
+		reverse_proxy api:8000
+	}
+
+	@admin path /admin /admin/*
+	handle @admin {
+		uri strip_prefix /admin
+		root * /srv/admin
+		try_files {path} {path}/index.html /index.html
+		file_server
+	}
+
+	handle {
+		root * /srv/site
+		try_files {path} {path}/index.html /index.html
+		file_server
+	}
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		-Server
+	}
+	@not_main {
+		not host {$SITE_DOMAIN}
+		not host {$ADMIN_DOMAIN:admin.invalid}
+	}
+	handle @not_main {
+		root * /srv/clients/{http.request.host}
+		try_files {path} {path}/index.html
+		file_server
+	}
+	handle {
+		respond 404
+	}
+}

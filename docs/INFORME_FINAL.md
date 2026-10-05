@@ -1,5 +1,7 @@
 # Informe final — autonomía 04-10-2026
 
+> Ronda 2 (`instrucciones2_041026.md`, rama `grok/deploy-r2-041026`): esta ronda 1 dejó el demo verde, pero el stack Docker no arranca y el worker de producción no usa los adaptadores ni los agentes reales. El estado de deploy está en `docs/PROGRESS_R2.md` y el cierre irá en `docs/INFORME_FINAL_R2.md`. No tomar este archivo como «solo falta Docker».
+
 Rama `grok/autonomia-041026`. Integrador A0. La evidencia de abajo es la salida de los comandos corridos en esta máquina el 2026-10-04. Donde un comando no pudo correr, se pega el error real.
 
 ## Qué se hizo

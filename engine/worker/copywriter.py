@@ -1,4 +1,4 @@
-"""Borrador determinista de outreach. El Checker lo tiene que poder aprobar."""
+"""Fallback de outreach si el Diagnoser no dejó pitch. El Checker lo tiene que poder aprobar."""
 
 from __future__ import annotations
 

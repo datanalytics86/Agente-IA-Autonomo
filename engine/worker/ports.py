@@ -33,6 +33,7 @@ class PlaceHit:
     opportunity_score: int
     scenario: str
     unsafe_text: str = ""
+    email_source_url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -119,6 +120,9 @@ class Ports:
     payments: PaymentPort
     notifier: Notifier
     network_calls: int = 0
+    auditor: object | None = None
+    hosting: object | None = None
+    meta: object | None = None
 
 
 @dataclass

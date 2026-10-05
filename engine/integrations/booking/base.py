@@ -177,6 +177,10 @@ class CalComBooking:
             f"metadata[lead_id]={quote(lead, safe='')}",
         )
 
+    def poll(self) -> list[BookingEvent]:
+        """Las citas reales llegan por webhook. Este sondeo no abre sockets."""
+        return []
+
     def parse_webhook(self, body: bytes, headers: Mapping[str, str]) -> BookingEvent:
         verify_calcom_signature(
             body,
@@ -209,6 +213,10 @@ class CalendlyBooking:
     def link_for(self, lead_id: str) -> str:
         lead = _require_lead(lead_id)
         return _append_query(self.settings.booking_link, f"utm_content={quote(lead, safe='')}")
+
+    def poll(self) -> list[BookingEvent]:
+        """Las citas reales llegan por webhook. Este sondeo no abre sockets."""
+        return []
 
     def parse_webhook(self, body: bytes, headers: Mapping[str, str]) -> BookingEvent:
         verify_calendly_signature(
@@ -246,6 +254,9 @@ class FakeBooking:
     def link_for(self, lead_id: str) -> str:
         lead = _require_lead(lead_id)
         return _append_query(self.settings.booking_link, f"lead_id={quote(lead, safe='')}")
+
+    def poll(self) -> list[BookingEvent]:
+        return []
 
     def parse_webhook(self, body: bytes, headers: Mapping[str, str]) -> BookingEvent:
         del headers

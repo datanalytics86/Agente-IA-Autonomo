@@ -15,6 +15,7 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.32",
     "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.2",
     "alembic>=1.13",
     "apscheduler>=3.10",
     "httpx>=0.27",
@@ -76,11 +77,28 @@ plugins = ["pydantic.mypy"]
 mypy_path = "."
 namespace_packages = false
 warn_unused_configs = true
-exclude = "(^|[/\\\\])(agents|api|integrations|simulation|tests|migrations)[/\\\\]|(^|[/\\\\])main\\.py$"
+# No es per-module en mypy 2.4. Va global para no aflojar el strict de core/db/worker.
+warn_redundant_casts = true
+# El motor se chequea entero. tests/ y migrations/ quedan fuera.
+# ADR-013 (excluir agents/api/integrations/simulation) queda reemplazado.
+exclude = "(^|[/\\\\])(tests|migrations)[/\\\\]"
 
+# Strict solo en core, db y worker. Los flags van uno a uno: en mypy 2.4
+# `strict = true` dentro de un override enciende el modo estricto global.
 [[tool.mypy.overrides]]
 module = ["core", "core.*", "db", "db.*", "worker", "worker.*"]
-strict = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_unused_ignores = true
+warn_return_any = true
+implicit_reexport = false
+strict_equality = true
+extra_checks = true
 
 [[tool.mypy.overrides]]
 module = ["apscheduler.*"]

@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import Identity from '../components/Identity.astro';
+import Turnstile from '../components/Turnstile.astro';
 
 const kinds = [
   { value: 'acceso', label: 'Acceso' },
@@ -51,6 +52,7 @@ const kinds = [
         Detalle
         <textarea class="min-h-32 rounded-lg border border-white/15 bg-surface px-3 py-3 text-base" name="details" required maxlength="4000"></textarea>
       </label>
+      <Turnstile />
       <button class="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-surface" type="submit">
         Enviar solicitud
       </button>

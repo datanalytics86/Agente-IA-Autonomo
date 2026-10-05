@@ -17,7 +17,7 @@ from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatc
 from itsdangerous import BadSignature, SignatureExpired, URLSafeSerializer, URLSafeTimedSerializer
 
 from api.errors import ApiError
-from core.config import get_settings
+from core.config import ProdConfigError, get_settings
 
 SESSION_COOKIE = "session"
 CSRF_COOKIE = "csrf_token"
@@ -74,8 +74,15 @@ def cookies_secure() -> bool:
     return get_settings().public_base_url.lower().startswith("https://")
 
 
+def _signing_key() -> str:
+    key = get_settings().resolved_secret_key
+    if not key.strip():
+        raise ProdConfigError(["falta SECRET_KEY"])
+    return key
+
+
 def _session_serializer() -> URLSafeTimedSerializer:
-    return URLSafeTimedSerializer(get_settings().resolved_secret_key, salt="agencia-session")
+    return URLSafeTimedSerializer(_signing_key(), salt="agencia-session")
 
 
 def dump_session(user_id: str, email: str) -> str:
@@ -95,7 +102,7 @@ def load_session(token: str) -> dict[str, str]:
 
 
 def _baja_serializer() -> URLSafeSerializer:
-    return URLSafeSerializer(get_settings().resolved_secret_key, salt="baja")
+    return URLSafeSerializer(_signing_key(), salt="baja")
 
 
 def make_baja_token(lead_id: str) -> str:
@@ -131,11 +138,11 @@ def consent_record(kind: str, version: str, ip: str) -> dict[str, str]:
 
 
 def turnstile_accepts(token: str, remote_ip: str | None) -> bool:
-    """Sin secret: demo acepta y prod rechaza. Con secret, Cloudflare decide."""
+    """Sin TURNSTILE_SECRET_KEY no se exige token. Con secret, Cloudflare decide."""
     settings = get_settings()
     secret = settings.turnstile_secret_key.strip()
     if secret == "":
-        return settings.app_mode == "demo"
+        return True
     if token.strip() == "":
         return False
     try:

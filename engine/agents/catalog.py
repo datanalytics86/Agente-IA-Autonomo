@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from agents.schemas import Tone
+
 CATEGORY_SLUGS: tuple[str, ...] = (
     "clinica-dental",
     "optica",
@@ -56,7 +58,7 @@ THEME_BY_CATEGORY: dict[str, str] = {
     "ferreteria": "servicios",
 }
 
-TONE_BY_CATEGORY: dict[str, str] = {
+TONE_BY_CATEGORY: dict[str, Tone] = {
     "clinica-dental": "usted",
     "optica": "usted",
     "abogados": "usted",

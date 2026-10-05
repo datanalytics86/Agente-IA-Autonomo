@@ -11,8 +11,8 @@ Fin: 2026-03-16T00:00:00-03:00
 | diagnosticado | 0 |
 | landing | 0 |
 | video | 0 |
-| pitch_listo | 174 |
-| enviado | 33 |
+| pitch_listo | 166 |
+| enviado | 42 |
 | respondio | 0 |
 | agendado | 0 |
 | propuesta | 0 |
@@ -30,18 +30,18 @@ Fin: 2026-03-16T00:00:00-03:00
 | Status | Cantidad |
 | --- | --- |
 | bounced | 1 |
-| manual_pending | 3 |
-| queued | 215 |
-| received | 3 |
-| sent | 35 |
+| manual_pending | 1 |
+| queued | 50 |
+| received | 4 |
+| sent | 46 |
 
 ## Métricas
 
-- enviados: 35
+- enviados: 46
 - rebotes: 1
-- ingresos_clp: 175000
+- ingresos_clp: 350000
 - canal_pausado: email_outreach
-- approvals: deal_alto_valor=1, tasa_respuesta_baja=1
+- approvals: baja_confianza=1, deal_alto_valor=1, tarea_manual=1, tasa_respuesta_baja=1
 - llamadas_de_red: 0
 
 ## Aserciones

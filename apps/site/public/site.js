@@ -62,6 +62,32 @@
     return Boolean(field && field.value);
   }
 
+  function turnstileToken(form) {
+    var widget = form.querySelector('.cf-turnstile');
+    if (!widget) return '';
+    var input = form.querySelector('[name="cf-turnstile-response"]');
+    var token = input && typeof input.value === 'string' ? input.value.trim() : '';
+    if (!token && window.turnstile && typeof window.turnstile.getResponse === 'function') {
+      try {
+        token = String(window.turnstile.getResponse(widget) || '').trim();
+      } catch (error) {
+        token = '';
+      }
+    }
+    return token;
+  }
+
+  function putTurnstile(form, body, status) {
+    if (!form.querySelector('.cf-turnstile')) return true;
+    var token = turnstileToken(form);
+    if (!token) {
+      if (status) status.textContent = 'Falta completar la verificación anti-bots.';
+      return false;
+    }
+    body.turnstile_token = token;
+    return true;
+  }
+
   function formatClp(value) {
     if (value === null || value === undefined) return 'a cotizar';
     var number = Number(value);
@@ -103,6 +129,7 @@
       if (website) body.website_url = website;
       var trap = form.querySelector('input[name="honeypot"]');
       body.honeypot = trap ? trap.value : '';
+      if (!putTurnstile(form, body, status)) return;
       form.dataset.busy = '1';
       if (status) status.textContent = 'Enviando…';
       postJson('/api/public/diagnostico', body)
@@ -157,6 +184,7 @@
         details: valueOf(form, 'details'),
         honeypot: '',
       };
+      if (!putTurnstile(form, body, status)) return;
       form.dataset.busy = '1';
       if (status) status.textContent = 'Enviando…';
       postJson('/api/public/derechos', body)
@@ -204,9 +232,11 @@
         if (status) status.textContent = 'El token no tiene el formato del enlace de baja.';
         return;
       }
+      var body = { token: token };
+      if (!putTurnstile(form, body, status)) return;
       form.dataset.busy = '1';
       if (status) status.textContent = 'Enviando…';
-      postJson('/api/public/baja', { token: token })
+      postJson('/api/public/baja', body)
         .then(function (result) {
           if (result.ok) {
             form.hidden = true;
@@ -220,6 +250,62 @@
         })
         .catch(function () {
           if (status) status.textContent = 'No pudimos registrar la baja. Revisa la conexión.';
+        })
+        .then(function () {
+          form.dataset.busy = '0';
+        });
+    });
+  }
+
+  function initContacto() {
+    var form = document.querySelector('#contacto-form');
+    if (!form) return;
+    var status = document.querySelector('#contacto-estado');
+    var ok = document.querySelector('#contacto-ok');
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      if (form.dataset.busy === '1') return;
+      if (honeyFilled(form)) {
+        form.hidden = true;
+        if (ok) ok.hidden = false;
+        return;
+      }
+      var consent = form.querySelector('input[name="consent"]');
+      if (!consent || !consent.checked) {
+        if (status) status.textContent = 'Falta aceptar el texto de consentimiento.';
+        return;
+      }
+      var body = {
+        name: valueOf(form, 'name'),
+        email: valueOf(form, 'email'),
+        message: valueOf(form, 'message'),
+        consent: true,
+        honeypot: '',
+      };
+      var trap = form.querySelector('input[name="honeypot"]');
+      body.honeypot = trap ? trap.value : '';
+      if (!putTurnstile(form, body, status)) return;
+      form.dataset.busy = '1';
+      if (status) status.textContent = 'Enviando…';
+      postJson('/api/public/contacto', body)
+        .then(function (result) {
+          if (result.status === 202 || result.ok) {
+            form.hidden = true;
+            if (ok) ok.hidden = false;
+            if (status) status.textContent = '';
+            return;
+          }
+          if (status) {
+            status.textContent = errorMessage(
+              result.data,
+              'No pudimos enviar el mensaje. No quedó una copia en este navegador.',
+            );
+          }
+        })
+        .catch(function () {
+          if (status) {
+            status.textContent = 'No pudimos enviar el mensaje. Revisa la conexión e inténtalo de nuevo.';
+          }
         })
         .then(function () {
           form.dataset.busy = '0';
@@ -538,6 +624,7 @@
   }
 
   initDiagnostico();
+  initContacto();
   initDerechos();
   initBaja();
   initCheckout();

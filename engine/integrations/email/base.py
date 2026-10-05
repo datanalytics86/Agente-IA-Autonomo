@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from core.config import Settings
 from integrations.results import SendResult
+
+if TYPE_CHECKING:
+    from integrations.email.inbound import ImapClient
 
 SYSTEM_KINDS = frozenset({"recibo", "portal", "derechos"})
 
@@ -21,6 +24,24 @@ class InboundMail(BaseModel):
     subject: str
     text: str
     in_reply_to: str | None = None
+    intent: str = ""
+
+    @property
+    def from_email(self) -> str:
+        return bare_address(self.from_addr)
+
+    @property
+    def body(self) -> str:
+        return self.text
+
+
+def bare_address(value: str) -> str:
+    text = value.strip()
+    start = text.rfind("<")
+    end = text.rfind(">")
+    if start != -1 and end > start:
+        text = text[start + 1 : end]
+    return text.strip().lower()
 
 
 class TransactionalEmail(Protocol):
@@ -180,7 +201,7 @@ def build_outreach_email(
 def build_inbound_poller(
     settings: Settings,
     *,
-    client_factory: object | None = None,
+    client_factory: Callable[[Settings], ImapClient] | None = None,
 ) -> InboundPoller:
     from integrations.email.inbound import FakeInbound, ImapPoller
 
@@ -193,4 +214,4 @@ def build_inbound_poller(
         return FakeInbound()
     if client_factory is None:
         return ImapPoller(settings)
-    return ImapPoller(settings, client_factory=client_factory)  # type: ignore[arg-type]
+    return ImapPoller(settings, client_factory=client_factory)

@@ -11,7 +11,7 @@ from typing import Any, Protocol
 from urllib.parse import quote
 
 import httpx
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from core.config import Settings
 from integrations.errors import ProviderRequestError, WebhookSignatureError
@@ -26,6 +26,14 @@ class Preference(BaseModel):
     order_id: str
     amount_clp: int
 
+    @property
+    def id(self) -> str:
+        return self.preference_id
+
+    @property
+    def url(self) -> str:
+        return self.checkout_url
+
 
 class PaymentFact(BaseModel):
     """Hecho leído del proveedor. Dos lecturas del mismo id devuelven el mismo hecho."""
@@ -38,6 +46,9 @@ class PaymentFact(BaseModel):
     amount_clp: int
     order_id: str | None = None
     approved: bool = False
+    lead_id: str | None = None
+    package_code: str | None = None
+    raw: dict[str, object] = Field(default_factory=dict)
 
 
 class PaymentProvider(Protocol):
@@ -218,6 +229,10 @@ class MercadoPagoProvider:
         )
         return payment_id
 
+    def poll(self) -> list[PaymentFact]:
+        """El estado entra por webhook y fetch_payment. Este sondeo no abre sockets."""
+        return []
+
     def fetch_payment(self, provider_payment_id: str) -> PaymentFact:
         """Lee el pago en MP. No lo persiste: el mismo id vuelve a dar el mismo hecho."""
         self._guard()
@@ -289,6 +304,9 @@ class FakePaymentProvider:
             order_id=None,
             approved=False,
         )
+
+    def poll(self) -> list[PaymentFact]:
+        return []
 
     def stage(self, fact: PaymentFact) -> None:
         self.payments[fact.provider_payment_id] = fact

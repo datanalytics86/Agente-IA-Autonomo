@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import Turnstile from '../components/Turnstile.astro';
 import { DIAGNOSTICO_CONSENT_TEXT } from '../data/consent';
 import { rubros } from '../data/rubros';
 ---
@@ -87,6 +88,8 @@ import { rubros } from '../data/rubros';
       <input class="mt-1 h-5 w-5 accent-accent" name="consent" type="checkbox" required />
       <span>{DIAGNOSTICO_CONSENT_TEXT}</span>
     </label>
+
+    <Turnstile />
 
     <button class="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-surface" type="submit">
       Pedir el informe

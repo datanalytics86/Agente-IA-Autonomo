@@ -4,15 +4,27 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.compliance import looks_like_injection
-from core.config import get_settings
+from core.config import ENGINE_DIR, get_settings
 from core.hitl import needs_value_review
-from db.models import Approval, Lead, LeadEvent, Message, Payment, Suppression
+from db.models import (
+    Approval,
+    Artifact,
+    Lead,
+    LeadEvent,
+    LlmCall,
+    Message,
+    Order,
+    Payment,
+    Project,
+    Suppression,
+)
 from db.normalize import contact_hash
 from db.repositories import SettingsRepository
 from worker.schedule import in_send_window, is_business_day, local_date, to_local
@@ -108,6 +120,7 @@ def collect_violations(
     found.extend(_high_value(leads, by_lead))
     found.extend(_response_rate(session))
     found.extend(_delivered(session, leads))
+    found.extend(_round2(session, messages))
     return found
 
 
@@ -319,15 +332,15 @@ def _injection(
             continue
         if not looks_like_injection(message.body_text or ""):
             continue
-        lead = leads.get(message.lead_id)
-        if lead is None:
+        owner = leads.get(message.lead_id)
+        if owner is None:
             continue
-        if lead.status in forbidden:
-            found.append(f"acción derivada de inyección: {lead.business}")
-        for other in by_lead.get(lead.id, []):
+        if owner.status in forbidden:
+            found.append(f"acción derivada de inyección: {owner.business}")
+        for other in by_lead.get(owner.id, []):
             step = other.sequence_step or 0
             if other.direction == "out" and step > 1 and other.status in _SENT:
-                found.append(f"envío derivado de inyección: {lead.business}")
+                found.append(f"envío derivado de inyección: {owner.business}")
     return found
 
 
@@ -382,6 +395,118 @@ def _delivered(session: Session, leads: list[Lead]) -> list[str]:
     if not any(lead.status in {"entregado", "postventa"} for lead in leads):
         found.append("ningún lead está entregado")
     return found
+
+
+def _round2(session: Session, messages: list[Message]) -> list[str]:
+    """Aserciones de la §7.3. El informe las suma a las de la ronda 1."""
+    found: list[str] = []
+    found.extend(_artifacts_on_disk(session))
+    found.extend(_llm_is_fake(session))
+    found.extend(_publication_gates(session))
+    found.extend(_mobile_classified(messages))
+    found.extend(_bounces_suppressed(session, messages))
+    if not _informe_sent(messages):
+        found.append("no se envió el informe de diagnóstico gratis")
+    return found
+
+
+def _artifact_file(path: str) -> Path:
+    candidate = Path(path)
+    if candidate.is_file():
+        return candidate
+    return ENGINE_DIR / candidate
+
+
+def _artifacts_on_disk(session: Session) -> list[str]:
+    found: list[str] = []
+    for row in session.scalars(select(Artifact)).all():
+        if not _artifact_file(row.path).is_file():
+            found.append(f"artefacto sin archivo: {row.kind}")
+    return found
+
+
+def _llm_is_fake(session: Session) -> list[str]:
+    found: list[str] = []
+    for row in session.scalars(select(LlmCall)).all():
+        if row.model != "deterministic-fallback":
+            found.append(f"llm_call fuera de FakeLlm: {row.model}")
+        if row.tokens_in == 120 and row.cost_usd == Decimal("0.001"):
+            found.append("llm_call con la fila falsa de tokens")
+    return found
+
+
+def _publication_gates(session: Session) -> list[str]:
+    found: list[str] = []
+    projects = list(session.scalars(select(Project).where(Project.status == "publicado")).all())
+    if not projects:
+        found.append("no hay publicación con saldo pagado")
+    for project in projects:
+        intake = project.intake if isinstance(project.intake, dict) else {}
+        if intake.get("client_approved") is not True:
+            found.append("entrega sin aprobación del cliente")
+        order = session.get(Order, project.order_id)
+        if order is None or order.status != "paid":
+            found.append("publicación sin saldo pagado")
+            continue
+        paid = sum(
+            int(row.amount_clp)
+            for row in session.scalars(select(Payment).where(Payment.order_id == order.id)).all()
+            if row.status == "approved"
+        )
+        if paid < order.total_clp:
+            found.append("publicación sin saldo pagado")
+    return found
+
+
+def _mobile_classified(messages: list[Message]) -> list[str]:
+    pending = [
+        message
+        for message in messages
+        if message.direction == "in"
+        and message.channel == "email_outreach"
+        and message.intent is None
+    ]
+    if pending:
+        return ["respuesta IMAP sin intención no clasificada por Mobile"]
+    classified = [
+        message
+        for message in messages
+        if message.direction == "in"
+        and message.channel == "email_outreach"
+        and message.intent_confidence is not None
+    ]
+    if not classified:
+        return ["ninguna respuesta sin intención pasó por Mobile"]
+    return []
+
+
+def _bounces_suppressed(session: Session, messages: list[Message]) -> list[str]:
+    bounced = [message for message in messages if message.status == "bounced"]
+    if not bounced:
+        return ["ningún rebote quedó en supresión"]
+    rows = list(session.scalars(select(Suppression).where(Suppression.kind == "email")).all())
+    hashes = {row.value_hash for row in rows}
+    found: list[str] = []
+    leads = {lead.id: lead for lead in session.scalars(select(Lead)).all()}
+    for message in bounced:
+        lead = leads.get(message.lead_id)
+        email = lead.contact_email if lead is not None else ""
+        if not email or contact_hash("email", email) not in hashes:
+            found.append("rebote sin supresión")
+    return found
+
+
+def _informe_sent(messages: list[Message]) -> bool:
+    for message in messages:
+        meta = message.check_result if isinstance(message.check_result, dict) else {}
+        if (
+            message.channel == "email_tx"
+            and message.direction == "out"
+            and message.status == "sent"
+            and meta.get("kind") == "informe_diagnostico"
+        ):
+            return True
+    return False
 
 
 def _aware(moment: datetime) -> datetime:

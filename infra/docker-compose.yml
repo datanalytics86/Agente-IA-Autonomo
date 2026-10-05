@@ -1,17 +1,29 @@
-# Demo local. Sin envíos: DRY_RUN=true y OUTREACH_ENABLED=false.
-# La clave de Postgres es solo de esta demo, no de producción.
-# No hay job de CI que construya esta imagen.
+# Demo y CI. Sin envíos: el .env de prueba deja APP_MODE=demo y DRY_RUN=true.
+# Sustitución de ${VAR}: `docker compose --env-file infra/.env.ci` si no hay
+# un .env en la raíz. Dentro de api/worker/migrate, env_file lee ../.env y,
+# si no existe, infra/.env.ci (el de abajo gana).
+# DATABASE_URL del contenedor siempre usa el driver psycopg hacia el servicio db.
+# Una clave con @ : / o # hay que pasarla ya codificada: se interpola tal cual.
 
 name: agencia
 
-x-engine-env: &engine-env
-  APP_MODE: ${APP_MODE:-demo}
-  DRY_RUN: ${DRY_RUN:-true}
-  OUTREACH_ENABLED: ${OUTREACH_ENABLED:-false}
-  DATABASE_URL: ${DATABASE_URL:-postgresql://agencia:agencia@db:5432/agencia}
-  TZ: ${TZ:-America/Santiago}
-  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost}
-  ADMIN_BASE_URL: ${ADMIN_BASE_URL:-http://localhost/admin}
+x-engine-build: &engine-build
+  context: ..
+  dockerfile: infra/Dockerfile.engine
+
+x-env-file: &env-file
+  - path: .env.ci
+    required: false
+  - path: ../.env
+    required: false
+
+x-engine-environment: &engine-environment
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agencia}:${POSTGRES_PASSWORD:-agencia}@db:5432/${POSTGRES_DB:-agencia}
+  CLIENT_SITES_DIR: /data/client_sites
+
+x-engine-volumes: &engine-volumes
+  - artifacts:/app/output
+  - client_sites:/data/client_sites
 
 services:
   db:
@@ -30,49 +42,126 @@ services:
       timeout: 5s
       retries: 12
       start_period: 10s
+    restart: unless-stopped
 
-  api:
-    build:
-      context: ..
-      dockerfile: infra/Dockerfile.engine
-    # Alias, no merge key: Compose v2 (Go) no siempre acepta `<<`.
-    environment: *engine-env
+  migrate:
+    build: *engine-build
+    env_file: *env-file
+    environment: *engine-environment
+    command: ["python", "migrate_entry.py"]
+    volumes: *engine-volumes
     depends_on:
       db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import pathlib,sys; sys.exit(0 if pathlib.Path('/tmp/migrated').is_file() else 1)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    restart: unless-stopped
+
+  api:
+    build: *engine-build
+    env_file: *env-file
+    environment: *engine-environment
+    command: ["python", "main.py", "--mode", "api"]
+    volumes: *engine-volumes
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
         condition: service_healthy
     expose:
       - "8000"
+    init: true
+    restart: unless-stopped
 
   worker:
-    build:
-      context: ..
-      dockerfile: infra/Dockerfile.engine
-    environment: *engine-env
-    # El Dockerfile documenta el CMD de la api. El worker lo sustituye.
-    command: ["python", "main.py", "--mode", "worker"]
+    build: *engine-build
+    env_file: *env-file
+    environment: *engine-environment
+    command: ["python", "worker_entry.py"]
+    volumes: *engine-volumes
     depends_on:
       db:
         condition: service_healthy
-
-  web:
-    image: nginx:alpine
-    volumes:
-      - ../apps/web/dist:/usr/share/nginx/html:ro
+      migrate:
+        condition: service_healthy
+    # La imagen chequea /healthz. El worker no sirve HTTP: este check
+    # pasa cuando worker_entry ya dejó /tmp/worker-ready.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import pathlib,sys; sys.exit(0 if pathlib.Path('/tmp/worker-ready').is_file() else 1)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 25s
+    init: true
+    restart: unless-stopped
 
   caddy:
-    image: caddy:2
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.front
+      args:
+        PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost}
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:-localhost}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:-localhost}
     depends_on:
-      - api
-      - web
+      api:
+        condition: service_healthy
     ports:
       - "80:80"
+    # La imagen no trae healthcheck. Este pide /healthz por el proxy.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 18
+      start_period: 10s
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./site-root:/srv/site:ro
+      - client_sites:/srv/clients
       - caddy_data:/data
       - caddy_config:/config
+    restart: unless-stopped
+
+  backup:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.backup
+    environment:
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER:-agencia}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-agencia}
+      PGDATABASE: ${POSTGRES_DB:-agencia}
+      BACKUP_DIR: /backups
+    volumes:
+      - backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   pgdata:
+  artifacts:
+  client_sites:
   caddy_data:
   caddy_config:
+  backups:

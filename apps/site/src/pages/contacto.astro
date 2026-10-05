@@ -1,0 +1,73 @@
+---
+import Base from '../layouts/Base.astro';
+import Turnstile from '../components/Turnstile.astro';
+import { agency } from '../data/agency';
+
+const consent = `Acepto que ${agency.name} use mi nombre, mi correo y este mensaje solo para responder el contacto. No autorizo otras comunicaciones con estos datos.`;
+---
+
+<Base
+  title="Contacto"
+  description="Escribe a la agencia. El mensaje pide consentimiento y no guarda una copia en el navegador."
+>
+  <h1 class="text-4xl font-semibold tracking-tight">Contacto</h1>
+  <p class="mt-4 max-w-2xl text-muted">
+    Cuéntanos qué necesitas. Respondemos al correo que indiques. No es una obligación de compra.
+  </p>
+
+  <p id="contacto-ok" class="mt-8 text-xl font-semibold text-accent" hidden>
+    Recibimos el mensaje. Te responderemos a ese correo.
+  </p>
+  <p id="contacto-estado" class="mt-4 text-sm text-muted" role="status"></p>
+
+  <form id="contacto-form" class="relative mt-8 grid max-w-xl gap-5">
+    <div class="hp" aria-hidden="true">
+      <label for="contacto-honeypot">No completar</label>
+      <input id="contacto-honeypot" name="honeypot" type="text" tabindex="-1" autocomplete="off" />
+    </div>
+
+    <label class="grid gap-2 text-sm">
+      Nombre
+      <input
+        class="rounded-lg border border-white/15 bg-surface px-3 py-3 text-base"
+        name="name"
+        required
+        maxlength="160"
+        autocomplete="name"
+      />
+    </label>
+
+    <label class="grid gap-2 text-sm">
+      Correo
+      <input
+        class="rounded-lg border border-white/15 bg-surface px-3 py-3 text-base"
+        name="email"
+        type="email"
+        required
+        maxlength="160"
+        autocomplete="email"
+      />
+    </label>
+
+    <label class="grid gap-2 text-sm">
+      Mensaje
+      <textarea
+        class="min-h-32 rounded-lg border border-white/15 bg-surface px-3 py-3 text-base"
+        name="message"
+        required
+        maxlength="4000"
+      ></textarea>
+    </label>
+
+    <label class="flex items-start gap-3 text-sm">
+      <input class="mt-1 h-5 w-5 accent-accent" name="consent" type="checkbox" required />
+      <span>{consent}</span>
+    </label>
+
+    <Turnstile />
+
+    <button class="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-surface" type="submit">
+      Enviar mensaje
+    </button>
+  </form>
+</Base>

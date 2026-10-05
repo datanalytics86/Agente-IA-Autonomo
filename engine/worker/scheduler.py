@@ -9,6 +9,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from core.config import get_settings
 from db.session import session_scope
 from worker.clock import SystemClock
 from worker.defaults import build_default_ports
@@ -16,20 +17,30 @@ from worker.jobs import JOBS
 from worker.locking import refresh_lock
 from worker.ports import JobContext
 from worker.runner import execute
+from worker.wiring import bind_worker_session, build_ports, unbind_worker_session
 
 TZ = "America/Santiago"
 
 
 def run_job(name: str) -> None:
+    settings = get_settings()
     clock = SystemClock()
     with session_scope() as session:
-        ctx = JobContext(
-            session=session,
-            clock=clock,
-            rng=random.Random(),
-            ports=build_default_ports(),
-        )
-        execute(name, JOBS[name], ctx)
+        token = bind_worker_session(session)
+        try:
+            if settings.app_mode == "demo":
+                ports = build_default_ports()
+            else:
+                ports = build_ports(settings, session=session)
+            ctx = JobContext(
+                session=session,
+                clock=clock,
+                rng=random.Random(),
+                ports=ports,
+            )
+            execute(name, JOBS[name], ctx)
+        finally:
+            unbind_worker_session(token)
 
 
 def build_scheduler(owner: str) -> BlockingScheduler:
@@ -90,6 +101,15 @@ def build_scheduler(owner: str) -> BlockingScheduler:
         IntervalTrigger(minutes=5, timezone=TZ),
         id="inbound_poll",
         args=["inbound_poll"],
+        coalesce=True,
+        max_instances=1,
+        misfire_grace_time=300,
+    )
+    scheduler.add_job(
+        run_job,
+        IntervalTrigger(minutes=10, timezone=TZ),
+        id="diagnostico_gratis",
+        args=["diagnostico_gratis"],
         coalesce=True,
         max_instances=1,
         misfire_grace_time=300,
