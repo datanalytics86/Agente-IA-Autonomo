@@ -1,12 +1,12 @@
 # PROGRESS — Ronda 2 deploy 04-10-2026
 
-Rama: `grok/deploy-r2-041026` · Base: `main` en `d5dcc6b` · HEAD de trabajo: `d4363aa` más `engine/tests/test_coverage_floors.py` (aún sin commit) · Ola actual: cierre de DoD
+Rama: `grok/deploy-r2-041026` · Base: `main` en `d5dcc6b` · SHA de producto: `21593a9` · Ola actual: informe y PR
 
 ## Estado de la DoD (§8)
 
-A ✅ · B ✅ · C ✅ · D ☐ · E ✅ · F ✅ · G ✅ · H ☐ · I ☐
+A ✅ · B ✅ · C ✅ · D ✅ · E ✅ · F ✅ · G ✅ · H ✅ · I ✅ (CI de `21593a9`; el commit de este informe no cambia el motor)
 
-Docker local: el comando `docker` no existe en esta máquina. `docker compose ... config` se validó con el binario Compose v5.6.0 (no hace falta el daemon). El smoke §7.2 sigue siendo el job `compose-smoke`. La corrida verde conocida es https://github.com/datanalytics86/Agente-IA-Autonomo/actions/runs/37247682028 sobre `00190b0`. Ese SHA no incluye el embudo de B3 ni el arnés de simulación. D e I quedan abiertos hasta un run verde del HEAD que se empuje.
+Docker local: el comando `docker` no existe en esta máquina. `docker compose ... config` se validó con el binario Compose v5.6.0 (no hace falta el daemon). El smoke §7.2 del código de producto es el job `compose-smoke` del run https://github.com/datanalytics86/Agente-IA-Autonomo/actions/runs/37259799699 sobre `21593a9` (success, diez pasos, `smoke ok`). Los seis jobs de ese run están en success. La corrida anterior https://github.com/datanalytics86/Agente-IA-Autonomo/actions/runs/37247682028 sobre `00190b0` no incluye el embudo de B3 ni el arnés.
 
 ## Línea base de cobertura (sin el test de 14 días)
 
@@ -38,12 +38,12 @@ Docker local: el comando `docker` no existe en esta máquina. `docker compose ..
 | G18 | P1 | ✅ | notifier |
 | G19 | P1 | ✅ | mypy del motor |
 | G20 | P1 | ✅ | cobertura 89 % y ≥ 80 % en los cinco archivos |
-| G21 | P1 | ☐ | CI del HEAD nuevo (openapi, e2e, compose-smoke, engine) |
+| G21 | P1 | ✅ | CI de `21593a9`: run `37259799699`, seis jobs en success |
 | G22 | P1 | ✅ | simulación 14 días dentro de `pytest -q --cov --cov-fail-under=85`: 317 passed, violaciones 0 |
 | G23 | P1 | ✅ | backup en el smoke de `00190b0` |
 | G24 | P1 | ✅ | nota en los docs de la ronda 1 |
 
-G1, G2, G4, G5, G7, G8 y G23 quedan cerrados contra el run `37247682028`. El próximo push tiene que volver a poner ese job en verde sobre el HEAD, porque el worker de la imagen cambió después de `00190b0`.
+G1, G2, G4, G5, G7, G8 y G23 quedan reconfirmados en el run `37259799699` sobre `21593a9`. El run `37247682028` sobre `00190b0` es la corrida anterior, sin el embudo de B3.
 
 ## Tablero
 
@@ -52,7 +52,7 @@ G1, G2, G4, G5, G7, G8 y G23 quedan cerrados contra el run `37247682028`. El pr�
 | R2-B0-00 | Rama y contratos | B0 | ✅ | 589a37a | tablero y contrato de `build_ports` |
 | R2-B0-01 | Nota en docs de la ronda 1 | B0 | ✅ | 589a37a | nota al inicio de PROGRESS e INFORME |
 | R2-B0-02 | `.env.example` e `infra/.env.ci` | B0 | ✅ | | dominios, Postgres y build del sitio |
-| R2-B0-03 | Informe y PR | B0 | ☐ | | `docs/INFORME_FINAL_R2.md` |
+| R2-B0-03 | Informe y PR | B0 | ✅ | este cierre | `docs/INFORME_FINAL_R2.md` y run `37259799699` |
 | R2-B1-01 | psycopg y requirements | B1 | ✅ | 509cf8f | `test_requirements_cubre_pyproject` |
 | R2-B1-02 | Dockerfile.engine | B1 | ✅ | 00190b0 | smoke `37247682028` |
 | R2-B1-03 | Dockerfile.front | B1 | ✅ | 00190b0 | smoke `37247682028` |
@@ -81,8 +81,8 @@ G1, G2, G4, G5, G7, G8 y G23 quedan cerrados contra el run `37247682028`. El pr�
 | R2-B5-03 | Turnstile en el sitio | B5 | ✅ | 49c46f9 | sitio 7 passed tras `astro build` |
 | R2-B5-04 | Identidad en el build del sitio | B5 | ✅ | 49c46f9 | `SITE_BUILD=prod` sin identidad sale 1 |
 | R2-B6-01 | mypy del motor | B6 | ✅ | 33fc67f | `mypy .` 105 archivos en este árbol |
-| R2-B6-02 | Cobertura 85 % | B6 | ✅ | | 89 % fuente; pisos del G20 cubiertos |
-| R2-B6-03 | CI openapi y e2e | B6 | ☐ | 33fc67f | jobs en ci.yml; falta el run del HEAD |
+| R2-B6-02 | Cobertura 85 % | B6 | ✅ | 21593a9 | 89 % fuente; pisos del G20 cubiertos |
+| R2-B6-03 | CI openapi y e2e | B6 | ✅ | 21593a9 | run `37259799699` |
 | R2-B6-04 | Simulación del pipeline real | B6 | ✅ | d4363aa | `reporte_seed42_d14.md` violaciones 0; 317 passed |
 | R2-B7-01 | DEPLOY_VPS.md | B7 | ✅ | ce0adda | cita el run `37247682028` |
 | R2-B7-02 | GO_LIVE.md | B7 | ✅ | ce0adda | checklist del dueño, identidad sin inventar |
@@ -110,4 +110,4 @@ G1, G2, G4, G5, G7, G8 y G23 quedan cerrados contra el run `37247682028`. El pr�
 
 ## Próxima acción exacta
 
-Empujar `grok/deploy-r2-041026`, esperar el run de CI (engine, e2e, compose-smoke) y recién entonces escribir `docs/INFORME_FINAL_R2.md` y abrir el PR a `main`. No marcar D, G21, H ni I hasta ese run verde.
+El PR hacia `main` lleva `docs/INFORME_FINAL_R2.md`. El commit de ese informe no cambia el motor ni las imágenes. Su CI repite la suite; si falla, se corrige sin bajar el smoke ni la §7.3.

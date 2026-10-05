@@ -48,4 +48,4 @@ docker compose -f infra/docker-compose.yml --env-file infra/.env.ci exec -T back
 
 ## Smoke
 
-`infra/scripts/smoke.py` cubre los 10 pasos de la §7.2 contra el compose base y `infra/.env.ci`. En CI lo corre el job `compose-smoke`. La corrida verde es https://github.com/datanalytics86/Agente-IA-Autonomo/actions/runs/37247682028 sobre el commit `00190b0`. `POST /api/public/diagnostico` está implementado como 202; el script acepta 200 o 202 y comprueba que el lead quede en `/api/leads`.
+`infra/scripts/smoke.py` cubre los 10 pasos de la §7.2 contra el compose base y `infra/.env.ci`. En CI lo corre el job `compose-smoke`. La corrida verde del código de producto `21593a9` es https://github.com/datanalytics86/Agente-IA-Autonomo/actions/runs/37259799699. La corrida anterior, sobre `00190b0`, es https://github.com/datanalytics86/Agente-IA-Autonomo/actions/runs/37247682028. `POST /api/public/diagnostico` está implementado como 202; el script acepta 200 o 202 y comprueba que el lead quede en `/api/leads`.

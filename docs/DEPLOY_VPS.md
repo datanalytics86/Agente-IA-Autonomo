@@ -2,7 +2,7 @@
 
 Ubuntu 22.04, 24.04 o 26.04, 64 bits. Los comandos de Compose se corren en la raíz del clon. El `.env` vive ahí y no se commitea (`.gitignore` ya ignora `.env`).
 
-La evidencia del stack de demo es el job `compose-smoke` de CI. La corrida verde es https://github.com/datanalytics86/Agente-IA-Autonomo/actions/runs/37247682028 sobre el commit `00190b0`. En esta máquina no está el comando `docker`.
+La evidencia del stack de demo es el job `compose-smoke` de CI. La corrida verde del código de producto `21593a9` es https://github.com/datanalytics86/Agente-IA-Autonomo/actions/runs/37259799699. La corrida anterior, sobre `00190b0`, es https://github.com/datanalytics86/Agente-IA-Autonomo/actions/runs/37247682028. En esta máquina no está el comando `docker`.
 
 ## 1. Docker
 

@@ -4,7 +4,7 @@ Operación local y de producción. Los defaults dejan el sistema en demo: no env
 
 El panel no está en la raíz del sitio. Vite publica con `base: '/admin/'` y el router usa `basepath: '/admin'`. En producción se abre `https://<SITE_DOMAIN>/admin/`. Caddy redirige `/admin` a `/admin/` (308).
 
-La evidencia del stack de demo es el job `compose-smoke` de CI: https://github.com/datanalytics86/Agente-IA-Autonomo/actions/runs/37247682028 sobre el commit `00190b0`. En esta máquina no está el comando `docker`.
+La evidencia del stack de demo es el job `compose-smoke` de CI. La corrida verde del código de producto `21593a9` es https://github.com/datanalytics86/Agente-IA-Autonomo/actions/runs/37259799699. La corrida anterior, sobre `00190b0`, es https://github.com/datanalytics86/Agente-IA-Autonomo/actions/runs/37247682028. En esta máquina no está el comando `docker`.
 
 ## Pausar la salida
 
