@@ -226,6 +226,19 @@ def _publish_project(project: Project, lead: Lead | None) -> Path:
     return copy_site(resolve_sites_dir(get_settings()), slug, source)
 
 
+def _unique_tx_id(session: Session, candidate: str | None) -> str:
+    from db.models import new_id
+
+    chosen = candidate.strip() if isinstance(candidate, str) else ""
+    if not chosen:
+        chosen = f"tx-{new_id()}"
+    while (
+        session.scalar(select(Message.id).where(Message.provider_message_id == chosen)) is not None
+    ):
+        chosen = f"tx-{new_id()}"
+    return chosen
+
+
 def _send_diagnostico_mail(session: Session, lead: Lead, email: str) -> None:
     subject = f"Recibimos el diagnóstico de {lead.business}"
     text = (
@@ -254,7 +267,9 @@ def _send_diagnostico_mail(session: Session, lead: Lead, email: str) -> None:
             subject=subject,
             body_text=text,
             body_html=body,
-            provider_message_id=f"tx-{lead.id}" if sent else None,
+            provider_message_id=_unique_tx_id(session, result.provider_message_id)
+            if sent
+            else None,
             sent_at=datetime.now(UTC) if sent else None,
         )
     )
@@ -636,6 +651,14 @@ def accept_signed_event(
         return {"ok": True, "duplicate": True}
     if provider in {"calcom", "calendly"}:
         _maybe_schedule(session, body)
+    elif provider == "email":
+        from worker.sending import apply_email_provider_event
+
+        apply_email_provider_event(session, body)
+    elif provider == "meta":
+        from worker.sending import apply_meta_provider_event
+
+        apply_meta_provider_event(session, body)
     return {"ok": True, "duplicate": False}
 
 

@@ -15,6 +15,7 @@ from worker.maintenance import (
 )
 from worker.ports import JobContext
 from worker.sending import (
+    job_diagnostico_gratis,
     job_followups,
     job_inbound,
     job_outreach,
@@ -28,6 +29,7 @@ JOBS: dict[str, Callable[[JobContext], int]] = {
     "outreach_send": job_outreach,
     "followups": job_followups,
     "inbound_poll": job_inbound,
+    "diagnostico_gratis": job_diagnostico_gratis,
     "response_rate_guard": job_response_guard,
     "hitl_digest": job_digest,
     "warmup_ramp": job_warmup,
