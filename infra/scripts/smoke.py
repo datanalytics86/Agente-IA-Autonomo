@@ -164,12 +164,17 @@ def step_health(opener: urllib.request.OpenerDirector) -> None:
     print("1 healthz y readyz ok", flush=True)
 
 
+# El HTML viejo de infra/site-root decía «Sitio público (marcador)».
+# El sitio real explica el placeholder de identidad y usa la palabra «marcador».
+_STUB_MARKER = "sitio público (marcador)"
+
+
 def step_site(opener: urllib.request.OpenerDirector) -> None:
     status, _headers, body = open_path(opener, "GET", "/")
     text = body.decode("utf-8", errors="replace")
     if status != 200:
         fail(f"GET / status {status}")
-    if "marcador" in text.lower():
+    if _STUB_MARKER in text.lower():
         fail("GET / sigue sirviendo el marcador")
     if "Landings para pymes locales" not in text:
         fail("GET / no trae el title del sitio Astro")
@@ -184,7 +189,7 @@ def step_admin(opener: urllib.request.OpenerDirector) -> None:
             fail(f"GET {path} status {status}")
         if "Agente IA Autónomo" not in text:
             fail(f"GET {path} no es el HTML del dashboard")
-        if "marcador" in text.lower():
+        if _STUB_MARKER in text.lower():
             fail(f"GET {path} contiene el marcador")
         refs = re.findall(r"""(?:src|href)=["']([^"']+)["']""", text)
         assets = [ref for ref in refs if ref.startswith("/admin/")]
