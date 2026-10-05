@@ -13,11 +13,12 @@ python infra/scripts/smoke.py
 
 `env_file` de api, worker y migrate: `../.env` y, si no está, `infra/.env.ci`. El de la raíz pisa al de CI. `DATABASE_URL` del contenedor se arma con el driver `postgresql+psycopg://` hacia el servicio `db`. Una clave con `@`, `:`, `/` o `#` tiene que ir ya codificada.
 
-- `http://127.0.0.1/` es el build de `apps/site` (dentro de la imagen, no `infra/site-root`).
-- `http://127.0.0.1/admin/` es el dashboard, construido con `base=/admin/`.
-- `/api`, `/webhooks`, `/demo` y `/u` van a `api:8000`. `/healthz` y `/readyz` también: JSON, no el HTML del sitio.
+- `http://127.0.0.1/` es el build de `apps/site` (dentro de la imagen, no `infra/site-root`). El panel no está en esa raíz.
+- `http://127.0.0.1/admin/` es el dashboard. Vite usa `base: '/admin/'` y el router `basepath: '/admin'`. `/admin` redirige a `/admin/` (308).
+- `/api`, `/webhooks`, `/demo` y `/u` van a `api:8000`. `/healthz` y `/readyz` también: JSON `{"status":"ok"}`, no el HTML del sitio. `/readyz` sin base responde 503.
 - `/demo` lleva `X-Robots-Tag: noindex, nofollow`.
-- `migrate` corre `alembic upgrade head` antes de api y worker. El contenedor queda vivo para que `up --wait` no lo tome por un fallo.
+- `migrate` corre `alembic upgrade head` y se queda vivo: un contenedor que sale, aunque sea con 0, `up --wait` lo toma por un fallo. El healthcheck es el archivo `/tmp/migrated`.
+- El worker no sirve HTTP. El healthcheck de la imagen pegaría a `/healthz`; Compose lo reemplaza por el archivo `/tmp/worker-ready`, que `worker_entry.py` escribe después del primer `job_runs`.
 - Postgres 16 en el compose base solo escucha en `127.0.0.1:5432`. En el override de prod no publica puertos.
 
 Volúmenes: `pgdata`, `artifacts` (`/app/output` en api y worker), `client_sites`, `caddy_data`, `backups`.
@@ -28,8 +29,10 @@ Hace falta un `.env` real en la raíz. `POSTGRES_PASSWORD`, `POSTGRES_USER`, `PO
 
 ```bash
 docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml --env-file .env config
-docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml --env-file .env up -d
+docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml --env-file .env up -d --build
 ```
+
+Ese es el arranque de producción. Caddy publica 80 (el archivo base) y 443 (el override) y usa `infra/Caddyfile.prod`. El panel queda en `https://<SITE_DOMAIN>/admin/`. `GET /healthz` es el JSON de la API. El worker sigue sin HTTP. Paso a paso del VPS: `docs/DEPLOY_VPS.md`.
 
 No inventar nombre, RUT ni dirección de la agencia en ese `.env`.
 
@@ -45,4 +48,4 @@ docker compose -f infra/docker-compose.yml --env-file infra/.env.ci exec -T back
 
 ## Smoke
 
-`infra/scripts/smoke.py` cubre los 10 pasos de la §7.2. En CI lo corre el job `compose-smoke`. `POST /api/public/diagnostico` está implementado como 202; el script acepta 200 o 202 y comprueba que el lead quede en `/api/leads`.
+`infra/scripts/smoke.py` cubre los 10 pasos de la §7.2 contra el compose base y `infra/.env.ci`. En CI lo corre el job `compose-smoke`. Esa corrida es la evidencia: este archivo no da el smoke por verde. Al escribir esto no hay una corrida verde del commit `922434a`. `POST /api/public/diagnostico` está implementado como 202; el script acepta 200 o 202 y comprueba que el lead quede en `/api/leads`.
