@@ -107,6 +107,15 @@ def build_scheduler(owner: str) -> BlockingScheduler:
     )
     scheduler.add_job(
         run_job,
+        IntervalTrigger(minutes=10, timezone=TZ),
+        id="diagnostico_gratis",
+        args=["diagnostico_gratis"],
+        coalesce=True,
+        max_instances=1,
+        misfire_grace_time=300,
+    )
+    scheduler.add_job(
+        run_job,
         IntervalTrigger(hours=1, timezone=TZ),
         id="response_rate_guard",
         args=["response_rate_guard"],
