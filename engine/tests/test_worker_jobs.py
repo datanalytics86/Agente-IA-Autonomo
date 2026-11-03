@@ -17,7 +17,7 @@ from db.models import Approval, Artifact, Lead, Message, Project
 from db.repositories import LeadRepository, MessageRepository, SettingsRepository
 from db.session import create_all, reset_engine, session_scope
 from worker.clock import FakeClock
-from worker.copywriter import checker_settings, outreach_parts
+from worker.copywriter import agency_label, checker_settings, outreach_parts
 from worker.defaults import GuardedOutreach, build_default_ports
 from worker.jobs import JOBS
 from worker.maintenance import job_demo_expiry, job_postventa, job_retention
@@ -58,6 +58,7 @@ def _caches() -> object:
 def session(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> object:
     url = f"sqlite:///{(tmp_path / 'jobs.db').as_posix()}"
     monkeypatch.setenv("DATABASE_URL", url)
+    monkeypatch.setenv("AGENCY_NAME", "Agencia Andina")
     reset_settings()
     reset_engine()
     create_all()
@@ -133,7 +134,28 @@ def _ctx(session: Session, moment: datetime, outreach: object | None = None) -> 
     )
 
 
-def test_borrador_pasa_el_checker() -> None:
+def test_sin_nombre_no_inventa_agencia(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("AGENCY_NAME", raising=False)
+    reset_settings()
+    assert agency_label() == ""
+    subject, text, body = outreach_parts(business="Café Andes", commune="Ñuñoa", step=1)
+    result = check_rules(
+        {
+            "body": text,
+            "body_html": body,
+            "channel": "email_outreach",
+            "subject": subject,
+            "direction": "out",
+        },
+        {"business": "Café Andes"},
+        checker_settings(),
+    )
+    assert result.approved is False
+
+
+def test_borrador_pasa_el_checker(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENCY_NAME", "Agencia Andina")
+    reset_settings()
     subject, text, body = outreach_parts(business="Café Andes", commune="Ñuñoa", step=2)
     result = check_rules(
         {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import random
 import socket
 from collections.abc import Callable
@@ -73,6 +74,9 @@ def run_simulation(
 ) -> int:
     if days < 1:
         raise ValueError("days debe ser >= 1")
+    # La simulación no es un envío real. Sin nombre el checker rechaza todo el embudo.
+    if not os.environ.get("AGENCY_NAME", "").strip():
+        os.environ["AGENCY_NAME"] = "Agencia Simulada"
     reset_settings()
     start = SIM_START_LOCAL.astimezone(UTC)
     end = (SIM_START_LOCAL + timedelta(days=days)).astimezone(UTC)
