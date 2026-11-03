@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from core.compliance import check_rules
 from core.config import reset_settings
-from db.models import Approval, Artifact, Lead, Message, Project
+from db.models import Approval, Artifact, JobRun, Lead, Message, Project
 from db.repositories import LeadRepository, MessageRepository, SettingsRepository
 from db.session import create_all, reset_engine, session_scope
 from worker.clock import FakeClock
@@ -22,7 +22,7 @@ from worker.defaults import GuardedOutreach, build_default_ports
 from worker.jobs import JOBS
 from worker.maintenance import job_demo_expiry, job_postventa, job_retention
 from worker.ports import InboundMail, JobContext, SendResult
-from worker.runner import execute
+from worker.runner import drain_queued, execute
 from worker.sending import apply_inbound, job_outreach, job_warmup
 
 TZ = ZoneInfo("America/Santiago")
@@ -378,3 +378,14 @@ def _order(session: Session, lead: Lead) -> str:
 def test_guarded_outreach_no_declara_envio() -> None:
     result = GuardedOutreach().send("1", "a@b.cl", "s", "t", "<p>t</p>")
     assert result.status == "blocked"
+
+
+def test_drain_queued_corre_el_job(session: Session) -> None:
+    row = JobRun(job="metrics_rollup", status="queued", processed=0)
+    session.add(row)
+    session.flush()
+    ctx = _ctx(session, datetime(2026, 3, 3, 12, 0, tzinfo=TZ))
+    assert drain_queued(ctx) == 1
+    stored = session.get(JobRun, row.id)
+    assert stored is not None
+    assert stored.status == "ok"

@@ -5,9 +5,11 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 
+from sqlalchemy import select
+
 from core.config import get_settings
 from core.errors import DuplicateLeadError
-from db.models import Approval, Lead
+from db.models import Approval, JobRun, Lead
 from db.repositories import (
     ApprovalRepository,
     EventRepository,
@@ -21,11 +23,21 @@ SENDING_JOBS = frozenset({"outreach_send"})
 SYSTEM_LEAD_ID = "lead_sistema"
 
 
-def execute(name: str, fn: Callable[[JobContext], int], ctx: JobContext) -> int:
+def execute(
+    name: str,
+    fn: Callable[[JobContext], int],
+    ctx: JobContext,
+    queued: JobRun | None = None,
+) -> int:
     """Abre job_runs, reintenta con backoff y tras 3 fallos crea error_sistema."""
     session = ctx.session
     runs = JobRunRepository(session)
-    run = runs.start(name)
+    if queued is None:
+        run = runs.start(name)
+    else:
+        run = queued
+        run.status = "running"
+        session.flush()
     attempts = max(1, get_settings().job_max_retries)
     kill = SettingsRepository(session).get("kill_switch", False) is True
     ctx.allow_send = kill if name in SENDING_JOBS else True
@@ -55,6 +67,28 @@ def execute(name: str, fn: Callable[[JobContext], int], ctx: JobContext) -> int:
         return 0
     runs.finish(run, status="ok", processed=processed)
     return processed
+
+
+def drain_queued(ctx: JobContext) -> int:
+    """Corre las filas que encoló la API. El scheduler lo llama en el heartbeat."""
+    from worker.jobs import JOBS
+
+    rows = list(
+        ctx.session.scalars(
+            select(JobRun).where(JobRun.status == "queued").order_by(JobRun.started_at.asc())
+        ).all()
+    )
+    done = 0
+    for row in rows:
+        fn = JOBS.get(row.job)
+        if fn is None:
+            JobRunRepository(ctx.session).finish(
+                row, status="error", processed=0, error="job desconocido"
+            )
+            continue
+        execute(row.job, fn, ctx, queued=row)
+        done += 1
+    return done
 
 
 def _error_approval(ctx: JobContext, name: str, error: Exception) -> None:
