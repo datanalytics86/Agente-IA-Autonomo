@@ -333,6 +333,24 @@ def test_login_rate_limit(client: TestClient) -> None:
     assert other.status_code == 401
 
 
+def test_dos_diagnosticos_no_chocan_el_id_del_correo(client: TestClient) -> None:
+    first = client.post("/api/public/diagnostico", json=_diag())
+    second = client.post(
+        "/api/public/diagnostico",
+        json=_diag(business="Óptica Norte", email="otra@example.com"),
+    )
+    assert first.status_code == 202, first.text
+    assert second.status_code == 202, second.text
+    with session_scope() as session:
+        ids = [
+            row.provider_message_id
+            for row in session.scalars(select(Message).where(Message.channel == "email_tx"))
+        ]
+    assert len(ids) == 2
+    assert len(set(ids)) == 2
+    assert all(item and not str(item).startswith("tx-") for item in ids)
+
+
 def test_diagnostico_con_consentimiento_crea_lead(client: TestClient) -> None:
     response = client.post("/api/public/diagnostico", json=_diag())
     assert response.status_code == 202

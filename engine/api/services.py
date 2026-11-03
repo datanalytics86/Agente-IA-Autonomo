@@ -55,6 +55,7 @@ from db.models import (
     Project,
     Suppression,
     WebhookEvent,
+    new_id,
     utcnow,
 )
 from db.normalize import CONTACT_KINDS, normalize_contact
@@ -245,6 +246,14 @@ def _send_diagnostico_mail(session: Session, lead: Lead, email: str) -> None:
         kind="diagnostico",
     )
     sent = result.status == "sent"
+    provider_message_id = None
+    if sent:
+        provider_message_id = result.provider_message_id or new_id()
+        taken = session.scalar(
+            select(Message.id).where(Message.provider_message_id == provider_message_id)
+        )
+        if taken is not None:
+            provider_message_id = new_id()
     session.add(
         Message(
             lead_id=lead.id,
@@ -255,7 +264,7 @@ def _send_diagnostico_mail(session: Session, lead: Lead, email: str) -> None:
             subject=subject,
             body_text=text,
             body_html=body,
-            provider_message_id=f"tx-{lead.id}" if sent else None,
+            provider_message_id=provider_message_id,
             sent_at=datetime.now(UTC) if sent else None,
         )
     )
