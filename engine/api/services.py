@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import html
-import os
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -1180,11 +1179,12 @@ def meta_statuses() -> dict[str, Any]:
 
 
 def webhook_event_id(headers: dict[str, str], body: bytes) -> str:
-    for key in ("x-request-id", "svix-id", "webhook-id"):
+    """svix-id y webhook-id entran en la firma. x-request-id no, y no sirve de id."""
+    for key in ("svix-id", "webhook-id"):
         if headers.get(key):
             return headers[key]
     return hashlib.sha256(body).hexdigest()
 
 
 def resend_secret() -> str:
-    return os.environ.get("RESEND_WEBHOOK_SECRET", "").strip()
+    return get_settings().resend_webhook_secret.strip()
