@@ -42,6 +42,7 @@ _DEFAULT_CATEGORIES = ",".join(SCOUT_CATEGORY_SLUGS)
 # Valor de proceso: no se escribe a disco. Cambia al reiniciar.
 _EPHEMERAL_SECRET = secrets.token_urlsafe(32)
 _ephemeral_warned = False
+_MIN_PROD_SECRET = 32
 
 
 def _env_files() -> tuple[Path, ...]:
@@ -183,6 +184,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _note_empty_secret(self) -> Self:
+        if self.app_mode == "prod" and len(self.secret_key.strip()) < _MIN_PROD_SECRET:
+            raise ValueError("APP_MODE=prod exige SECRET_KEY de al menos 32 caracteres")
         if self.app_mode == "demo" and self.secret_key == "":
             _warn_ephemeral_once()
         return self

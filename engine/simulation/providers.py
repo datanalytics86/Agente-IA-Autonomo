@@ -180,6 +180,8 @@ class FakeOutreach:
         subject: str,
         text: str,
         html: str,
+        *,
+        lead_id: str = "",
     ) -> SendResult:
         cached = self._done.get(message_id)
         if cached is not None:

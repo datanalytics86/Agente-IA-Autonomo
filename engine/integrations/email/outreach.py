@@ -9,7 +9,6 @@ from collections.abc import Callable
 from email.message import EmailMessage
 from html import escape
 from typing import Protocol
-from urllib.parse import quote
 
 from core.config import Settings
 from integrations.email.base import outreach_block_reason, outreach_has_credential
@@ -52,6 +51,15 @@ def outreach_html(html: str, text: str) -> str:
     return f"<p>{escape(text)}</p>"
 
 
+def _unsubscribe_url(settings: Settings, lead_id: str) -> str:
+    base = settings.public_base_url.rstrip("/")
+    if not lead_id.strip():
+        return f"{base}/baja"
+    from api.security import make_baja_token
+
+    return f"{base}/u/{make_baja_token(lead_id)}"
+
+
 def build_outreach_message(
     settings: Settings,
     message_id: str,
@@ -59,9 +67,10 @@ def build_outreach_message(
     subject: str,
     text: str,
     html: str,
+    *,
+    lead_id: str = "",
 ) -> EmailMessage:
-    base = settings.public_base_url.rstrip("/")
-    unsubscribe = f"{base}/baja?mid={quote(message_id, safe='')}"
+    unsubscribe = _unsubscribe_url(settings, lead_id)
     message = EmailMessage()
     message["From"] = settings.outreach_from
     message["To"] = to
@@ -90,7 +99,16 @@ class SmtpOutreach:
         self._suppressed = suppressed or (lambda _to: False)
         self._transport = transport or StdlibSmtpTransport(settings)
 
-    def send(self, message_id: str, to: str, subject: str, text: str, html: str) -> SendResult:
+    def send(
+        self,
+        message_id: str,
+        to: str,
+        subject: str,
+        text: str,
+        html: str,
+        *,
+        lead_id: str = "",
+    ) -> SendResult:
         reason = outreach_block_reason(
             self.settings,
             kill_switch=self.kill_switch,
@@ -100,7 +118,9 @@ class SmtpOutreach:
             return SendResult(status="blocked", reason=reason, channel=_CHANNEL)
         if self._suppressed(to):
             return SendResult(status="blocked", reason="suppressed", channel=_CHANNEL)
-        message = build_outreach_message(self.settings, message_id, to, subject, text, html)
+        message = build_outreach_message(
+            self.settings, message_id, to, subject, text, html, lead_id=lead_id
+        )
         provider_id = self._transport.send(message)
         return SendResult(
             status="sent",
@@ -131,7 +151,16 @@ class FakeOutreach:
             self._bounce_rate = 0.0 if bounce_rate is None else bounce_rate
         self.outbox: list[EmailMessage] = []
 
-    def send(self, message_id: str, to: str, subject: str, text: str, html: str) -> SendResult:
+    def send(
+        self,
+        message_id: str,
+        to: str,
+        subject: str,
+        text: str,
+        html: str,
+        *,
+        lead_id: str = "",
+    ) -> SendResult:
         reason = outreach_block_reason(
             self.settings,
             kill_switch=self.kill_switch,
@@ -147,7 +176,9 @@ class FakeOutreach:
             and self._rng.random() < self._bounce_rate
         ):
             return SendResult(status="bounced", reason="simulado", channel=_CHANNEL)
-        message = build_outreach_message(self.settings, message_id, to, subject, text, html)
+        message = build_outreach_message(
+            self.settings, message_id, to, subject, text, html, lead_id=lead_id
+        )
         self.outbox.append(message)
         return SendResult(
             status="sent",
