@@ -20,6 +20,7 @@ from db.repositories import EventRepository, LlmCallRepository
 from db.session import create_all, reset_engine, session_scope
 from integrations.llm.base import (
     _FALLBACKS,
+    _MAX_TOKENS,
     UNTRUSTED_INSTRUCTION,
     FakeLlm,
     LlmError,
@@ -27,6 +28,7 @@ from integrations.llm.base import (
     build_llm,
     load_prompt,
     render_user_message,
+    reset_unscoped_spend,
 )
 
 _URL = "https://api.x.ai/v1/chat/completions"
@@ -209,6 +211,7 @@ def test_reintenta_dos_veces_y_luego_fallback(session: Session, block_network: N
         first = json.loads(route.calls[0].request.content)
         second = json.loads(route.calls[1].request.content)
     assert first["temperature"] == 0
+    assert first["max_tokens"] == _MAX_TOKENS
     assert first["model"] == "grok-4.7"
     user = first["messages"][1]["content"]
     assert "<datos_no_confiables>" in user
@@ -222,30 +225,46 @@ def test_reintenta_dos_veces_y_luego_fallback(session: Session, block_network: N
     assert any("3 intentos" in row.message for row in warns)
 
 
-def test_modelo_desconocido_cuesta_cero_y_avisa(session: Session, block_network: None) -> None:
+def test_modelo_desconocido_no_llama_al_proveedor(session: Session, block_network: None) -> None:
     settings = _settings(xai_api_key="test-key")
-    payload = _chat(
-        json.dumps(_verdict()),
-        model="grok-desconocido",
-        tokens_in=10,
-        tokens_out=4,
-    )
     with respx.mock:
-        respx.post(_URL).mock(return_value=httpx.Response(200, json=payload))
+        route = respx.post(_URL).mock(return_value=httpx.Response(500))
         verdict = XaiLlm(settings, session).complete_json(
             "checker_judge",
             JudgeVerdict,
             {"layer1_approved": True},
             model="grok-desconocido",
         )
-    assert verdict.approved is True
-    assert verdict.fallback is False
-    calls = _calls(session)
-    assert len(calls) == 1
-    assert calls[0].cost_usd == Decimal("0.000000")
-    assert calls[0].model == "grok-desconocido"
+        assert route.call_count == 0
+    assert verdict.fallback is True
     warns = EventRepository(session).list(level="warn")
     assert any("sin tarifa" in row.message for row in warns)
+
+
+def test_presupuesto_sin_sesion_no_llama(block_network: None) -> None:
+    reset_unscoped_spend()
+    settings = _settings(xai_api_key="test-key", llm_daily_budget_usd=0)
+    with respx.mock:
+        route = respx.post(_URL).mock(return_value=httpx.Response(500))
+        verdict = XaiLlm(settings, None).complete_json(
+            "checker_judge",
+            JudgeVerdict,
+            {"layer1_approved": True},
+        )
+        assert route.call_count == 0
+    assert verdict.fallback is True
+
+
+def test_gasto_sin_sesion_cuenta_para_el_tope(block_network: None) -> None:
+    reset_unscoped_spend()
+    settings = _settings(xai_api_key="test-key", llm_daily_budget_usd=1)
+    payload = _chat(json.dumps(_verdict()), tokens_in=1_000_000, tokens_out=0)
+    with respx.mock:
+        route = respx.post(_URL).mock(return_value=httpx.Response(200, json=payload))
+        client = XaiLlm(settings, None)
+        client.complete_json("checker_judge", JudgeVerdict, {"layer1_approved": True})
+        client.complete_json("checker_judge", JudgeVerdict, {"layer1_approved": True})
+        assert route.call_count == 1
 
 
 def test_tarifa_grok_47(session: Session, block_network: None) -> None:
