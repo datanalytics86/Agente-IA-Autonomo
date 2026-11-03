@@ -259,6 +259,20 @@ def test_login_cookie_y_csrf(client: TestClient) -> None:
     assert client.get("/api/auth/me").status_code == 401
 
 
+def test_baja_suprime_el_email_y_no_el_dominio(client: TestClient) -> None:
+    from api.security import make_baja_token
+    from db.models import Suppression
+
+    with session_scope() as session:
+        lead = _lead(session, contact_email="persona@gmail.com", status="enviado")
+        token = make_baja_token(lead.id)
+    response = client.post("/api/public/baja", json={"token": token})
+    assert response.status_code == 200, response.text
+    with session_scope() as session:
+        kinds = {row.kind for row in session.scalars(select(Suppression))}
+    assert kinds == {"email"}
+
+
 def test_login_rate_limit(client: TestClient) -> None:
     for _ in range(5):
         response = client.post(

@@ -424,10 +424,6 @@ def apply_baja(session: Session, token: str) -> dict[str, bool]:
     repo = SuppressionRepository(session)
     if lead.contact_email:
         repo.add("email", lead.contact_email, reason="baja", source="unsubscribe")
-        if "@" in lead.contact_email:
-            domain = lead.contact_email.split("@", 1)[1]
-            if domain:
-                repo.add("domain", domain, reason="baja", source="unsubscribe")
     if "opt_out" in TRANSITIONS.get(lead.status, frozenset()):
         transition_lead(session, lead, "opt_out", actor="sistema", reason="baja solicitada")
     EventRepository(session).append(

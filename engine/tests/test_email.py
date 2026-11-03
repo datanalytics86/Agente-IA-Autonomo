@@ -74,7 +74,7 @@ def _html_part(message: EmailMessage) -> str:
 def _assert_outreach_headers(message: EmailMessage) -> None:
     assert message["Reply-To"] == "inbox@example.com"
     assert message["From"] == "Agencia <out@example.com>"
-    assert message["List-Unsubscribe"] == "<https://agencia.example/baja?mid=m1>"
+    assert message["List-Unsubscribe"] == "<https://agencia.example/baja>"
     assert message["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
     html = _html_part(message)
     assert "<img" not in html.lower()
@@ -138,6 +138,27 @@ def test_dry_run_outreach_no_llama_respx(
     assert fake.send("m1", "info@negocio.cl", "Hola", "Hola", _HTML).status == "blocked"
     assert real.send("m1", "info@negocio.cl", "Hola", "Hola", _HTML).status == "blocked"
     assert route.call_count == 0
+
+
+def test_list_unsubscribe_firma_el_lead(monkeypatch: pytest.MonkeyPatch) -> None:
+    from api.security import read_baja_token
+    from core.config import reset_settings
+
+    monkeypatch.setenv("APP_MODE", "prod")
+    monkeypatch.setenv("SECRET_KEY", "x" * 32)
+    reset_settings()
+    fake = FakeOutreach(_settings(secret_key="x" * 32), kill_switch=True)
+    assert fake.send(
+        "m1",
+        "info@negocio.cl",
+        "Hola",
+        "Hola",
+        _HTML,
+        lead_id="lead-baja",
+    ).status == "sent"
+    header = fake.outbox[0]["List-Unsubscribe"]
+    token = header.removeprefix("<https://agencia.example/u/").removesuffix(">")
+    assert read_baja_token(token) == "lead-baja"
 
 
 def test_outreach_arma_baja_sin_pixel(monkeypatch: pytest.MonkeyPatch) -> None:
