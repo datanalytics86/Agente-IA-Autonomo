@@ -25,6 +25,7 @@ def _settings(**overrides: Any) -> Settings:
     data: dict[str, Any] = {
         "app_mode": "prod",
         "dry_run": False,
+        "secret_key": "x" * 32,
         "meta_app_secret": "app-secret",
         "meta_verify_token": "verify-token",
         "ig_access_token": "ig-test",

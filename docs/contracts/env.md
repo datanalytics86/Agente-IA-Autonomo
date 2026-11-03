@@ -23,7 +23,7 @@ Todo umbral vive aquí y puede taparse en runtime con `settings_kv` (kill switch
 | Variable | Default |
 |---|---|
 | DATABASE_URL | `sqlite:///./state/agencia.db` (relativo a `engine/`) |
-| SECRET_KEY | vacío hasta go-live. En demo, si está vacío, se deriva un valor de proceso no persistido y se avisa en el log |
+| SECRET_KEY | vacío en demo: se deriva un valor de proceso no persistido y se avisa en el log. En prod hace falta al menos 32 caracteres; si no, el proceso no arranca |
 | ADMIN_EMAIL | vacío |
 | ADMIN_PASSWORD_HASH | vacío (argon2). Lo escribe `--mode create-admin` |
 | PUBLIC_BASE_URL | `http://localhost` |
