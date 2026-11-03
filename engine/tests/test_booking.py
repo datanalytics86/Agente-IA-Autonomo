@@ -26,6 +26,7 @@ def _settings(**overrides: Any) -> Settings:
     data: dict[str, Any] = {
         "app_mode": "prod",
         "dry_run": False,
+        "secret_key": "x" * 32,
         "booking_provider": "calcom",
         "booking_link": "https://cal.example/demo?utm_source=agencia",
         "calcom_webhook_secret": "cal-secret",

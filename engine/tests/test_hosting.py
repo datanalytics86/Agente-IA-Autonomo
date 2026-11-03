@@ -25,6 +25,7 @@ def _settings(**overrides: Any) -> Settings:
     data: dict[str, Any] = {
         "app_mode": "prod",
         "dry_run": False,
+        "secret_key": "x" * 32,
         "hosting_provider": "caddy",
         "client_sites_dir": "engine/output/clients",
         "cloudflare_api_token": "",
