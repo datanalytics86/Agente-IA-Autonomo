@@ -31,11 +31,8 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          if [ -f engine/pyproject.toml ]; then
-            python -m pip install -e "./engine[dev]"
-          else
-            python -m pip install -r engine/requirements.txt pytest ruff
-          fi
+          python -m pip install -r engine/requirements-dev.txt
+          python -m pip install -e ./engine --no-deps
 
       - name: Lint, tipos, tests o smoke del CLI
         run: |
@@ -81,7 +78,8 @@ jobs:
           set -euo pipefail
           cd ../..
           python3 -m venv engine/.venv
-          engine/.venv/bin/python -m pip install -e "./engine[dev]"
+          engine/.venv/bin/python -m pip install -r engine/requirements-dev.txt
+          engine/.venv/bin/python -m pip install -e ./engine --no-deps
           npm ci --prefix apps/site
           cd apps/web
           npx playwright install --with-deps chromium
