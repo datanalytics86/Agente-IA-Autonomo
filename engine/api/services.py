@@ -45,6 +45,7 @@ from db.models import (
     Artifact,
     DataRequest,
     Event,
+    JobRun,
     Lead,
     LeadEvent,
     LlmCall,
@@ -424,10 +425,6 @@ def apply_baja(session: Session, token: str) -> dict[str, bool]:
     repo = SuppressionRepository(session)
     if lead.contact_email:
         repo.add("email", lead.contact_email, reason="baja", source="unsubscribe")
-        if "@" in lead.contact_email:
-            domain = lead.contact_email.split("@", 1)[1]
-            if domain:
-                repo.add("domain", domain, reason="baja", source="unsubscribe")
     if "opt_out" in TRANSITIONS.get(lead.status, frozenset()):
         transition_lead(session, lead, "opt_out", actor="sistema", reason="baja solicitada")
     EventRepository(session).append(
@@ -992,14 +989,28 @@ def agent_rows(session: Session) -> list[dict[str, Any]]:
     return rows
 
 
+_ACTION_JOBS = {
+    "scout": "scout",
+    "cycle": "pipeline_tick",
+    "followups": "followups",
+    "digest": "hitl_digest",
+}
+
+
 def enqueue_action(session: Session, name: str, email: str) -> dict[str, str]:
-    event = EventRepository(session).append(
+    job = _ACTION_JOBS.get(name)
+    if job is None:
+        raise ApiError(422, "validation_error", "acción desconocida")
+    row = JobRun(job=job, status="queued", processed=0, started_at=utcnow())
+    session.add(row)
+    session.flush()
+    EventRepository(session).append(
         agent="api",
         level="info",
         message=f"job encolado: {name}",
-        meta={"job": name, "by": email},
+        meta={"job": job, "by": email, "run_id": row.id},
     )
-    return {"id": event.id, "status": "queued"}
+    return {"id": row.id, "status": "queued"}
 
 
 def list_events(

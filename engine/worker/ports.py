@@ -82,6 +82,8 @@ class OutreachEmail(Protocol):
         subject: str,
         text: str,
         html: str,
+        *,
+        lead_id: str = "",
     ) -> SendResult: ...
 
 
