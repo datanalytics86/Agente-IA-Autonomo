@@ -15,7 +15,7 @@ from worker.defaults import build_default_ports
 from worker.jobs import JOBS
 from worker.locking import refresh_lock
 from worker.ports import JobContext
-from worker.runner import execute
+from worker.runner import drain_queued, execute
 
 TZ = "America/Santiago"
 
@@ -117,8 +117,17 @@ def build_scheduler(owner: str) -> BlockingScheduler:
 def _heartbeat(owner: str) -> None:
     from datetime import UTC, datetime
 
+    clock = SystemClock()
     with session_scope() as session:
         refresh_lock(session, owner, datetime.now(UTC))
+        drain_queued(
+            JobContext(
+                session=session,
+                clock=clock,
+                rng=random.Random(),
+                ports=build_default_ports(),
+            )
+        )
 
 
 Dispatch = Callable[[str], None]

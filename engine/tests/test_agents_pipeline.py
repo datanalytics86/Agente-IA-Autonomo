@@ -244,6 +244,7 @@ def test_pitcher_prod_encola_email_sin_enviado(
     block_network: None,
 ) -> None:
     monkeypatch.setenv("APP_MODE", "prod")
+    monkeypatch.setenv("SECRET_KEY", "x" * 32)
     monkeypatch.setenv("DRY_RUN", "false")
     monkeypatch.setenv("XAI_API_KEY", "")
     reset_settings()

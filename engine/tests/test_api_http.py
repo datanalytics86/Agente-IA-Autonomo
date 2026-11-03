@@ -24,6 +24,7 @@ from db.models import (
     Approval,
     Artifact,
     Event,
+    JobRun,
     Lead,
     LlmCall,
     Message,
@@ -102,7 +103,7 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> Any:
     monkeypatch.setenv("APP_MODE", "demo")
     monkeypatch.setenv("DRY_RUN", "true")
     monkeypatch.setenv("OUTREACH_ENABLED", "false")
-    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
+    monkeypatch.setenv("SECRET_KEY", "x" * 32)
     monkeypatch.setenv("ADMIN_EMAIL", _EMAIL)
     monkeypatch.setenv("TURNSTILE_SECRET_KEY", "")
     monkeypatch.setenv("PUBLIC_BASE_URL", "http://localhost")
@@ -217,6 +218,35 @@ def test_readyz_503_si_la_base_falla(
         reset_engine()
 
 
+def test_ip_privada_no_abre_domain_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    from api.routers.internal import client_may_check
+
+    monkeypatch.delenv("INTERNAL_CHECK_TOKEN", raising=False)
+    reset_settings()
+    assert client_may_check("10.1.2.3", "") is False
+    assert client_may_check("127.0.0.1", "") is True
+    monkeypatch.setenv("INTERNAL_CHECK_TOKEN", "token-interno")
+    reset_settings()
+    assert client_may_check("10.1.2.3", "token-interno") is True
+    assert client_may_check("10.1.2.3", "otro") is False
+    reset_settings()
+
+
+def test_prod_oculta_docs(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+    monkeypatch.setenv("APP_MODE", "prod")
+    monkeypatch.setenv("SECRET_KEY", "x" * 32)
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{(tmp_path / 'docs.db').as_posix()}")
+    reset_settings()
+    reset_engine()
+    app = create_app()
+    with TestClient(app) as prod:
+        assert prod.get("/docs").status_code == 404
+        assert prod.get("/openapi.json").status_code == 404
+        assert prod.get("/healthz").status_code == 200
+    reset_settings()
+    reset_engine()
+
+
 def test_login_cookie_y_csrf(client: TestClient) -> None:
     anonymous = client.get("/api/auth/me")
     assert anonymous.status_code == 401
@@ -259,6 +289,33 @@ def test_login_cookie_y_csrf(client: TestClient) -> None:
     assert client.get("/api/auth/me").status_code == 401
 
 
+def test_baja_suprime_el_email_y_no_el_dominio(client: TestClient) -> None:
+    from api.security import make_baja_token
+    from db.models import Suppression
+
+    with session_scope() as session:
+        lead = _lead(session, contact_email="persona@gmail.com", status="enviado")
+        token = make_baja_token(lead.id)
+    response = client.post("/api/public/baja", json={"token": token})
+    assert response.status_code == 200, response.text
+    with session_scope() as session:
+        kinds = {row.kind for row in session.scalars(select(Suppression))}
+    assert kinds == {"email"}
+
+
+def test_action_scout_encola_job_run(client: TestClient) -> None:
+    headers = _login(client)
+    response = client.post("/api/actions/scout", headers=headers)
+    assert response.status_code == 202, response.text
+    assert response.json()["status"] == "queued"
+    with session_scope() as session:
+        rows = list(session.scalars(select(JobRun)))
+        assert len(rows) == 1
+        assert rows[0].id == response.json()["id"]
+        assert rows[0].job == "scout"
+        assert rows[0].status == "queued"
+
+
 def test_login_rate_limit(client: TestClient) -> None:
     for _ in range(5):
         response = client.post(
@@ -269,6 +326,29 @@ def test_login_rate_limit(client: TestClient) -> None:
     blocked = client.post("/api/auth/login", json={"email": _EMAIL, "password": "mala"})
     assert blocked.status_code == 429
     assert blocked.json()["error"]["code"] == "rate_limited"
+    other = client.post(
+        "/api/auth/login",
+        json={"email": "otro@example.com", "password": "mala"},
+    )
+    assert other.status_code == 401
+
+
+def test_dos_diagnosticos_no_chocan_el_id_del_correo(client: TestClient) -> None:
+    first = client.post("/api/public/diagnostico", json=_diag())
+    second = client.post(
+        "/api/public/diagnostico",
+        json=_diag(business="Óptica Norte", email="otra@example.com"),
+    )
+    assert first.status_code == 202, first.text
+    assert second.status_code == 202, second.text
+    with session_scope() as session:
+        ids = [
+            row.provider_message_id
+            for row in session.scalars(select(Message).where(Message.channel == "email_tx"))
+        ]
+    assert len(ids) == 2
+    assert len(set(ids)) == 2
+    assert all(item and not str(item).startswith("tx-") for item in ids)
 
 
 def test_diagnostico_con_consentimiento_crea_lead(client: TestClient) -> None:
@@ -356,6 +436,25 @@ def test_webhook_firma_invalida_es_401(client: TestClient) -> None:
     assert response.json()["error"]["code"] == "invalid_signature"
     with session_scope() as session:
         assert session.scalar(select(func.count()).select_from(Payment)) == 0
+
+
+def test_calcom_reescrito_con_otro_request_id_es_duplicado(client: TestClient) -> None:
+    body = b'{"payload":{"metadata":{"lead_id":"no-existe"}}}'
+    digest = hmac.new(b"cal-test-secret", body, hashlib.sha256).hexdigest()
+    base = {"x-cal-signature-256": digest, "content-type": "application/json"}
+    first = client.post(
+        "/webhooks/calcom",
+        content=body,
+        headers={**base, "x-request-id": "uno"},
+    )
+    second = client.post(
+        "/webhooks/calcom",
+        content=body,
+        headers={**base, "x-request-id": "dos"},
+    )
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200, second.text
+    assert second.json()["duplicate"] is True
 
 
 @pytest.mark.parametrize(

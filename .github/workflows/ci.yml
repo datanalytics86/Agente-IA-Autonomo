@@ -76,6 +76,16 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: e2e en Chromium
+        run: |
+          set -euo pipefail
+          cd ../..
+          python3 -m venv engine/.venv
+          engine/.venv/bin/python -m pip install -e "./engine[dev]"
+          cd apps/web
+          npx playwright install --with-deps chromium
+          npm run e2e
+
       - name: Tests solo si el script test existe y no es el placeholder
         run: |
           set -euo pipefail

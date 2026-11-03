@@ -8,7 +8,6 @@ el fake local. No abre red ni cobra.
 from __future__ import annotations
 
 import hmac
-import importlib
 import secrets
 from collections.abc import Iterator, Mapping
 from typing import Annotated, Protocol
@@ -109,14 +108,13 @@ def build_payment_provider(settings: Settings) -> PaymentProvider:
     )
     if not needs_fake:
         try:
-            module = importlib.import_module("integrations.payments")
-            factory = getattr(module, "build_payment_provider", None)
+            from integrations.payments import build_payments
         except ImportError:
-            factory = None
-        if factory is not None:
-            built = factory(settings)
+            build_payments = None  # type: ignore[assignment]
+        if build_payments is not None:
+            built = build_payments(settings)
             if built is not None:
-                return built
+                return built  # type: ignore[return-value]
     return LocalPaymentProvider(settings.public_base_url)
 
 
@@ -198,16 +196,16 @@ def clear_auth_cookies(response: Response) -> None:
     response.delete_cookie(CSRF_COOKIE, path="/", samesite="lax", secure=secure, httponly=False)
 
 
-def authenticate(session: Session, email: str, password: str, ip: str) -> User:
-    if login_blocked(ip):
+def authenticate(session: Session, email: str, password: str, bucket: str) -> User:
+    if login_blocked(bucket):
         raise ApiError(429, "rate_limited", "demasiados intentos; espera 15 minutos")
     user = session.scalar(select(User).where(User.email == email))
     if user is None:
         burn_password_check(password)
-        record_login_failure(ip)
+        record_login_failure(bucket)
         raise ApiError(401, "invalid_credentials", "credenciales inválidas")
     if not verify_password(password, user.password_hash):
-        record_login_failure(ip)
+        record_login_failure(bucket)
         raise ApiError(401, "invalid_credentials", "credenciales inválidas")
-    clear_login_failures(ip)
+    clear_login_failures(bucket)
     return user
