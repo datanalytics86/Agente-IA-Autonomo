@@ -149,14 +149,17 @@ def test_list_unsubscribe_firma_el_lead(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setenv("SECRET_KEY", "x" * 32)
     reset_settings()
     fake = FakeOutreach(_settings(secret_key="x" * 32), kill_switch=True)
-    assert fake.send(
-        "m1",
-        "info@negocio.cl",
-        "Hola",
-        "Hola",
-        _HTML,
-        lead_id="lead-baja",
-    ).status == "sent"
+    assert (
+        fake.send(
+            "m1",
+            "info@negocio.cl",
+            "Hola",
+            "Hola",
+            _HTML,
+            lead_id="lead-baja",
+        ).status
+        == "sent"
+    )
     header = fake.outbox[0]["List-Unsubscribe"]
     token = header.removeprefix("<https://agencia.example/u/").removesuffix(">")
     assert read_baja_token(token) == "lead-baja"
