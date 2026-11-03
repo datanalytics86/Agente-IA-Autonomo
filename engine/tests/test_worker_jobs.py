@@ -40,6 +40,8 @@ class MemoryOutreach:
         subject: str,
         text: str,
         html: str,
+        *,
+        lead_id: str = "",
     ) -> SendResult:
         self.sent.append(to)
         return SendResult(status=self.outcome, provider_message_id=f"m-{message_id}")
