@@ -59,7 +59,7 @@ def _settings(**overrides: Any) -> Settings:
     data: dict[str, Any] = {
         "app_mode": "prod",
         "dry_run": False,
-        "secret_key": "test-secret",
+        "secret_key": "x" * 32,
         "xai_api_key": "",
         "llm_base_url": "https://api.x.ai/v1",
         "llm_model": "grok-4.7",
