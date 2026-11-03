@@ -219,6 +219,7 @@ def test_readyz_503_si_la_base_falla(
 
 def test_prod_oculta_docs(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
     monkeypatch.setenv("APP_MODE", "prod")
+    monkeypatch.setenv("SECRET_KEY", "x" * 32)
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{(tmp_path / 'docs.db').as_posix()}")
     reset_settings()
     reset_engine()
