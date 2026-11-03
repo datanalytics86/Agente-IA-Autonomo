@@ -18,7 +18,7 @@ from db.repositories import LeadRepository, MessageRepository, SettingsRepositor
 from db.session import create_all, reset_engine, session_scope
 from worker.clock import FakeClock
 from worker.copywriter import checker_settings, outreach_parts
-from worker.defaults import GuardedOutreach, build_default_ports
+from worker.defaults import EmptySource, GuardedOutreach, build_default_ports
 from worker.jobs import JOBS
 from worker.maintenance import job_demo_expiry, job_postventa, job_retention
 from worker.ports import InboundMail, JobContext, SendResult
@@ -373,6 +373,66 @@ def _order(session: Session, lead: Lead) -> str:
         )
     )
     return order.id
+
+
+def test_place_sin_email_no_se_mapea() -> None:
+    from worker.defaults import place_from_source
+
+    class Hit:
+        place_id = "abc"
+        name = "Café Sin Mail"
+        formatted_address = "Av 1"
+        business_status = "OPERATIONAL"
+        rating = 4.9
+        user_rating_count = 40
+        website_uri = None
+        national_phone_number = "+56911111111"
+
+    assert place_from_source(Hit(), commune="Ñuñoa", category="cafeteria") is None
+
+
+def test_place_incompleto_no_crea_lead(session: Session) -> None:
+    from worker.defaults import _PlacesBridge
+    from worker.funnel import job_scout
+
+    class Hit:
+        place_id = "abc"
+        name = "Café Sin Mail"
+        formatted_address = "Av 1"
+        business_status = "OPERATIONAL"
+        rating = 4.9
+        user_rating_count = 40
+
+    class Source:
+        def search(self, commune: str, category_slug: str, limit: int) -> list[Hit]:
+            return [Hit()]
+
+    ctx = _ctx(session, datetime(2026, 3, 3, 9, 0, tzinfo=TZ))
+    ctx.ports.places = _PlacesBridge(Source())  # type: ignore[assignment]
+    assert job_scout(ctx) == 0
+    assert LeadRepository(session).list(limit=20) == []
+
+
+def test_prod_con_credencial_usa_adaptadores_reales(monkeypatch: pytest.MonkeyPatch) -> None:
+    from worker.defaults import _PlacesBridge, _SmtpBridge, build_default_ports
+
+    monkeypatch.setenv("APP_MODE", "prod")
+    monkeypatch.setenv("DRY_RUN", "false")
+    monkeypatch.setenv("OUTREACH_ENABLED", "true")
+    monkeypatch.setenv("GOOGLE_PLACES_API_KEY", "dummy-places")
+    monkeypatch.setenv("OUTREACH_SMTP_HOST", "smtp.example")
+    monkeypatch.setenv("OUTREACH_SMTP_USER", "user")
+    monkeypatch.setenv("OUTREACH_SMTP_PASSWORD", "secret")
+    reset_settings()
+    ports = build_default_ports()
+    assert isinstance(ports.places, _PlacesBridge)
+    assert isinstance(ports.outreach, _SmtpBridge)
+    monkeypatch.setenv("APP_MODE", "demo")
+    monkeypatch.setenv("DRY_RUN", "true")
+    reset_settings()
+    demo = build_default_ports()
+    assert isinstance(demo.places, EmptySource)
+    assert isinstance(demo.outreach, GuardedOutreach)
 
 
 def test_guarded_outreach_no_declara_envio() -> None:
