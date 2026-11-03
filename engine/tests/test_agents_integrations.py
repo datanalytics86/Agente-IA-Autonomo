@@ -257,6 +257,7 @@ def test_alto_valor_forzado_solo_en_demo_y_rubro(db: Path, monkeypatch: pytest.M
         assert lead.contact_email is None
 
     monkeypatch.setenv("APP_MODE", "prod")
+    monkeypatch.setenv("SECRET_KEY", "x" * 32)
     monkeypatch.setenv("DRY_RUN", "true")
     monkeypatch.setenv("SCOUT_CATEGORIES", "clinica-dental")
     reset_settings()

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from pydantic import AliasChoices
+from pydantic import AliasChoices, ValidationError
 
 from core.config import Settings, get_settings, reset_settings
 from core.hitl import needs_value_review
@@ -134,7 +134,7 @@ def test_env_de_raiz_pisa_engine_y_el_proceso_pisa_ambos(
         encoding="utf-8",
     )
     root_env.write_text(
-        "APP_MODE=prod\nDRY_RUN=false\nAGENCY_NAME=raiz\n",
+        "APP_MODE=prod\nDRY_RUN=false\nAGENCY_NAME=raiz\nSECRET_KEY=" + ("x" * 32) + "\n",
         encoding="utf-8",
     )
     monkeypatch.setenv("HITL_VALUE_CLP", "99")
@@ -143,6 +143,22 @@ def test_env_de_raiz_pisa_engine_y_el_proceso_pisa_ambos(
     assert settings.dry_run is False
     assert settings.agency_name == "raiz"
     assert settings.hitl_value_clp == 99
+
+
+def test_prod_rechaza_secret_key_vacio_o_corto(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_env(monkeypatch)
+    with pytest.raises(ValidationError, match="SECRET_KEY"):
+        Settings(_env_file=None, app_mode="prod", secret_key="")
+    with pytest.raises(ValidationError, match="SECRET_KEY"):
+        Settings(_env_file=None, app_mode="prod", secret_key="x" * 31)
+    with pytest.raises(ValidationError, match="SECRET_KEY"):
+        Settings(_env_file=None, app_mode="prod", secret_key=" " * 40)
+    monkeypatch.setenv("APP_MODE", "prod")
+    monkeypatch.setenv("SECRET_KEY", "")
+    with pytest.raises(ValidationError, match="SECRET_KEY"):
+        Settings(_env_file=None)
+    accepted = Settings(_env_file=None, app_mode="prod", secret_key="x" * 32)
+    assert accepted.resolved_secret_key == "x" * 32
 
 
 def test_secreto_efimero_no_se_persiste_en_el_campo(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from core.config import get_settings
 from core.errors import TransitionError
-from db.models import Event, Lead, LeadEvent
+from db.models import Event, JobRun, Lead, LeadEvent
 from db.repositories import SettingsRepository, SuppressionRepository
 
 ACTORS = frozenset({"agente", "humano", "sistema", "webhook"})
@@ -182,6 +182,11 @@ def _resolve_target(
         if _contact_suppressed(session, lead):
             raise TransitionError("perdido → nuevo bloqueado: contacto suprimido")
     return to
+
+
+def mark_job_running(run: JobRun) -> None:
+    """Único sitio que asigna el status de un job encolado."""
+    run.status = "running"
 
 
 def _video_enabled(session: Session) -> bool:
