@@ -178,6 +178,7 @@ def job_outreach(ctx: JobContext) -> int:
             message.subject or "",
             message.body_text,
             message.body_html or "",
+            lead_id=lead.id,
         )
         if result.status == "bounced":
             patch_fields(
