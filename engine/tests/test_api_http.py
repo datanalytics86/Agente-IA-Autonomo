@@ -218,6 +218,20 @@ def test_readyz_503_si_la_base_falla(
         reset_engine()
 
 
+def test_ip_privada_no_abre_domain_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    from api.routers.internal import client_may_check
+
+    monkeypatch.delenv("INTERNAL_CHECK_TOKEN", raising=False)
+    reset_settings()
+    assert client_may_check("10.1.2.3", "") is False
+    assert client_may_check("127.0.0.1", "") is True
+    monkeypatch.setenv("INTERNAL_CHECK_TOKEN", "token-interno")
+    reset_settings()
+    assert client_may_check("10.1.2.3", "token-interno") is True
+    assert client_may_check("10.1.2.3", "otro") is False
+    reset_settings()
+
+
 def test_prod_oculta_docs(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
     monkeypatch.setenv("APP_MODE", "prod")
     monkeypatch.setenv("SECRET_KEY", "x" * 32)
@@ -312,6 +326,11 @@ def test_login_rate_limit(client: TestClient) -> None:
     blocked = client.post("/api/auth/login", json={"email": _EMAIL, "password": "mala"})
     assert blocked.status_code == 429
     assert blocked.json()["error"]["code"] == "rate_limited"
+    other = client.post(
+        "/api/auth/login",
+        json={"email": "otro@example.com", "password": "mala"},
+    )
+    assert other.status_code == 401
 
 
 def test_diagnostico_con_consentimiento_crea_lead(client: TestClient) -> None:
