@@ -10,8 +10,7 @@ MANUAL_CHANNELS = frozenset({"instagram", "linkedin", "whatsapp"})
 
 
 def agency_label() -> str:
-    name = get_settings().agency_name.strip()
-    return name or "Agencia Demo"
+    return get_settings().agency_name.strip()
 
 
 def checker_settings() -> dict[str, object]:

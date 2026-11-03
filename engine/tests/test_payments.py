@@ -25,6 +25,7 @@ def _settings(**overrides: Any) -> Settings:
     data: dict[str, Any] = {
         "app_mode": "prod",
         "dry_run": False,
+        "secret_key": "x" * 32,
         "mp_access_token": "TEST-MP",
         "mp_webhook_secret": "mp-secret",
         "public_base_url": "https://agencia.example",
@@ -147,6 +148,14 @@ def test_fetch_pendiente_no_queda_approved(respx_mock: Any) -> None:
     assert fact.approved is False
     assert fact.status == "pending"
     assert fact.provider_payment_id == "42"
+
+
+def test_la_api_en_prod_usa_mercado_pago() -> None:
+    from api.deps import LocalPaymentProvider, build_payment_provider
+
+    assert isinstance(build_payment_provider(_settings()), MercadoPagoProvider)
+    demo = build_payment_provider(_settings(app_mode="demo"))
+    assert isinstance(demo, LocalPaymentProvider)
 
 
 def test_dry_run_no_llama_a_mercado_pago(respx_mock: Any) -> None:

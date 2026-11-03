@@ -31,6 +31,8 @@ class GuardedOutreach:
         subject: str,
         text: str,
         html: str,
+        *,
+        lead_id: str = "",
     ) -> SendResult:
         settings = get_settings()
         credential = bool(settings.outreach_smtp_host and settings.outreach_smtp_user)
