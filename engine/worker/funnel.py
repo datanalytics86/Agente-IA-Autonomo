@@ -4,16 +4,17 @@ from __future__ import annotations
 
 from datetime import timedelta
 from decimal import Decimal
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.compliance import check_rules
-from core.config import get_settings
+from core.config import ENGINE_DIR, get_settings
 from core.errors import DuplicateLeadError
 from core.hitl import needs_value_review
 from core.states import transition
-from db.models import Artifact, Lead, LlmCall, Message, Order, Payment, Project
+from db.models import Artifact, Lead, Message, Order, Payment, Project
 from db.repositories import (
     ArtifactRepository,
     EventRepository,
@@ -254,21 +255,6 @@ def _charge_llm(ctx: JobContext, lead_id: str, agent: str) -> bool:
             ts=ctx.clock.now(),
         )
         return False
-    repo.add(
-        LlmCall(
-            agent=agent,
-            model=get_settings().llm_model,
-            prompt_name=agent,
-            prompt_version="worker-1",
-            tokens_in=120,
-            tokens_out=40,
-            cost_usd=Decimal("0.001"),
-            latency_ms=1,
-            ok=True,
-            lead_id=lead_id,
-            ts=ctx.clock.now(),
-        )
-    )
     return True
 
 
@@ -296,24 +282,15 @@ def _one_step(ctx: JobContext, lead: Lead) -> bool:
         return _collect_payment(ctx, lead)
     if status == "pagado":
         return _start_production(ctx, lead)
-    if status == "en_produccion":
-        _touch_project(ctx, lead, "en_revision_cliente")
-        transition(
-            ctx.session,
-            lead,
-            "en_revision_cliente",
-            actor="agente",
-            reason="preview lista",
-        )
-        return True
-    if status == "en_revision_cliente":
-        _touch_project(ctx, lead, "aprobado", delivered=True)
-        transition(ctx.session, lead, "entregado", actor="agente", reason="cliente aprueba")
-        return True
+    # en_produccion y en_revision_cliente esperan al portal. El worker no aprueba por el cliente.
     return False
 
 
 def _ensure_artifact(ctx: JobContext, lead: Lead, kind: str, path: str) -> None:
+    raw = Path(path)
+    file_path = raw if raw.is_absolute() else ENGINE_DIR / raw
+    if not file_path.is_file():
+        return
     current = ArtifactRepository(ctx.session).list(lead_id=lead.id, limit=20)
     if any(item.kind == kind for item in current):
         return
