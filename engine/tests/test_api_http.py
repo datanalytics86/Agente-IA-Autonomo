@@ -24,6 +24,7 @@ from db.models import (
     Approval,
     Artifact,
     Event,
+    JobRun,
     Lead,
     LlmCall,
     Message,
@@ -257,6 +258,19 @@ def test_login_cookie_y_csrf(client: TestClient) -> None:
     logged_out = client.post("/api/auth/logout", headers=headers)
     assert logged_out.status_code == 204
     assert client.get("/api/auth/me").status_code == 401
+
+
+def test_action_scout_encola_job_run(client: TestClient) -> None:
+    headers = _login(client)
+    response = client.post("/api/actions/scout", headers=headers)
+    assert response.status_code == 202, response.text
+    assert response.json()["status"] == "queued"
+    with session_scope() as session:
+        rows = list(session.scalars(select(JobRun)))
+        assert len(rows) == 1
+        assert rows[0].id == response.json()["id"]
+        assert rows[0].job == "scout"
+        assert rows[0].status == "queued"
 
 
 def test_login_rate_limit(client: TestClient) -> None:
