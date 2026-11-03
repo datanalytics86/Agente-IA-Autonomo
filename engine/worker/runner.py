@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from core.config import get_settings
 from core.errors import DuplicateLeadError
+from core.states import mark_job_running
 from db.models import Approval, JobRun, Lead
 from db.repositories import (
     ApprovalRepository,
@@ -36,7 +37,7 @@ def execute(
         run = runs.start(name)
     else:
         run = queued
-        run.status = "running"
+        mark_job_running(run)
         session.flush()
     attempts = max(1, get_settings().job_max_retries)
     kill = SettingsRepository(session).get("kill_switch", False) is True
