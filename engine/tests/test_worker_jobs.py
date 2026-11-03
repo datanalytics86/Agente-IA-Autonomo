@@ -441,6 +441,7 @@ def test_prod_con_credencial_usa_adaptadores_reales(monkeypatch: pytest.MonkeyPa
     from worker.defaults import _PlacesBridge, _SmtpBridge, build_default_ports
 
     monkeypatch.setenv("APP_MODE", "prod")
+    monkeypatch.setenv("SECRET_KEY", "x" * 32)
     monkeypatch.setenv("DRY_RUN", "false")
     monkeypatch.setenv("OUTREACH_ENABLED", "true")
     monkeypatch.setenv("GOOGLE_PLACES_API_KEY", "dummy-places")
