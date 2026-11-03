@@ -114,6 +114,7 @@ class Settings(BaseSettings):
     diagnose_daily_limit: int = 15
 
     resend_api_key: str = ""
+    resend_webhook_secret: str = ""
     email_tx_from: str = ""
     outreach_smtp_host: str = ""
     outreach_smtp_port: int = 587

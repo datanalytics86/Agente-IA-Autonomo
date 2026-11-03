@@ -438,6 +438,25 @@ def test_webhook_firma_invalida_es_401(client: TestClient) -> None:
         assert session.scalar(select(func.count()).select_from(Payment)) == 0
 
 
+def test_calcom_reescrito_con_otro_request_id_es_duplicado(client: TestClient) -> None:
+    body = b'{"payload":{"metadata":{"lead_id":"no-existe"}}}'
+    digest = hmac.new(b"cal-test-secret", body, hashlib.sha256).hexdigest()
+    base = {"x-cal-signature-256": digest, "content-type": "application/json"}
+    first = client.post(
+        "/webhooks/calcom",
+        content=body,
+        headers={**base, "x-request-id": "uno"},
+    )
+    second = client.post(
+        "/webhooks/calcom",
+        content=body,
+        headers={**base, "x-request-id": "dos"},
+    )
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200, second.text
+    assert second.json()["duplicate"] is True
+
+
 @pytest.mark.parametrize(
     "path",
     ["/webhooks/calcom", "/webhooks/calendly", "/webhooks/email", "/webhooks/meta"],
