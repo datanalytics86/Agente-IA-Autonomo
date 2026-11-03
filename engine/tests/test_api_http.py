@@ -103,7 +103,7 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> Any:
     monkeypatch.setenv("APP_MODE", "demo")
     monkeypatch.setenv("DRY_RUN", "true")
     monkeypatch.setenv("OUTREACH_ENABLED", "false")
-    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
+    monkeypatch.setenv("SECRET_KEY", "x" * 32)
     monkeypatch.setenv("ADMIN_EMAIL", _EMAIL)
     monkeypatch.setenv("TURNSTILE_SECRET_KEY", "")
     monkeypatch.setenv("PUBLIC_BASE_URL", "http://localhost")
