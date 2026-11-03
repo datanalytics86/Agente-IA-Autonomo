@@ -41,11 +41,11 @@ python -m venv .venv
 .\.venv\Scripts\python.exe main.py --mode status
 ```
 
-Bash:
+Bash. En Debian/Ubuntu, si `python3 -m venv` dice que falta `ensurepip`, instala `python3.12-venv` (y `python3-pip`). El comando es `python3`, no `python`.
 
 ```bash
 cd engine
-python -m venv .venv
+python3 -m venv .venv
 .venv/bin/python -m pip install -e ".[dev]"
 .venv/bin/python main.py --mode demo
 .venv/bin/python main.py --mode status

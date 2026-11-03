@@ -37,6 +37,9 @@ services:
       dockerfile: infra/Dockerfile.engine
     # Alias, no merge key: Compose v2 (Go) no siempre acepta `<<`.
     environment: *engine-env
+    env_file:
+      - path: ../.env
+        required: false
     depends_on:
       db:
         condition: service_healthy
@@ -48,6 +51,9 @@ services:
       context: ..
       dockerfile: infra/Dockerfile.engine
     environment: *engine-env
+    env_file:
+      - path: ../.env
+        required: false
     # El Dockerfile documenta el CMD de la api. El worker lo sustituye.
     command: ["python", "main.py", "--mode", "worker"]
     depends_on:

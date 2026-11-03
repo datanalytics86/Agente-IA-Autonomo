@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { defineConfig } from '@playwright/test'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -5,7 +6,10 @@ import { fileURLToPath } from 'node:url'
 const here = dirname(fileURLToPath(import.meta.url))
 const engine = resolve(here, '../../../engine')
 const site = resolve(here, '../../site')
-const python = resolve(engine, '.venv/Scripts/python.exe')
+const winPython = resolve(engine, '.venv/Scripts/python.exe')
+const unixPython = resolve(engine, '.venv/bin/python')
+const python = existsSync(winPython) ? winPython : existsSync(unixPython) ? unixPython : 'python3'
+const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
 export default defineConfig({
   testDir: '.',
@@ -18,7 +22,6 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: 'http://127.0.0.1:4321',
-    channel: 'msedge',
   },
   webServer: [
     {
@@ -45,7 +48,7 @@ export default defineConfig({
       },
     },
     {
-      command: 'npm.cmd run build && npm.cmd run preview -- --host 127.0.0.1 --port 4321',
+      command: `${npm} run build && ${npm} run preview -- --host 127.0.0.1 --port 4321`,
       cwd: site,
       url: 'http://127.0.0.1:4321',
       reuseExistingServer: false,
