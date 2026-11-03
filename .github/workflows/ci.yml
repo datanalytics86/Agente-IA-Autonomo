@@ -82,6 +82,7 @@ jobs:
           cd ../..
           python3 -m venv engine/.venv
           engine/.venv/bin/python -m pip install -e "./engine[dev]"
+          npm ci --prefix apps/site
           cd apps/web
           npx playwright install --with-deps chromium
           npm run e2e
