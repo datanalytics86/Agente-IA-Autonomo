@@ -47,8 +47,6 @@ _PATH = (
     "propuesta",
     "pagado",
     "en_produccion",
-    "en_revision_cliente",
-    "entregado",
 )
 _SENT = frozenset({"sent", "delivered", "bounced"})
 _AUTO = frozenset({"instagram", "linkedin", "whatsapp"})
@@ -359,14 +357,18 @@ def _response_rate(session: Session) -> list[str]:
 
 
 def _delivered(session: Session, leads: list[Lead]) -> list[str]:
+    """El worker cobra y deja el proyecto en producción. No entrega por su cuenta."""
     found: list[str] = []
+    real = [lead for lead in leads if lead.source != "sistema"]
+    if any(lead.status in {"entregado", "postventa"} for lead in real):
+        found.append("el worker marcó entregado sin aprobación del cliente")
     events = list(session.scalars(select(LeadEvent)).all())
     by_lead: dict[str, set[str]] = defaultdict(set)
     for event in events:
         by_lead[event.lead_id].add(event.to_status)
     walked = any(all(step in seen for step in _PATH) for seen in by_lead.values())
     if not walked:
-        found.append("ningún lead recorrió el embudo hasta entregado")
+        found.append("ningún lead recorrió el embudo hasta producción")
     revenue = sum(int(row.amount_clp) for row in session.scalars(select(Payment)).all())
     if revenue <= 0:
         found.append("no hay pago registrado")
@@ -379,8 +381,8 @@ def _delivered(session: Session, leads: list[Lead]) -> list[str]:
             reported = -1
     if reported != revenue or reported <= 0:
         found.append("los ingresos no están reflejados en las métricas")
-    if not any(lead.status in {"entregado", "postventa"} for lead in leads):
-        found.append("ningún lead está entregado")
+    if not any(lead.status == "en_produccion" for lead in real):
+        found.append("ningún lead quedó en producción tras el pago")
     return found
 
 

@@ -38,7 +38,16 @@ class TransactionalEmail(Protocol):
 
 
 class OutreachEmail(Protocol):
-    def send(self, message_id: str, to: str, subject: str, text: str, html: str) -> SendResult: ...
+    def send(
+        self,
+        message_id: str,
+        to: str,
+        subject: str,
+        text: str,
+        html: str,
+        *,
+        lead_id: str = "",
+    ) -> SendResult: ...
 
 
 class InboundPoller(Protocol):
