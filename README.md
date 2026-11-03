@@ -65,7 +65,7 @@ npm ci
 npm run dev
 ```
 
-El panel abre http://localhost:8080. El sitio, en `apps/site`, usa `npm run dev` de Astro. Para dejar la API arriba hace falta `create-admin` y `--mode api`, como está en el runbook.
+El panel abre http://localhost:8080/admin/. El sitio, en `apps/site`, usa `npm run dev` de Astro. Para dejar la API arriba hace falta `create-admin` y `--mode api`, como está en el runbook.
 
 ## Reglas que el código no cruza
 

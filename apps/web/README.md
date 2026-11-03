@@ -54,6 +54,6 @@ npm ci
 npm run dev
 ```
 
-Abre http://localhost:8080. Vite escucha en `0.0.0.0:8080`.
+Abre http://localhost:8080/admin/. Vite escucha en `0.0.0.0:8080` y el `base` es `/admin/`.
 
 En la misma carpeta: `npm run lint`, `npm run build`, `npm test` y `npm run e2e`. El e2e levanta la API en `127.0.0.1:8765` con una base SQLite desechable y el sitio en el puerto 4321. El pago es el falso local: no llama a Mercado Pago y no cobra.

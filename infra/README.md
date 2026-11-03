@@ -16,7 +16,7 @@ docker compose -f infra/docker-compose.yml up --build
 
 - Sitio público (marcador hasta que exista `apps/site`): http://localhost/
 - `/api`, `/webhooks`, `/demo` y `/u` se proxean a `api` (puerto interno 8000).
-- Dashboard estático: http://localhost/admin tras `npm run build` en `apps/web`. El build actual pide `/assets` en la raíz; el `base` `/admin` lo cierra A6.
+- Dashboard estático: http://localhost/admin/ tras `npm run build` en `apps/web`. El `base` es `/admin/` y Caddy quita ese prefijo antes de nginx. `/healthz` y `/readyz` van a la API. El sitio es el build de `apps/site` (`dist`), no el marcador de `site-root`.
 - Postgres 16 solo en `127.0.0.1:5432`. Usuario, clave y base de demo: `agencia`. No sirve fuera de esta máquina.
 - `/demo/*` lleva `X-Robots-Tag: noindex, nofollow`. El resto del sitio no.
 
