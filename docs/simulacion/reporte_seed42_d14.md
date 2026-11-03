@@ -17,9 +17,9 @@ Fin: 2026-03-16T00:00:00-03:00
 | agendado | 0 |
 | propuesta | 0 |
 | pagado | 0 |
-| en_produccion | 0 |
+| en_produccion | 1 |
 | en_revision_cliente | 0 |
-| entregado | 1 |
+| entregado | 0 |
 | postventa | 0 |
 | revision | 1 |
 | perdido | 1 |

@@ -13,12 +13,13 @@ from sqlalchemy.orm import Session
 
 from core.compliance import check_rules
 from core.config import reset_settings
-from db.models import Approval, Artifact, JobRun, Lead, Message, Project
+from db.models import Approval, Artifact, JobRun, Lead, LlmCall, Message, Project
 from db.repositories import LeadRepository, MessageRepository, SettingsRepository
 from db.session import create_all, reset_engine, session_scope
 from worker.clock import FakeClock
 from worker.copywriter import agency_label, checker_settings, outreach_parts
 from worker.defaults import EmptySource, GuardedOutreach, build_default_ports
+from worker.funnel import _charge_llm, _ensure_artifact
 from worker.jobs import JOBS
 from worker.maintenance import job_demo_expiry, job_postventa, job_retention
 from worker.ports import InboundMail, JobContext, SendResult
@@ -397,6 +398,26 @@ def _order(session: Session, lead: Lead) -> str:
         )
     )
     return order.id
+
+
+def test_no_inventa_costo_ni_archivo_ni_entrega(session: Session, tmp_path: Path) -> None:
+    ctx = _ctx(session, datetime(2026, 3, 3, 12, 0, tzinfo=TZ))
+    nuevo = _lead(session, status="nuevo", business="Nuevo Local")
+    assert _charge_llm(ctx, nuevo.id, "diagnoser") is True
+    assert list(session.scalars(select(LlmCall)).all()) == []
+    produccion = _lead(session, status="en_produccion", business="En obra")
+    revision = _lead(session, status="en_revision_cliente", business="En revision")
+    JOBS["pipeline_tick"](ctx)
+    assert LeadRepository(session).get(produccion.id).status == "en_produccion"  # type: ignore[union-attr]
+    assert LeadRepository(session).get(revision.id).status == "en_revision_cliente"  # type: ignore[union-attr]
+    _ensure_artifact(ctx, nuevo, "landing_demo", "output/no-existe.html")
+    assert list(session.scalars(select(Artifact)).all()) == []
+    real = tmp_path / "index.html"
+    real.write_text("<p>ok</p>", encoding="utf-8")
+    _ensure_artifact(ctx, nuevo, "landing_demo", str(real))
+    rows = list(session.scalars(select(Artifact)).all())
+    assert len(rows) == 1
+    assert rows[0].path == str(real)
 
 
 def test_place_sin_email_no_se_mapea() -> None:
