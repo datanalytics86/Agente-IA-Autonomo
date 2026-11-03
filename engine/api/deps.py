@@ -8,7 +8,6 @@ el fake local. No abre red ni cobra.
 from __future__ import annotations
 
 import hmac
-import importlib
 import secrets
 from collections.abc import Iterator, Mapping
 from typing import Annotated, Protocol
@@ -109,14 +108,13 @@ def build_payment_provider(settings: Settings) -> PaymentProvider:
     )
     if not needs_fake:
         try:
-            module = importlib.import_module("integrations.payments")
-            factory = getattr(module, "build_payment_provider", None)
+            from integrations.payments import build_payments
         except ImportError:
-            factory = None
-        if factory is not None:
-            built = factory(settings)
+            build_payments = None  # type: ignore[assignment]
+        if build_payments is not None:
+            built = build_payments(settings)
             if built is not None:
-                return built
+                return built  # type: ignore[return-value]
     return LocalPaymentProvider(settings.public_base_url)
 
 

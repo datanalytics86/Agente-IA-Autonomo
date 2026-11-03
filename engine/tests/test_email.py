@@ -46,6 +46,7 @@ def _settings(**overrides: Any) -> Settings:
     data: dict[str, Any] = {
         "app_mode": "prod",
         "dry_run": False,
+        "secret_key": "x" * 32,
         "outreach_enabled": True,
         "outreach_smtp_host": "smtp.example",
         "outreach_smtp_port": 587,

@@ -45,6 +45,7 @@ from db.models import (
     Artifact,
     DataRequest,
     Event,
+    JobRun,
     Lead,
     LeadEvent,
     LlmCall,
@@ -988,14 +989,28 @@ def agent_rows(session: Session) -> list[dict[str, Any]]:
     return rows
 
 
+_ACTION_JOBS = {
+    "scout": "scout",
+    "cycle": "pipeline_tick",
+    "followups": "followups",
+    "digest": "hitl_digest",
+}
+
+
 def enqueue_action(session: Session, name: str, email: str) -> dict[str, str]:
-    event = EventRepository(session).append(
+    job = _ACTION_JOBS.get(name)
+    if job is None:
+        raise ApiError(422, "validation_error", "acción desconocida")
+    row = JobRun(job=job, status="queued", processed=0, started_at=utcnow())
+    session.add(row)
+    session.flush()
+    EventRepository(session).append(
         agent="api",
         level="info",
         message=f"job encolado: {name}",
-        meta={"job": name, "by": email},
+        meta={"job": job, "by": email, "run_id": row.id},
     )
-    return {"id": event.id, "status": "queued"}
+    return {"id": row.id, "status": "queued"}
 
 
 def list_events(
