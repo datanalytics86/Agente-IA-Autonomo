@@ -31,6 +31,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    public_docs = None if settings.app_mode == "prod" else "/docs"
     app = FastAPI(
         title="Agencia API",
         version="0.1.0",
@@ -38,6 +39,9 @@ def create_app() -> FastAPI:
             "API de la agencia. JSON en snake_case. "
             "Los errores usan el esquema Error. Regenerada desde FastAPI."
         ),
+        docs_url=public_docs,
+        redoc_url=None if settings.app_mode == "prod" else "/redoc",
+        openapi_url=None if settings.app_mode == "prod" else "/openapi.json",
         lifespan=_lifespan,
     )
     app.add_middleware(

@@ -13,17 +13,17 @@ from sqlalchemy.orm import Session
 
 from core.compliance import check_rules
 from core.config import reset_settings
-from db.models import Approval, Artifact, Lead, LlmCall, Message, Project
+from db.models import Approval, Artifact, JobRun, Lead, LlmCall, Message, Project
 from db.repositories import LeadRepository, MessageRepository, SettingsRepository
 from db.session import create_all, reset_engine, session_scope
 from worker.clock import FakeClock
-from worker.copywriter import checker_settings, outreach_parts
-from worker.defaults import GuardedOutreach, build_default_ports
+from worker.copywriter import agency_label, checker_settings, outreach_parts
+from worker.defaults import EmptySource, GuardedOutreach, build_default_ports
 from worker.funnel import _charge_llm, _ensure_artifact
 from worker.jobs import JOBS
 from worker.maintenance import job_demo_expiry, job_postventa, job_retention
 from worker.ports import InboundMail, JobContext, SendResult
-from worker.runner import execute
+from worker.runner import drain_queued, execute
 from worker.sending import apply_inbound, job_outreach, job_warmup
 
 TZ = ZoneInfo("America/Santiago")
@@ -41,6 +41,8 @@ class MemoryOutreach:
         subject: str,
         text: str,
         html: str,
+        *,
+        lead_id: str = "",
     ) -> SendResult:
         self.sent.append(to)
         return SendResult(status=self.outcome, provider_message_id=f"m-{message_id}")
@@ -59,6 +61,7 @@ def _caches() -> object:
 def session(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> object:
     url = f"sqlite:///{(tmp_path / 'jobs.db').as_posix()}"
     monkeypatch.setenv("DATABASE_URL", url)
+    monkeypatch.setenv("AGENCY_NAME", "Agencia Andina")
     reset_settings()
     reset_engine()
     create_all()
@@ -134,7 +137,28 @@ def _ctx(session: Session, moment: datetime, outreach: object | None = None) -> 
     )
 
 
-def test_borrador_pasa_el_checker() -> None:
+def test_sin_nombre_no_inventa_agencia(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("AGENCY_NAME", raising=False)
+    reset_settings()
+    assert agency_label() == ""
+    subject, text, body = outreach_parts(business="Café Andes", commune="Ñuñoa", step=1)
+    result = check_rules(
+        {
+            "body": text,
+            "body_html": body,
+            "channel": "email_outreach",
+            "subject": subject,
+            "direction": "out",
+        },
+        {"business": "Café Andes"},
+        checker_settings(),
+    )
+    assert result.approved is False
+
+
+def test_borrador_pasa_el_checker(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENCY_NAME", "Agencia Andina")
+    reset_settings()
     subject, text, body = outreach_parts(business="Café Andes", commune="Ñuñoa", step=2)
     result = check_rules(
         {
@@ -396,6 +420,78 @@ def test_no_inventa_costo_ni_archivo_ni_entrega(session: Session, tmp_path: Path
     assert rows[0].path == str(real)
 
 
+def test_place_sin_email_no_se_mapea() -> None:
+    from worker.defaults import place_from_source
+
+    class Hit:
+        place_id = "abc"
+        name = "Café Sin Mail"
+        formatted_address = "Av 1"
+        business_status = "OPERATIONAL"
+        rating = 4.9
+        user_rating_count = 40
+        website_uri = None
+        national_phone_number = "+56911111111"
+
+    assert place_from_source(Hit(), commune="Ñuñoa", category="cafeteria") is None
+
+
+def test_place_incompleto_no_crea_lead(session: Session) -> None:
+    from worker.defaults import _PlacesBridge
+    from worker.funnel import job_scout
+
+    class Hit:
+        place_id = "abc"
+        name = "Café Sin Mail"
+        formatted_address = "Av 1"
+        business_status = "OPERATIONAL"
+        rating = 4.9
+        user_rating_count = 40
+
+    class Source:
+        def search(self, commune: str, category_slug: str, limit: int) -> list[Hit]:
+            return [Hit()]
+
+    ctx = _ctx(session, datetime(2026, 3, 3, 9, 0, tzinfo=TZ))
+    ctx.ports.places = _PlacesBridge(Source())  # type: ignore[assignment]
+    assert job_scout(ctx) == 0
+    assert LeadRepository(session).list(limit=20) == []
+
+
+def test_prod_con_credencial_usa_adaptadores_reales(monkeypatch: pytest.MonkeyPatch) -> None:
+    from worker.defaults import _PlacesBridge, _SmtpBridge, build_default_ports
+
+    monkeypatch.setenv("APP_MODE", "prod")
+    monkeypatch.setenv("SECRET_KEY", "x" * 32)
+    monkeypatch.setenv("DRY_RUN", "false")
+    monkeypatch.setenv("OUTREACH_ENABLED", "true")
+    monkeypatch.setenv("GOOGLE_PLACES_API_KEY", "dummy-places")
+    monkeypatch.setenv("OUTREACH_SMTP_HOST", "smtp.example")
+    monkeypatch.setenv("OUTREACH_SMTP_USER", "user")
+    monkeypatch.setenv("OUTREACH_SMTP_PASSWORD", "secret")
+    reset_settings()
+    ports = build_default_ports()
+    assert isinstance(ports.places, _PlacesBridge)
+    assert isinstance(ports.outreach, _SmtpBridge)
+    monkeypatch.setenv("APP_MODE", "demo")
+    monkeypatch.setenv("DRY_RUN", "true")
+    reset_settings()
+    demo = build_default_ports()
+    assert isinstance(demo.places, EmptySource)
+    assert isinstance(demo.outreach, GuardedOutreach)
+
+
 def test_guarded_outreach_no_declara_envio() -> None:
     result = GuardedOutreach().send("1", "a@b.cl", "s", "t", "<p>t</p>")
     assert result.status == "blocked"
+
+
+def test_drain_queued_corre_el_job(session: Session) -> None:
+    row = JobRun(job="metrics_rollup", status="queued", processed=0)
+    session.add(row)
+    session.flush()
+    ctx = _ctx(session, datetime(2026, 3, 3, 12, 0, tzinfo=TZ))
+    assert drain_queued(ctx) == 1
+    stored = session.get(JobRun, row.id)
+    assert stored is not None
+    assert stored.status == "ok"
