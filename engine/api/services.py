@@ -45,6 +45,7 @@ from db.models import (
     Artifact,
     DataRequest,
     Event,
+    JobRun,
     Lead,
     LeadEvent,
     LlmCall,
@@ -54,6 +55,7 @@ from db.models import (
     Project,
     Suppression,
     WebhookEvent,
+    new_id,
     utcnow,
 )
 from db.normalize import CONTACT_KINDS, normalize_contact
@@ -244,6 +246,14 @@ def _send_diagnostico_mail(session: Session, lead: Lead, email: str) -> None:
         kind="diagnostico",
     )
     sent = result.status == "sent"
+    provider_message_id = None
+    if sent:
+        provider_message_id = result.provider_message_id or new_id()
+        taken = session.scalar(
+            select(Message.id).where(Message.provider_message_id == provider_message_id)
+        )
+        if taken is not None:
+            provider_message_id = new_id()
     session.add(
         Message(
             lead_id=lead.id,
@@ -254,7 +264,7 @@ def _send_diagnostico_mail(session: Session, lead: Lead, email: str) -> None:
             subject=subject,
             body_text=text,
             body_html=body,
-            provider_message_id=f"tx-{lead.id}" if sent else None,
+            provider_message_id=provider_message_id,
             sent_at=datetime.now(UTC) if sent else None,
         )
     )
@@ -424,10 +434,6 @@ def apply_baja(session: Session, token: str) -> dict[str, bool]:
     repo = SuppressionRepository(session)
     if lead.contact_email:
         repo.add("email", lead.contact_email, reason="baja", source="unsubscribe")
-        if "@" in lead.contact_email:
-            domain = lead.contact_email.split("@", 1)[1]
-            if domain:
-                repo.add("domain", domain, reason="baja", source="unsubscribe")
     if "opt_out" in TRANSITIONS.get(lead.status, frozenset()):
         transition_lead(session, lead, "opt_out", actor="sistema", reason="baja solicitada")
     EventRepository(session).append(
@@ -992,14 +998,28 @@ def agent_rows(session: Session) -> list[dict[str, Any]]:
     return rows
 
 
+_ACTION_JOBS = {
+    "scout": "scout",
+    "cycle": "pipeline_tick",
+    "followups": "followups",
+    "digest": "hitl_digest",
+}
+
+
 def enqueue_action(session: Session, name: str, email: str) -> dict[str, str]:
-    event = EventRepository(session).append(
+    job = _ACTION_JOBS.get(name)
+    if job is None:
+        raise ApiError(422, "validation_error", "acción desconocida")
+    row = JobRun(job=job, status="queued", processed=0, started_at=utcnow())
+    session.add(row)
+    session.flush()
+    EventRepository(session).append(
         agent="api",
         level="info",
         message=f"job encolado: {name}",
-        meta={"job": name, "by": email},
+        meta={"job": job, "by": email, "run_id": row.id},
     )
-    return {"id": event.id, "status": "queued"}
+    return {"id": row.id, "status": "queued"}
 
 
 def list_events(
