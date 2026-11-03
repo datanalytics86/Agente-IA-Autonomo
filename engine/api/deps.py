@@ -198,16 +198,16 @@ def clear_auth_cookies(response: Response) -> None:
     response.delete_cookie(CSRF_COOKIE, path="/", samesite="lax", secure=secure, httponly=False)
 
 
-def authenticate(session: Session, email: str, password: str, ip: str) -> User:
-    if login_blocked(ip):
+def authenticate(session: Session, email: str, password: str, bucket: str) -> User:
+    if login_blocked(bucket):
         raise ApiError(429, "rate_limited", "demasiados intentos; espera 15 minutos")
     user = session.scalar(select(User).where(User.email == email))
     if user is None:
         burn_password_check(password)
-        record_login_failure(ip)
+        record_login_failure(bucket)
         raise ApiError(401, "invalid_credentials", "credenciales inválidas")
     if not verify_password(password, user.password_hash):
-        record_login_failure(ip)
+        record_login_failure(bucket)
         raise ApiError(401, "invalid_credentials", "credenciales inválidas")
-    clear_login_failures(ip)
+    clear_login_failures(bucket)
     return user
