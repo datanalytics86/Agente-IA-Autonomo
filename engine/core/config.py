@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     admin_email: str = ""
     admin_password_hash: str = ""
     public_base_url: str = "http://localhost"
-    admin_base_url: str = "http://localhost:8080"
+    admin_base_url: str = "http://localhost:8080/admin"
     cors_origins: str = "http://localhost:8080,http://localhost:4321"
 
     agency_name: str = ""

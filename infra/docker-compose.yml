@@ -74,7 +74,7 @@ services:
       - "80:80"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./site-root:/srv/site:ro
+      - ../apps/site/dist:/srv/site:ro
       - caddy_data:/data
       - caddy_config:/config
 

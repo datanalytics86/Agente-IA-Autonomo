@@ -27,7 +27,7 @@ Todo umbral vive aquí y puede taparse en runtime con `settings_kv` (kill switch
 | ADMIN_EMAIL | vacío |
 | ADMIN_PASSWORD_HASH | vacío (argon2). Lo escribe `--mode create-admin` |
 | PUBLIC_BASE_URL | `http://localhost` |
-| ADMIN_BASE_URL | `http://localhost:8080` |
+| ADMIN_BASE_URL | `http://localhost:8080/admin` |
 | CORS_ORIGINS | `http://localhost:8080,http://localhost:4321` |
 
 ### Agencia

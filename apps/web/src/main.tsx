@@ -6,8 +6,11 @@ import { isUnauthorized } from './api/http'
 import { routeTree } from './routeTree.gen'
 import './index.css'
 
+const basepath = import.meta.env.BASE_URL.replace(/\/$/, '') || '/'
+
 const router = createRouter({
   routeTree,
+  basepath,
   defaultPreload: 'intent',
 })
 
