@@ -149,6 +149,14 @@ def test_fetch_pendiente_no_queda_approved(respx_mock: Any) -> None:
     assert fact.provider_payment_id == "42"
 
 
+def test_la_api_en_prod_usa_mercado_pago() -> None:
+    from api.deps import LocalPaymentProvider, build_payment_provider
+
+    assert isinstance(build_payment_provider(_settings()), MercadoPagoProvider)
+    demo = build_payment_provider(_settings(app_mode="demo"))
+    assert isinstance(demo, LocalPaymentProvider)
+
+
 def test_dry_run_no_llama_a_mercado_pago(respx_mock: Any) -> None:
     route = respx_mock.route().respond(200, json={"id": "x"})
     provider = MercadoPagoProvider(_settings(dry_run=True))
