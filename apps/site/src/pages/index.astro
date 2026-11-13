@@ -37,7 +37,7 @@ const steps = [
     </p>
     <div class="mt-8 flex flex-wrap gap-3">
       <a
-        class="inline-flex rounded-full bg-accent px-5 py-3 text-sm font-semibold text-surface hover:bg-accent-soft"
+        class="inline-flex min-h-[44px] items-center rounded-full bg-accent px-5 py-3 text-sm font-semibold text-surface hover:bg-accent-soft"
         href="/diagnostico-gratis"
       >
         Pedir diagnóstico gratis
@@ -87,7 +87,7 @@ const steps = [
               ))}
             </ul>
             <a
-              class="mt-5 inline-flex justify-center rounded-full border border-white/15 px-4 py-2 text-sm font-semibold hover:border-accent"
+              class="mt-5 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-white/15 px-4 py-2 text-sm font-semibold hover:border-accent"
               href={`/checkout/${item.code}`}
             >
               {item.priceClp === null ? 'Pedir cotización' : 'Ir al checkout'}
@@ -173,7 +173,7 @@ const steps = [
       Pide el informe o mira si la agenda ya está configurada. Ninguno de los dos cobra.
     </p>
     <div class="mt-5 flex flex-wrap gap-3">
-      <a class="inline-flex rounded-full bg-accent px-5 py-3 text-sm font-semibold text-surface" href="/diagnostico-gratis">
+      <a class="inline-flex min-h-[44px] items-center rounded-full bg-accent px-5 py-3 text-sm font-semibold text-surface" href="/diagnostico-gratis">
         Pedir diagnóstico gratis
       </a>
       <a class="inline-flex rounded-full border border-white/20 px-5 py-3 text-sm font-semibold" href="/agendar">
