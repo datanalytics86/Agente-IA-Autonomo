@@ -174,3 +174,17 @@ jobs:
               sys.exit(1)
           print("openapi ok:", ", ".join(required))
           PY
+
+  deploy-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: actionlint
+        run: |
+          set -euo pipefail
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+
+      - name: Guard de ALLOW_LIVE
+        run: bash infra/scripts/test-deploy-guard.sh

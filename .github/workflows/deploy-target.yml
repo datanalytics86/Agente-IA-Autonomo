@@ -1,0 +1,79 @@
+# Reusable. También queda skipped si vars.DEPLOY_ENABLED no es 'true'.
+# checkout v4.4.0.
+
+name: deploy-target
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        type: string
+        required: true
+      image_tag:
+        type: string
+        required: true
+      backup_first:
+        type: boolean
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: deploy-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    environment:
+      name: ${{ inputs.target }}
+      url: ${{ vars.PUBLIC_URL }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.image_tag }}
+          sparse-checkout: |
+            infra/docker-compose.prod.yml
+            infra/Caddyfile.prod
+            infra/scripts/deploy-guard.sh
+            infra/scripts/deploy-remote.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Preparar SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'TARGET=%s@%s\n' "$SSH_USER" "$SSH_HOST" >> "$GITHUB_ENV"
+
+      - name: Subir compose, Caddyfile y scripts
+        run: |
+          set -euo pipefail
+          ssh "$TARGET" "mkdir -p /opt/agencia/releases/${{ inputs.image_tag }}"
+          scp infra/docker-compose.prod.yml infra/Caddyfile.prod \
+            "$TARGET:/opt/agencia/releases/${{ inputs.image_tag }}/"
+          scp infra/scripts/deploy-guard.sh infra/scripts/deploy-remote.sh \
+            "$TARGET:/opt/agencia/"
+
+      - name: Deploy
+        env:
+          ALLOW_LIVE: ${{ vars.ALLOW_LIVE || 'false' }}
+          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+        run: |
+          set -euo pipefail
+          ssh "$TARGET" bash /opt/agencia/deploy-remote.sh \
+            "${{ inputs.image_tag }}" \
+            "${{ inputs.backup_first }}" \
+            "$ALLOW_LIVE" \
+            "$PUBLIC_URL"
