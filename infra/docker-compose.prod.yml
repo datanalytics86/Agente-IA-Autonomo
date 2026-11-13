@@ -1,7 +1,9 @@
 # Override de producción. Junto al compose base:
-#   IMAGE_TAG=... POSTGRES_PASSWORD=... \
+#   IMAGE_TAG=... POSTGRES_PASSWORD=... APP_MODE=... PUBLIC_BASE_URL=... \
 #   docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml up -d
 #
+# POSTGRES_PASSWORD tiene que ser hexadecimal, sin @, : ni /.
+# DATABASE_URL no la codifica: un carácter de esos parte la URL.
 # engine_output persiste landings y sitios. En la imagen el motor está en /app.
 # CLIENT_SITES_DIR queda absoluto porque el default relativo cae fuera de /app.
 # Caddy ve el volumen en /srv/output, solo lectura.
@@ -24,6 +26,8 @@ services:
     build: !reset null
     image: ghcr.io/datanalytics86/agente-ia-autonomo-engine:${IMAGE_TAG:?}
     environment:
+      APP_MODE: ${APP_MODE:?}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?}
       AGENCY_OUTPUT_DIR: /app/output
       CLIENT_SITES_DIR: /app/output/clients
       DATABASE_URL: postgresql://agencia:${POSTGRES_PASSWORD:?}@db:5432/agencia
@@ -39,6 +43,8 @@ services:
     build: !reset null
     image: ghcr.io/datanalytics86/agente-ia-autonomo-engine:${IMAGE_TAG:?}
     environment:
+      APP_MODE: ${APP_MODE:?}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?}
       AGENCY_OUTPUT_DIR: /app/output
       CLIENT_SITES_DIR: /app/output/clients
       DATABASE_URL: postgresql://agencia:${POSTGRES_PASSWORD:?}@db:5432/agencia
