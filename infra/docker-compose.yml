@@ -12,6 +12,8 @@ x-engine-env: &engine-env
   TZ: ${TZ:-America/Santiago}
   PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost}
   ADMIN_BASE_URL: ${ADMIN_BASE_URL:-http://localhost/admin}
+  # FORWARDED_ALLOW_IPS no va aquí: environment pisa al env_file.
+  # El default está en infra/compose.defaults.env y el .env de la raíz lo tapa.
 
 services:
   db:
@@ -38,6 +40,8 @@ services:
     # Alias, no merge key: Compose v2 (Go) no siempre acepta `<<`.
     environment: *engine-env
     env_file:
+      - path: compose.defaults.env
+        required: true
       - path: ../.env
         required: false
     depends_on:
@@ -52,6 +56,8 @@ services:
       dockerfile: infra/Dockerfile.engine
     environment: *engine-env
     env_file:
+      - path: compose.defaults.env
+        required: true
       - path: ../.env
         required: false
     # El Dockerfile documenta el CMD de la api. El worker lo sustituye.
@@ -67,6 +73,9 @@ services:
 
   caddy:
     image: caddy:2
+    networks:
+      default:
+        ipv4_address: 172.30.210.10
     depends_on:
       - api
       - web
@@ -80,6 +89,15 @@ services:
       - ../apps/site/dist:/srv/site:ro
       - caddy_data:/data
       - caddy_config:/config
+
+networks:
+  default:
+    # 172.30.210.0/24 puede chocar con una VPN u otro Compose del mismo host.
+    # Si el up falla al crear la red, cambia la ipam y FORWARDED_ALLOW_IPS
+    # en el .env de la raíz (pisa a infra/compose.defaults.env).
+    ipam:
+      config:
+        - subnet: 172.30.210.0/24
 
 volumes:
   pgdata:

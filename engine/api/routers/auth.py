@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Request, Response
 
-from api.deps import Db, apply_auth_cookies, authenticate
+from api.deps import Db, apply_auth_cookies, authenticate, client_ip
 from api.schemas import LoginIn, UserOut
 from db.models import utcnow
 
@@ -12,12 +12,12 @@ router = APIRouter(tags=["admin"])
 
 
 @router.post("/api/auth/login", response_model=UserOut)
-def login(payload: LoginIn, response: Response, session: Db) -> UserOut:
+def login(payload: LoginIn, request: Request, response: Response, session: Db) -> UserOut:
     user = authenticate(
         session,
         payload.email,
         payload.password,
-        payload.email.strip().lower(),
+        client_ip(request),
     )
     user.last_login_at = utcnow()
     session.add(user)
