@@ -1,0 +1,22 @@
+# Sitio y panel estáticos detrás de Caddy. El TLS real lo pide Caddyfile.prod (ACME).
+FROM node:22-bookworm-slim AS web
+
+WORKDIR /src
+COPY apps/web/package.json apps/web/package-lock.json ./
+RUN npm ci
+COPY apps/web/ ./
+RUN npm run build
+
+FROM node:22-bookworm-slim AS site
+
+WORKDIR /src
+COPY apps/site/package.json apps/site/package-lock.json ./
+RUN npm ci
+COPY apps/site/ ./
+RUN npm run build
+
+FROM caddy:2
+
+COPY infra/Caddyfile.prod /etc/caddy/Caddyfile
+COPY --from=site /src/dist /srv/site
+COPY --from=web /src/dist /srv/admin

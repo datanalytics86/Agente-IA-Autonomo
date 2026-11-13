@@ -23,7 +23,20 @@ services:
     volumes:
       - engine_output:/app/output
 
+  web:
+    profiles: ["sin-edge"]
+
   caddy:
+    image: ghcr.io/datanalytics86/agente-ia-autonomo-edge:${IMAGE_TAG:?}
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?}
+      SITE_ADDRESS: ${SITE_ADDRESS:?}
+      SITE_DOMAIN: ${SITE_DOMAIN:?}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?}
+    ports: !override
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
     volumes:
       - engine_output:/srv/output:ro
 

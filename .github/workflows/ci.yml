@@ -231,3 +231,25 @@ jobs:
             -w /work \
             postgres:16 \
             infra/scripts/ci-restore-probe.sh
+
+  edge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validar Caddyfile.prod
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -e ACME_EMAIL=ci@example.com \
+            -e SITE_ADDRESS=http://127.0.0.1:8088 \
+            -e SITE_DOMAIN=example.test \
+            -e PUBLIC_ORIGIN=http://127.0.0.1:8088 \
+            -v "$PWD/infra/Caddyfile.prod:/etc/caddy/Caddyfile:ro" \
+            caddy:2 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
+      - name: Construir la imagen edge sin publicarla
+        run: docker build -f infra/Dockerfile.edge -t agencia-edge:ci .
+
+      - name: Smoke de /, /admin/, /healthz y /readyz
+        run: bash infra/scripts/test-edge-smoke.sh
