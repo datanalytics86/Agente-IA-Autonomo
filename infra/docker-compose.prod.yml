@@ -1,0 +1,54 @@
+# Override de producción. Junto al compose base:
+#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml up -d
+#
+# engine_output persiste landings, storyboards y sitios de cliente.
+# En la imagen el motor vive en /app (agents/runtime.py → /app/output).
+# CLIENT_SITES_DIR por defecto es relativo a la raíz del repo; dentro del
+# contenedor eso cae fuera de /app, así que aquí queda absoluto y dentro
+# del volumen. Caddy lo ve en /srv/output (solo lectura). El perfil backup
+# lo archiva con tar junto al dump de Postgres.
+
+services:
+  api:
+    environment:
+      AGENCY_OUTPUT_DIR: /app/output
+      CLIENT_SITES_DIR: /app/output/clients
+    volumes:
+      - engine_output:/app/output
+
+  worker:
+    environment:
+      AGENCY_OUTPUT_DIR: /app/output
+      CLIENT_SITES_DIR: /app/output/clients
+    volumes:
+      - engine_output:/app/output
+
+  caddy:
+    volumes:
+      - engine_output:/srv/output:ro
+
+  backup:
+    image: postgres:16
+    profiles: ["backup"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER:-agencia}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?}
+      PGDATABASE: ${POSTGRES_DB:-agencia}
+      ENGINE_OUTPUT_DIR: /engine-output
+      BACKUP_DIR: /backups
+    volumes:
+      - engine_output:/engine-output:ro
+      - ./scripts/backup.sh:/opt/backup.sh:ro
+      - backups:/backups
+    entrypoint: ["bash", "/opt/backup.sh", "/backups"]
+    restart: "no"
+
+volumes:
+  engine_output:
+    name: engine_output
+  backups:

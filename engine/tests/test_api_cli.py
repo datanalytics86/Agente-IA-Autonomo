@@ -58,3 +58,14 @@ def test_ejemplo_no_guarda_admin_password() -> None:
     for relative in (".env.example", "engine/.env.example"):
         text = (_ROOT / relative).read_text(encoding="utf-8")
         assert "ADMIN_PASSWORD=" not in text
+
+
+def test_uvicorn_solo_confia_en_proxies_listados(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FORWARDED_ALLOW_IPS", "172.30.210.10")
+    reset_settings()
+    from api.cli import proxy_headers_options
+
+    assert proxy_headers_options() == {
+        "proxy_headers": True,
+        "forwarded_allow_ips": "172.30.210.10",
+    }
