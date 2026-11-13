@@ -23,8 +23,29 @@ services:
     volumes:
       - engine_output:/app/output
 
+  web:
+    profiles: ["sin-edge"]
+
   caddy:
-    volumes:
+    image: ghcr.io/datanalytics86/agente-ia-autonomo-edge:${IMAGE_TAG:?}
+    # !reset deja el campo en cero y pierde la lista. !override reemplaza [api, web].
+    depends_on: !override
+      - api
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?}
+      SITE_ADDRESS: ${SITE_ADDRESS:?}
+      SITE_DOMAIN: ${SITE_DOMAIN:?}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?}
+      EDGE_AUTH: ${EDGE_AUTH:-noauth}
+      STAGING_USER: ${STAGING_USER:-}
+      STAGING_HASH: ${STAGING_HASH:-}
+    ports: !override
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes: !override
+      - caddy_data:/data
+      - caddy_config:/config
       - engine_output:/srv/output:ro
 
   backup:
