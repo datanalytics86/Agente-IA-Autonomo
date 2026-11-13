@@ -50,7 +50,9 @@ tar -tf "$archive" | grep -q 'demo/index.html'
 compose="$root/infra/docker-compose.prod.yml"
 grep -q 'name: engine_output' "$compose"
 grep -q 'engine_output:/app/output' "$compose"
+grep -q 'engine_output:/srv/output:ro' "$compose"
 grep -q 'engine_output:/engine-output:ro' "$compose"
 grep -q 'AGENCY_OUTPUT_DIR: /app/output' "$compose"
+grep -q 'CLIENT_SITES_DIR: /app/output/clients' "$compose"
 
 echo "backup output ok"
