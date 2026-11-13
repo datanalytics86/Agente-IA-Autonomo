@@ -7,6 +7,7 @@ import hmac
 import json
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -17,6 +18,7 @@ from sqlalchemy import func, select
 
 from api.app import create_app
 from api.deps import LocalPaymentProvider, PaymentFact
+from api.routers.internal import reset_domain_checks
 from api.security import hash_password, mercadopago_signature, reset_login_attempts
 from core.config import reset_settings
 from core.states import transition
@@ -117,6 +119,7 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> Any:
     reset_settings()
     reset_engine()
     reset_login_attempts()
+    reset_domain_checks()
     app = create_app()
     with TestClient(app) as test_client:
         with session_scope() as session:
@@ -126,6 +129,7 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> Any:
     reset_engine()
     reset_settings()
     reset_login_attempts()
+    reset_domain_checks()
 
 
 def _diag(**overrides: Any) -> dict[str, Any]:
@@ -222,6 +226,7 @@ def test_ip_privada_no_abre_domain_check(monkeypatch: pytest.MonkeyPatch) -> Non
     from api.routers.internal import client_may_check
 
     monkeypatch.delenv("INTERNAL_CHECK_TOKEN", raising=False)
+    monkeypatch.delenv("INTERNAL_CHECK_NETS", raising=False)
     reset_settings()
     assert client_may_check("10.1.2.3", "") is False
     assert client_may_check("127.0.0.1", "") is True
@@ -229,7 +234,70 @@ def test_ip_privada_no_abre_domain_check(monkeypatch: pytest.MonkeyPatch) -> Non
     reset_settings()
     assert client_may_check("10.1.2.3", "token-interno") is True
     assert client_may_check("10.1.2.3", "otro") is False
+    monkeypatch.setenv("INTERNAL_CHECK_NETS", "172.28.10.0/24")
     reset_settings()
+    assert client_may_check("172.28.10.10", "") is True
+    assert client_may_check("203.0.113.5", "") is False
+    reset_settings()
+
+
+def test_domain_check_no_es_publico_y_tiene_limite(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("INTERNAL_CHECK_TOKEN", "token-interno")
+    monkeypatch.setenv("INTERNAL_CHECK_PER_MINUTE", "2")
+    monkeypatch.delenv("INTERNAL_CHECK_NETS", raising=False)
+    reset_settings()
+    reset_domain_checks()
+    with session_scope() as session:
+        lead = _lead(session, business="Cliente Sur")
+        order = Order(
+            lead_id=lead.id,
+            package_code="landing_esencial",
+            amount_clp=250_000,
+            iva_clp=0,
+            total_clp=250_000,
+            deposit_percent=50,
+            status="paid",
+        )
+        session.add(order)
+        session.flush()
+        session.add(
+            Project(
+                order_id=order.id,
+                lead_id=lead.id,
+                status="publicado",
+                max_revisions=1,
+                domain="cliente.cl",
+            )
+        )
+    with TestClient(client.app, client=("203.0.113.9", 50000)) as public:
+        spoofed = public.get(
+            "/api/internal/domain-check",
+            params={"domain": "cliente.cl"},
+            headers={"x-forwarded-for": "127.0.0.1"},
+        )
+        assert spoofed.status_code == 404
+        allowed = public.get(
+            "/api/internal/domain-check",
+            params={"domain": "cliente.cl"},
+            headers={"x-internal-token": "token-interno"},
+        )
+        assert allowed.status_code == 200, allowed.text
+        assert allowed.json() == {"allowed": True}
+        limited = public.get(
+            "/api/internal/domain-check",
+            params={"domain": "cliente.cl"},
+            headers={"x-internal-token": "token-interno"},
+        )
+        assert limited.status_code == 429
+        assert limited.json()["error"]["code"] == "rate_limited"
+    caddy_path = Path(__file__).resolve().parents[2] / "infra" / "Caddyfile"
+    caddy = caddy_path.read_text(encoding="utf-8")
+    assert caddy.index("@internal") < caddy.index("@api")
+    assert "respond 404" in caddy[caddy.index("@internal") : caddy.index("@api")]
+    reset_settings()
+    reset_domain_checks()
 
 
 def test_prod_oculta_docs(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:

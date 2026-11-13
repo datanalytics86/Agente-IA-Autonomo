@@ -26,6 +26,13 @@
 		reverse_proxy api:8000
 	}
 
+	# No se publica. Caddy llama a http://api:8000/api/internal/domain-check
+	# por la red de Compose (on-demand TLS). El sitio :80 responde 404.
+	@internal path /api/internal /api/internal/*
+	handle @internal {
+		respond 404
+	}
+
 	@api path /api /api/*
 	handle @api {
 		reverse_proxy api:8000

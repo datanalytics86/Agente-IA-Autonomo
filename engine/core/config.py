@@ -155,6 +155,8 @@ class Settings(BaseSettings):
     turnstile_site_key: str = ""
     turnstile_secret_key: str = ""
     internal_check_token: str = ""
+    internal_check_nets: str = ""
+    internal_check_per_minute: int = 60
     sentry_dsn: str = ""
 
     hosting_provider: Literal["caddy", "cloudflare_pages"] = "caddy"

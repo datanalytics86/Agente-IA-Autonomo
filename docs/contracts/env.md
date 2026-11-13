@@ -30,6 +30,8 @@ Todo umbral vive aquí y puede taparse en runtime con `settings_kv` (kill switch
 | ADMIN_BASE_URL | `http://localhost:8080/admin` |
 | CORS_ORIGINS | `http://localhost:8080,http://localhost:4321` |
 
+`INTERNAL_CHECK_NETS` vacío: una IP privada no abre `/api/internal/domain-check`. En Compose el default del servicio es `172.16.0.0/12,10.0.0.0/8` para que Caddy pregunte por la red interna. `INTERNAL_CHECK_TOKEN` es la otra vía. `INTERNAL_CHECK_PER_MINUTE` default 60. El header `X-Forwarded-For` no autoriza.
+
 ### Agencia
 
 `AGENCY_NAME`, `AGENCY_LEGAL_NAME`, `AGENCY_RUT`, `AGENCY_EMAIL`, `AGENCY_ADDRESS`. Todas vacías. La UI muestra el placeholder «completa los datos de la agencia». Prohibido inventar nombre, RUT o dirección.

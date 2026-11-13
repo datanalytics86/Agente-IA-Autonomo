@@ -12,6 +12,8 @@ x-engine-env: &engine-env
   TZ: ${TZ:-America/Santiago}
   PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost}
   ADMIN_BASE_URL: ${ADMIN_BASE_URL:-http://localhost/admin}
+  # Caddy (red Docker) puede llamar domain-check. Una IP privada no alcanza si esto está vacío.
+  INTERNAL_CHECK_NETS: ${INTERNAL_CHECK_NETS:-172.16.0.0/12,10.0.0.0/8}
 
 services:
   db:
