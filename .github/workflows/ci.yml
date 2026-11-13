@@ -174,3 +174,18 @@ jobs:
               sys.exit(1)
           print("openapi ok:", ", ".join(required))
           PY
+
+  bootstrap-host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          shellcheck infra/scripts/bootstrap-host.sh infra/scripts/test-bootstrap-host.sh
+
+      - name: iptables falso
+        run: bash infra/scripts/test-bootstrap-host.sh

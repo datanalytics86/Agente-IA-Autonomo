@@ -102,3 +102,7 @@ Copia de seguridad: `infra/scripts/backup.ps1` o `backup.sh`. Conservan 14 archi
 ## Producción
 
 Seguir `docs/GO_LIVE.md`. No completar nombre, RUT ni dirección en el código: van por entorno cuando el dueño los tenga. No hay envíos reales ni cobros reales en este runbook.
+
+## Host nuevo
+
+`infra/scripts/bootstrap-host.sh --check-only` verifica Debian 12 o Ubuntu 24.04 y que iptables no mezcle nft con legacy. Si hay reglas en legacy, `-P FORWARD DROP` en legacy, o dockerd usa otro backend, el script sale con error y no cambia el host. Sin `--check-only` crea el usuario `deploy`, `/opt/agencia` y, si falta, Docker CE desde el repo oficial. No lo corras en una máquina que no sea el VPS.
