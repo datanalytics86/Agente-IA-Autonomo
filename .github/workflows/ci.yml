@@ -174,3 +174,40 @@ jobs:
               sys.exit(1)
           print("openapi ok:", ", ".join(required))
           PY
+
+  postgres-restore:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: agencia
+          POSTGRES_PASSWORD: agencia
+          POSTGRES_DB: agencia
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agencia -d agencia"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cliente de Postgres
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Dump, restore y conteos
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: agencia
+          PGPASSWORD: agencia
+          PGDATABASE: agencia
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -c "CREATE TABLE probe (id int primary key, note text);"
+          psql -v ON_ERROR_STOP=1 -c "INSERT INTO probe (id, note) VALUES (1, 'uno'), (2, 'dos');"
+          bash infra/scripts/restore-check.sh | tee /tmp/restore.out
+          grep -qx 'ok' /tmp/restore.out
+          test "$(psql -At -c 'SELECT count(*) FROM probe')" = "2"
