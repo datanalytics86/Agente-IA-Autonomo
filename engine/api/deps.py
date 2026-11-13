@@ -8,6 +8,7 @@ el fake local. No abre red ni cobra.
 from __future__ import annotations
 
 import hmac
+import ipaddress
 import secrets
 from collections.abc import Iterator, Mapping
 from typing import Annotated, Protocol
@@ -137,10 +138,74 @@ def get_payment_provider(request: Request) -> PaymentProvider:
 Payments = Annotated[PaymentProvider, Depends(get_payment_provider)]
 
 
-def client_ip(request: Request) -> str:
-    if request.client is None or not request.client.host:
+def _forwarded_items() -> list[str]:
+    return [part.strip() for part in get_settings().forwarded_allow_ips.split(",") if part.strip()]
+
+
+def _peer_trusted(host: str) -> bool:
+    items = _forwarded_items()
+    if "*" in items:
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return host in items
+    for item in items:
+        if "/" in item:
+            try:
+                network = ipaddress.ip_network(item, strict=False)
+            except ValueError:
+                continue
+            if address in network:
+                return True
+            continue
+        try:
+            if address == ipaddress.ip_address(item):
+                return True
+        except ValueError:
+            if host == item:
+                return True
+    return False
+
+
+def _host_only(value: str) -> str:
+    raw = value.strip()
+    if raw.startswith("["):
+        end = raw.find("]")
+        if end != -1:
+            return raw[1:end]
+        return raw
+    if raw.count(":") == 1:
+        host, port = raw.rsplit(":", 1)
+        if port.isdigit():
+            return host
+    return raw
+
+
+def client_address(peer: str, forwarded: str | None) -> str:
+    """IP del cliente. X-Forwarded-For solo si el par TCP es un proxy de la lista."""
+    current = (peer or "").strip()
+    if current == "":
         return "unknown"
-    return request.client.host
+    if not _peer_trusted(current):
+        return current
+    chain = [part.strip() for part in (forwarded or "").split(",") if part.strip()]
+    if not chain:
+        return current
+    if "*" in _forwarded_items():
+        return _host_only(chain[0]) or current
+    for item in reversed(chain):
+        host = _host_only(item)
+        if host and not _peer_trusted(host):
+            return host
+    return _host_only(chain[0]) or current
+
+
+def client_ip(request: Request) -> str:
+    peer = ""
+    if request.client is not None and request.client.host:
+        peer = request.client.host
+    return client_address(peer, request.headers.get("x-forwarded-for"))
 
 
 def require_user(request: Request, session: Db) -> User:

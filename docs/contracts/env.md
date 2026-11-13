@@ -30,6 +30,8 @@ Todo umbral vive aquí y puede taparse en runtime con `settings_kv` (kill switch
 | ADMIN_BASE_URL | `http://localhost:8080/admin` |
 | CORS_ORIGINS | `http://localhost:8080,http://localhost:4321` |
 
+`FORWARDED_ALLOW_IPS` default `127.0.0.1`. Es la lista de proxies (IP o CIDR) que pueden fijar `X-Forwarded-For`. Un cliente que llega directo no puede cambiar el cubo del rate limit con ese header. En Compose la IP es la de Caddy (`172.30.210.10`).
+
 ### Agencia
 
 `AGENCY_NAME`, `AGENCY_LEGAL_NAME`, `AGENCY_RUT`, `AGENCY_EMAIL`, `AGENCY_ADDRESS`. Todas vacías. La UI muestra el placeholder «completa los datos de la agencia». Prohibido inventar nombre, RUT o dirección.

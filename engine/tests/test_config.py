@@ -66,6 +66,7 @@ def test_defaults_sin_entorno(monkeypatch: pytest.MonkeyPatch) -> None:
         "http://localhost:8080",
         "http://localhost:4321",
     ]
+    assert settings.forwarded_allow_ips == "127.0.0.1"
 
 
 def test_hitl_value_sale_del_entorno(monkeypatch: pytest.MonkeyPatch) -> None:
