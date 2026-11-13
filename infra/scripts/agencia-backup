@@ -34,7 +34,15 @@ if [ "${#dumps[@]}" -eq 0 ]; then
   exit 1
 fi
 
-latest="$(ls -1t "${BACKUP_DIR}"/agencia-*.dump | head -1)"
+latest="${dumps[0]}"
+latest_mtime=0
+for dump in "${dumps[@]}"; do
+  mtime="$(stat -c %Y "$dump")"
+  if [ "$mtime" -ge "$latest_mtime" ]; then
+    latest="$dump"
+    latest_mtime="$mtime"
+  fi
+done
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 suffix=""
 if [ -n "$label" ]; then
