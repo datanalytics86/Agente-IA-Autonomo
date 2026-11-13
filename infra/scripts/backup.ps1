@@ -1,6 +1,6 @@
-# Restauración se prueba en F7. Este script no restaura.
-# No lo ejecutes contra una base real antes de esa prueba.
 # pg_dump (formato custom) y rotación de 14 archivos.
+# Si ENGINE_OUTPUT_DIR es un directorio, archiva ese árbol (volumen engine_output).
+# Este script no restaura.
 # DATABASE_URL tiene que ser un URI de libpq (postgresql://...), no el de SQLAlchemy.
 # Si no hay DATABASE_URL, usa PGHOST, PGPORT, PGUSER y PGDATABASE.
 # No hay secretos en este archivo.
@@ -30,4 +30,17 @@ if ($LASTEXITCODE -ne 0) {
 $dumps = Get-ChildItem -Path $Dest -Filter "agencia-*.dump" | Sort-Object LastWriteTime -Descending
 if ($dumps.Count -gt 14) {
     $dumps | Select-Object -Skip 14 | Remove-Item -Force
+}
+
+$outputDir = $env:ENGINE_OUTPUT_DIR
+if ($outputDir -and (Test-Path -LiteralPath $outputDir -PathType Container)) {
+    $tarOut = Join-Path $Dest "agencia-$stamp-output.tar"
+    & tar -C $outputDir -cf $tarOut .
+    if ($LASTEXITCODE -ne 0) {
+        throw "tar de ENGINE_OUTPUT_DIR falló con código $LASTEXITCODE"
+    }
+    $archives = Get-ChildItem -Path $Dest -Filter "agencia-*-output.tar" | Sort-Object LastWriteTime -Descending
+    if ($archives.Count -gt 14) {
+        $archives | Select-Object -Skip 14 | Remove-Item -Force
+    }
 }

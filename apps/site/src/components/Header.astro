@@ -26,7 +26,7 @@ function current(href: string): boolean {
                 href={link.href}
                 aria-current={current(link.href) ? 'page' : undefined}
                 class:list={[
-                  'underline-offset-4 hover:underline',
+                  'inline-flex min-h-[44px] min-w-[44px] items-center justify-center underline-offset-4 hover:underline',
                   current(link.href) ? 'text-accent' : 'text-muted',
                 ]}
               >
