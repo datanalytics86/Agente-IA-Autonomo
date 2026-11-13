@@ -1,8 +1,18 @@
 #!/usr/bin/env bash
-# Cifra el último dump con age, lo sube con rclone y avisa a Healthchecks.
-# Sin AGE_RECIPIENT, RCLONE_DEST o BACKUP_DIR sale antes de llamar a rclone.
-# Opcional: HEALTHCHECKS_URL, --label <texto> (solo entra al nombre del archivo).
+# Cifra un dump nuevo y el tar de engine_output, los sube con rclone y avisa.
+# Lee /etc/agencia/backup.env (root 600) para que sudo y systemd vean las mismas variables.
+# BACKUP_DIR es el directorio del volumen agencia_backups en el host.
+# AGENCIA_BACKUP_ENV y AGENCIA_COMPOSE_DIR solo los usa la prueba.
+# La regla de retención en R2 está en infra/r2-lifecycle.json (30 días).
 set -euo pipefail
+
+env_file="${AGENCIA_BACKUP_ENV:-/etc/agencia/backup.env}"
+if [ -f "$env_file" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$env_file"
+  set +a
+fi
 
 label=""
 while [ $# -gt 0 ]; do
@@ -18,6 +28,19 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+ping_fail() {
+  if [ -n "${HEALTHCHECKS_URL:-}" ]; then
+    curl -fsS --max-time 10 -o /dev/null "${HEALTHCHECKS_URL%/}/fail" || true
+  fi
+}
+on_err() {
+  local code=$?
+  trap - ERR
+  ping_fail
+  exit "$code"
+}
+trap on_err ERR
+
 : "${AGE_RECIPIENT:?falta AGE_RECIPIENT}"
 : "${RCLONE_DEST:?falta RCLONE_DEST}"
 : "${BACKUP_DIR:?falta BACKUP_DIR}"
@@ -27,31 +50,75 @@ if [ ! -d "$BACKUP_DIR" ]; then
   exit 1
 fi
 
-shopt -s nullglob
-dumps=("${BACKUP_DIR}"/agencia-*.dump)
-if [ "${#dumps[@]}" -eq 0 ]; then
-  echo "no hay dumps en $BACKUP_DIR" >&2
+if [ -n "${AGENCIA_COMPOSE_DIR:-}" ]; then
+  compose_dir="$AGENCIA_COMPOSE_DIR"
+  image_tag="${IMAGE_TAG:-ci}"
+else
+  image_tag="$(tr -d '[:space:]' < /opt/agencia/current_tag)"
+  compose_dir="/opt/agencia/releases/${image_tag}/infra"
+fi
+env_args=()
+host_env="${AGENCIA_ENV_FILE:-/opt/agencia/.env}"
+if [ -f "$host_env" ]; then
+  env_args=(--env-file "$host_env")
+fi
+
+before="$(date +%s)"
+IMAGE_TAG="$image_tag" docker compose -p agencia "${env_args[@]}" \
+  -f "$compose_dir/docker-compose.yml" \
+  -f "$compose_dir/docker-compose.prod.yml" \
+  --profile backup run --rm backup
+
+newest_since() {
+  local pattern="$1"
+  local best="" best_mtime=0 mtime file
+  shopt -s nullglob
+  for file in "${BACKUP_DIR}"/${pattern}; do
+    mtime="$(stat -c %Y "$file")"
+    if [ "$mtime" -ge "$before" ] && [ "$mtime" -ge "$best_mtime" ]; then
+      best="$file"
+      best_mtime="$mtime"
+    fi
+  done
+  shopt -u nullglob
+  printf '%s\n' "$best"
+}
+
+dump="$(newest_since 'agencia-*.dump')"
+tar_file="$(newest_since 'agencia-*-output.tar')"
+if [ -z "$dump" ] || [ -z "$tar_file" ]; then
+  echo "el perfil backup no dejó un dump y un tar nuevos" >&2
   exit 1
 fi
 
-latest="${dumps[0]}"
-latest_mtime=0
-for dump in "${dumps[@]}"; do
-  mtime="$(stat -c %Y "$dump")"
-  if [ "$mtime" -ge "$latest_mtime" ]; then
-    latest="$dump"
-    latest_mtime="$mtime"
-  fi
-done
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 suffix=""
 if [ -n "$label" ]; then
   safe="$(printf '%s' "$label" | tr -c 'A-Za-z0-9._-' '-')"
   suffix="-${safe}"
 fi
-encrypted="${BACKUP_DIR}/agencia-${stamp}${suffix}.dump.age"
-age -r "$AGE_RECIPIENT" -o "$encrypted" "$latest"
-rclone copyto "$encrypted" "${RCLONE_DEST}/$(basename "$encrypted")"
+
+encrypt_and_upload() {
+  local src="$1"
+  local name="$2"
+  local encrypted="${BACKUP_DIR}/${name}"
+  age -r "$AGE_RECIPIENT" -o "$encrypted" "$src"
+  rclone copyto "$encrypted" "${RCLONE_DEST}/$(basename "$encrypted")"
+}
+
+encrypt_and_upload "$dump" "agencia-${stamp}${suffix}.dump.age"
+encrypt_and_upload "$tar_file" "agencia-${stamp}${suffix}-output.tar.age"
+
+shopt -s nullglob
+age_files=("${BACKUP_DIR}"/*.age)
+if [ "${#age_files[@]}" -gt 14 ]; then
+  mapfile -t oldest < <(stat -c '%Y %n' "${BACKUP_DIR}"/*.age | sort -n | awk '{print substr($0, index($0, " ")+1)}')
+  drop=$((${#oldest[@]} - 14))
+  for ((i = 0; i < drop; i++)); do
+    rm -f -- "${oldest[$i]}"
+  done
+fi
+shopt -u nullglob
 
 if [ -n "${HEALTHCHECKS_URL:-}" ]; then
   curl -fsS --max-time 10 -o /dev/null "$HEALTHCHECKS_URL"

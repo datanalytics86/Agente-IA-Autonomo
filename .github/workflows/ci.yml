@@ -195,6 +195,7 @@ jobs:
           sudo apt-get install -y shellcheck
           shellcheck infra/scripts/agencia-backup infra/scripts/test-agencia-backup.sh
           bash infra/scripts/test-agencia-backup.sh
+          sudo visudo -cf infra/sudoers.d/agencia-backup
   postgres-restore:
     runs-on: ubuntu-latest
     services:
