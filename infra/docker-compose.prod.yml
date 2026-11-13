@@ -1,31 +1,66 @@
 # Override de producción. Junto al compose base:
+#   IMAGE_TAG=... POSTGRES_PASSWORD=... APP_MODE=... PUBLIC_BASE_URL=... \
 #   docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml up -d
 #
-# engine_output persiste landings, storyboards y sitios de cliente.
-# En la imagen el motor vive en /app (agents/runtime.py → /app/output).
-# CLIENT_SITES_DIR por defecto es relativo a la raíz del repo; dentro del
-# contenedor eso cae fuera de /app, así que aquí queda absoluto y dentro
-# del volumen. Caddy lo ve en /srv/output (solo lectura). El perfil backup
-# lo archiva con tar junto al dump de Postgres.
+# POSTGRES_PASSWORD tiene que ser hexadecimal, sin @, : ni /.
+# DATABASE_URL no la codifica: un carácter de esos parte la URL.
+# engine_output persiste landings y sitios. En la imagen el motor está en /app.
+# CLIENT_SITES_DIR queda absoluto porque el default relativo cae fuera de /app.
+# Caddy ve el volumen en /srv/output, solo lectura.
+
+x-logging: &json-logs
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
 
 services:
-  api:
+  db:
     environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    ports: !reset []
+    restart: unless-stopped
+    logging: *json-logs
+
+  api:
+    build: !reset null
+    image: ghcr.io/datanalytics86/agente-ia-autonomo-engine:${IMAGE_TAG:?}
+    environment:
+      APP_MODE: ${APP_MODE:?}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?}
       AGENCY_OUTPUT_DIR: /app/output
       CLIENT_SITES_DIR: /app/output/clients
+      DATABASE_URL: postgresql://agencia:${POSTGRES_PASSWORD:?}@db:5432/agencia
+    env_file:
+      - path: ${AGENCIA_ENV_FILE:-/opt/agencia/.env}
+        required: true
     volumes:
       - engine_output:/app/output
+    restart: unless-stopped
+    logging: *json-logs
 
   worker:
+    build: !reset null
+    image: ghcr.io/datanalytics86/agente-ia-autonomo-engine:${IMAGE_TAG:?}
     environment:
+      APP_MODE: ${APP_MODE:?}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?}
       AGENCY_OUTPUT_DIR: /app/output
       CLIENT_SITES_DIR: /app/output/clients
+      DATABASE_URL: postgresql://agencia:${POSTGRES_PASSWORD:?}@db:5432/agencia
+    env_file:
+      - path: ${AGENCIA_ENV_FILE:-/opt/agencia/.env}
+        required: true
     volumes:
       - engine_output:/app/output
+    restart: unless-stopped
+    logging: *json-logs
 
   caddy:
     volumes:
       - engine_output:/srv/output:ro
+    restart: unless-stopped
+    logging: *json-logs
 
   backup:
     image: postgres:16
@@ -47,6 +82,7 @@ services:
       - backups:/backups
     entrypoint: ["bash", "/opt/backup.sh", "/backups"]
     restart: "no"
+    logging: *json-logs
 
 volumes:
   engine_output:
