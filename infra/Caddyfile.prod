@@ -1,10 +1,19 @@
 # TLS de producción con ACME. No usa tls internal.
 # On-demand TLS de sitios de clientes queda apagado.
 # HSTS solo en este archivo: max-age=31536000; includeSubDomains, sin preload.
+# www, panel y api piden certificado: esos DNS tienen que existir antes del primer up.
 {
 	email {$ACME_EMAIL}
 	admin off
-	auto_https disable_redirects
+}
+
+(noauth) {
+}
+
+(staging_auth) {
+	basic_auth {
+		{$STAGING_USER} {$STAGING_HASH}
+	}
 }
 
 (agencia) {
@@ -22,54 +31,53 @@
 		reverse_proxy {$API_UPSTREAM:api:8000}
 	}
 
-	@demo path /demo /demo/*
-	handle @demo {
-		header X-Robots-Tag "noindex, nofollow"
-		reverse_proxy {$API_UPSTREAM:api:8000}
-	}
-
-	@internal path_regexp (?i)^/+api(?:/|\.|%2[fF])*internal(?:/|$)
-	handle @internal {
-		respond 404
-	}
-
-	@api path /api /api/*
-	handle @api {
-		reverse_proxy {$API_UPSTREAM:api:8000}
-	}
-
-	@webhooks path /webhooks /webhooks/*
-	handle @webhooks {
-		reverse_proxy {$API_UPSTREAM:api:8000}
-	}
-
-	@ficha path /u /u/*
-	handle @ficha {
-		reverse_proxy {$API_UPSTREAM:api:8000}
-	}
-
-	handle /admin {
-		redir * /admin/ 308
-	}
-
-	handle /admin/* {
-		uri strip_prefix /admin
-		root * /srv/admin
-		try_files {path} /index.html
-		file_server
-	}
-
 	handle {
-		root * /srv/site
-		try_files {path} /index.html
-		file_server
-	}
-}
+		import {$EDGE_AUTH:noauth}
 
-# Basic auth de staging. No se importa salvo que el operador lo agregue.
-(staging_auth) {
-	basic_auth {
-		{$STAGING_USER} {$STAGING_HASH}
+		route {
+			@demo path /demo /demo/*
+			handle @demo {
+				header X-Robots-Tag "noindex, nofollow"
+				reverse_proxy {$API_UPSTREAM:api:8000}
+			}
+
+			@internal path_regexp (?i)^/+api(?:/|\.|%2[fF])*internal(?:/|$)
+			handle @internal {
+				respond 404
+			}
+
+			@api path /api /api/*
+			handle @api {
+				reverse_proxy {$API_UPSTREAM:api:8000}
+			}
+
+			@webhooks path /webhooks /webhooks/*
+			handle @webhooks {
+				reverse_proxy {$API_UPSTREAM:api:8000}
+			}
+
+			@ficha path /u /u/*
+			handle @ficha {
+				reverse_proxy {$API_UPSTREAM:api:8000}
+			}
+
+			handle /admin {
+				redir * /admin/ 308
+			}
+
+			handle /admin/* {
+				uri strip_prefix /admin
+				root * /srv/admin
+				try_files {path} /index.html
+				file_server
+			}
+
+			handle {
+				root * /srv/site
+				try_files {path} /index.html
+				file_server
+			}
+		}
 	}
 }
 

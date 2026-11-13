@@ -28,16 +28,22 @@ services:
 
   caddy:
     image: ghcr.io/datanalytics86/agente-ia-autonomo-edge:${IMAGE_TAG:?}
+    depends_on: !reset [api]
     environment:
       ACME_EMAIL: ${ACME_EMAIL:?}
       SITE_ADDRESS: ${SITE_ADDRESS:?}
       SITE_DOMAIN: ${SITE_DOMAIN:?}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?}
+      EDGE_AUTH: ${EDGE_AUTH:-noauth}
+      STAGING_USER: ${STAGING_USER:-}
+      STAGING_HASH: ${STAGING_HASH:-}
     ports: !override
       - "80:80"
       - "443:443"
       - "443:443/udp"
-    volumes:
+    volumes: !override
+      - caddy_data:/data
+      - caddy_config:/config
       - engine_output:/srv/output:ro
 
   backup:

@@ -33,7 +33,7 @@ docker rm -f agencia-edge-ci >/dev/null 2>&1 || true
 docker run -d --name agencia-edge-ci --network host \
   -e ACME_EMAIL=ci@example.com \
   -e SITE_ADDRESS=http://127.0.0.1:8088 \
-  -e SITE_DOMAIN=example.test \
+  -e SITE_DOMAIN=localhost \
   -e PUBLIC_ORIGIN=http://127.0.0.1:8088 \
   -e API_UPSTREAM=127.0.0.1:8765 \
   agencia-edge:ci
