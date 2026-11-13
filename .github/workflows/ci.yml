@@ -174,3 +174,18 @@ jobs:
               sys.exit(1)
           print("openapi ok:", ", ".join(required))
           PY
+
+  caddy-hsts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Caddy
+        run: |
+          set -euo pipefail
+          curl -sSfL "https://github.com/caddyserver/caddy/releases/download/v2.10.2/caddy_2.10.2_linux_amd64.tar.gz" -o /tmp/caddy.tgz
+          tar -xzf /tmp/caddy.tgz -C /tmp caddy
+          sudo mv /tmp/caddy /usr/local/bin/caddy
+
+      - name: HTTPS de prueba con HSTS
+        run: bash infra/scripts/test-hsts.sh

@@ -71,7 +71,10 @@ services:
       - api
       - web
     ports:
+      # 443 es solo el TLS de prueba (tls internal en el Caddyfile).
+      # El ACME de producción va en Caddyfile.prod.
       - "80:80"
+      - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ../apps/site/dist:/srv/site:ro
