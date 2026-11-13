@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Restauración se prueba en F7. Este script no restaura.
-# No lo ejecutes contra una base real antes de esa prueba.
 # pg_dump (formato custom) y rotación de 14 archivos.
+# Si ENGINE_OUTPUT_DIR es un directorio, archiva ese árbol (volumen engine_output).
 # DATABASE_URL tiene que ser un URI de libpq (postgresql://...), no el de SQLAlchemy.
 # Si no hay DATABASE_URL, usa PGHOST, PGPORT, PGUSER y PGDATABASE.
+# Este script no restaura.
 
 set -euo pipefail
 
@@ -22,11 +22,23 @@ else
     --dbname="${PGDATABASE:-agencia}"
 fi
 
-shopt -s nullglob
-dumps=("${dest}"/agencia-*.dump)
-if ((${#dumps[@]} > 14)); then
-  mapfile -t sorted < <(ls -1t "${dest}"/agencia-*.dump)
-  for old in "${sorted[@]:14}"; do
-    rm -f -- "$old"
-  done
+rotate() {
+  local pattern="$1"
+  shopt -s nullglob
+  local files=("${dest}"/${pattern})
+  if ((${#files[@]} > 14)); then
+    mapfile -t sorted < <(ls -1t "${dest}"/${pattern})
+    local old
+    for old in "${sorted[@]:14}"; do
+      rm -f -- "$old"
+    done
+  fi
+}
+
+rotate "agencia-*.dump"
+
+output_dir="${ENGINE_OUTPUT_DIR:-}"
+if [[ -n "$output_dir" && -d "$output_dir" ]]; then
+  tar -C "$output_dir" -cf "${dest}/agencia-${stamp}-output.tar" .
+  rotate "agencia-*-output.tar"
 fi

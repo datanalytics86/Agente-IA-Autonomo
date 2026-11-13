@@ -10,9 +10,17 @@ from sqlalchemy import select
 from api.app import create_app
 from api.security import hash_password
 from api.yamlutil import dump_yaml
-from core.config import REPO_ROOT, reset_settings
+from core.config import REPO_ROOT, get_settings, reset_settings
 from db.models import User
 from db.session import create_all, reset_engine, session_scope
+
+
+def proxy_headers_options() -> dict[str, object]:
+    """uvicorn confía en X-Forwarded-For solo desde FORWARDED_ALLOW_IPS."""
+    return {
+        "proxy_headers": True,
+        "forwarded_allow_ips": get_settings().forwarded_allow_ips.strip(),
+    }
 
 
 def main() -> int:
@@ -20,7 +28,14 @@ def main() -> int:
 
     host = os.environ.get("API_HOST", "0.0.0.0")
     port = int(os.environ.get("API_PORT", "8000"))
-    uvicorn.run(create_app(), host=host, port=port)
+    options = proxy_headers_options()
+    uvicorn.run(
+        create_app(),
+        host=host,
+        port=port,
+        proxy_headers=bool(options["proxy_headers"]),
+        forwarded_allow_ips=str(options["forwarded_allow_ips"]),
+    )
     return 0
 
 

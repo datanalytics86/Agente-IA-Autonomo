@@ -30,6 +30,8 @@ Todo umbral vive aquí y puede taparse en runtime con `settings_kv` (kill switch
 | ADMIN_BASE_URL | `http://localhost:8080/admin` |
 | CORS_ORIGINS | `http://localhost:8080,http://localhost:4321` |
 
+`FORWARDED_ALLOW_IPS` default de la app `127.0.0.1`. En Compose el default es `172.30.210.10` (`infra/compose.defaults.env`, la IP fija de Caddy) y el `.env` de la raíz lo pisa porque se carga después. Es la lista de proxies que pueden fijar `X-Forwarded-For`. Un cliente directo no cambia el cubo. La subred `172.30.210.0/24` puede chocar con otra red del host; si pasa, se cambia la ipam y esta variable juntas.
+
 ### Agencia
 
 `AGENCY_NAME`, `AGENCY_LEGAL_NAME`, `AGENCY_RUT`, `AGENCY_EMAIL`, `AGENCY_ADDRESS`. Todas vacías. La UI muestra el placeholder «completa los datos de la agencia». Prohibido inventar nombre, RUT o dirección.
