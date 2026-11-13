@@ -22,6 +22,8 @@ docker compose -f infra/docker-compose.yml up --build
 
 `api` arranca con `python main.py --mode api` y `worker` con `--mode worker`. Si el paquete todavía no está, el proceso sale con código 2. No es un deploy.
 
+Producción suma `infra/docker-compose.prod.yml`. El volumen nombrado `engine_output` se monta en `/app/output` de api y worker (`AGENCY_OUTPUT_DIR`). El perfil `backup` monta ese volumen en `/engine-output` y `infra/scripts/backup.sh` lo archiva junto al dump.
+
 El contexto de la imagen es la raíz del repo. `.dockerignore` excluye `.env`. No metas secretos en el compose.
 
 ## Backup

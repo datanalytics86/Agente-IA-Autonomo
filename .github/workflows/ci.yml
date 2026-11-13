@@ -137,6 +137,14 @@ jobs:
           npm run build
           npm test
 
+  backup-output:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Volumen engine_output dentro del backup
+        run: bash infra/scripts/test-backup-output.sh
+
   openapi:
     runs-on: ubuntu-latest
     steps:
