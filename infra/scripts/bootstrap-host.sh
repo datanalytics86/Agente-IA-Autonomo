@@ -93,6 +93,7 @@ if [ ! -x /usr/bin/docker ]; then
   install -d -m 755 /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
   chmod a+r /etc/apt/keyrings/docker.asc
+  # shellcheck disable=SC1091
   . /etc/os-release
   printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/%s %s stable\n' \
     "$(dpkg --print-architecture)" "$ID" "$VERSION_CODENAME" \
