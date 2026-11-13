@@ -1,26 +1,27 @@
 #!/usr/bin/env bash
 # Caddyfile.prod rechaza los paths internos que esquivan el matcher de /api.
+# www, panel y api escucharían :443; este chequeo los quita y usa solo HTTP.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 tmp="$(mktemp -d)"
-trap 'if [ -f "$tmp/caddy.pid" ]; then sudo kill "$(sudo cat "$tmp/caddy.pid")" 2>/dev/null || true; fi; rm -rf "$tmp"' EXIT
+trap 'if [ -f "$tmp/caddy.pid" ]; then kill "$(cat "$tmp/caddy.pid")" 2>/dev/null || true; fi; rm -rf "$tmp"' EXIT
 
-mkdir -p "$tmp/site" "$tmp/admin"
-printf '<html>sitio</html>\n' > "$tmp/site/index.html"
-printf '<html>admin</html>\n' > "$tmp/admin/index.html"
-sed \
-  -e 's#reverse_proxy {$API_UPSTREAM:api:8000}#respond "proxied" 200#' \
-  -e 's#admin off#admin off\n\tlocal_certs#' \
-  "$root/infra/Caddyfile.prod" > "$tmp/Caddyfile"
+sed 's#reverse_proxy {$API_UPSTREAM:api:8000}#respond "proxied" 200#' \
+  "$root/infra/Caddyfile.prod" \
+  | awk '
+    /^www\.\{/ || /^panel\.\{/ || /^api\.\{/ { skip=1 }
+    skip && /^}/ { skip=0; next }
+    !skip { print }
+  ' > "$tmp/Caddyfile"
 
 export ACME_EMAIL=ci@example.com
 export SITE_ADDRESS=http://:8099
 export SITE_DOMAIN=localhost
 export PUBLIC_ORIGIN=http://127.0.0.1:8099
 export EDGE_AUTH=noauth
-# Los hosts www/panel/api escuchan :443. En local hace falta root; en CI también.
-sudo -E caddy start --config "$tmp/Caddyfile" --adapter caddyfile --pidfile "$tmp/caddy.pid" >/dev/null
+
+caddy start --config "$tmp/Caddyfile" --adapter caddyfile --pidfile "$tmp/caddy.pid" >/dev/null
 sleep 0.4
 
 reject() {
