@@ -1,0 +1,116 @@
+# Desactivado mientras vars.DEPLOY_ENABLED no sea 'true': cada job queda skipped.
+# No corre en pull_request. No pasa secretos por argumento a ssh.
+# Acciones pinneadas: checkout v4.4.0, setup-buildx v3.12.0, build-push v6.19.2.
+
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: SHA completo de una imagen ya publicada
+        required: true
+        type: string
+      target:
+        description: staging o production
+        required: true
+        type: choice
+        options: [staging, production]
+
+permissions: {}
+
+concurrency:
+  group: deploy-${{ github.event.inputs.target || 'pipeline' }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  ENGINE_IMAGE: ghcr.io/datanalytics86/agente-ia-autonomo-engine
+  EDGE_IMAGE: ghcr.io/datanalytics86/agente-ia-autonomo-edge
+
+jobs:
+  build:
+    if: >
+      vars.DEPLOY_ENABLED == 'true' &&
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - id: meta
+        run: echo "tag=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Engine
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: infra/Dockerfile.engine
+          push: true
+          tags: ${{ env.ENGINE_IMAGE }}:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha,scope=engine
+          cache-to: type=gha,mode=max,scope=engine
+
+      - name: Edge
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: infra/Dockerfile.edge
+          push: true
+          tags: ${{ env.EDGE_IMAGE }}:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha,scope=edge
+          cache-to: type=gha,mode=max,scope=edge
+
+  deploy-staging:
+    needs: build
+    if: vars.DEPLOY_ENABLED == 'true' && needs.build.result == 'success'
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/deploy-target.yml
+    with:
+      target: staging
+      image_tag: ${{ needs.build.outputs.tag }}
+      backup_first: false
+    secrets: inherit
+
+  deploy-production:
+    needs: [build, deploy-staging]
+    if: vars.DEPLOY_ENABLED == 'true' && needs.deploy-staging.result == 'success'
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/deploy-target.yml
+    with:
+      target: production
+      image_tag: ${{ needs.build.outputs.tag }}
+      backup_first: true
+    secrets: inherit
+
+  manual:
+    if: vars.DEPLOY_ENABLED == 'true' && github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/deploy-target.yml
+    with:
+      target: ${{ inputs.target }}
+      image_tag: ${{ inputs.image_tag }}
+      backup_first: ${{ inputs.target == 'production' }}
+    secrets: inherit
