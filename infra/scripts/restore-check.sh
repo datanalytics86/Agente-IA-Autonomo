@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Dump de la base de origen y restore en una base temporal.
 # Compara conteos por tabla y su checksum. Borra la temporal al salir.
+# El cliente tiene que ser de la misma generación que el servidor.
+# pg_dump 17 o más nuevo manda `SET transaction_timeout` y Postgres 16 lo rechaza.
 # Conexión por variables libpq: PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE.
 # No usa servicios de pago.
 

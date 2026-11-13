@@ -194,20 +194,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cliente de Postgres
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-
-      - name: Dump, restore y conteos
-        env:
-          PGHOST: localhost
-          PGPORT: "5432"
-          PGUSER: agencia
-          PGPASSWORD: agencia
-          PGDATABASE: agencia
+      - name: Dump, restore y conteos con el cliente de Postgres 16
         run: |
           set -euo pipefail
-          psql -v ON_ERROR_STOP=1 -c "CREATE TABLE probe (id int primary key, note text);"
-          psql -v ON_ERROR_STOP=1 -c "INSERT INTO probe (id, note) VALUES (1, 'uno'), (2, 'dos');"
-          bash infra/scripts/restore-check.sh | tee /tmp/restore.out
-          grep -qx 'ok' /tmp/restore.out
-          test "$(psql -At -c 'SELECT count(*) FROM probe')" = "2"
+          docker run --rm --network host --entrypoint bash \
+            -e PGHOST=127.0.0.1 \
+            -e PGPORT=5432 \
+            -e PGUSER=agencia \
+            -e PGPASSWORD=agencia \
+            -e PGDATABASE=agencia \
+            -v "$PWD:/work" \
+            -w /work \
+            postgres:16 \
+            infra/scripts/ci-restore-probe.sh
