@@ -71,6 +71,7 @@ jobs:
           ALLOW_LIVE: ${{ vars.ALLOW_LIVE || 'false' }}
           PUBLIC_URL: ${{ vars.PUBLIC_URL }}
         run: |
+          # shellcheck disable=SC2029
           set -euo pipefail
           ssh "$TARGET" bash /opt/agencia/deploy-remote.sh \
             "${{ inputs.image_tag }}" \
