@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Cifra el último dump con age, lo sube con rclone y avisa a Healthchecks.
+# Sin AGE_RECIPIENT, RCLONE_DEST o BACKUP_DIR sale antes de llamar a rclone.
+# Opcional: HEALTHCHECKS_URL, --label <texto> (solo entra al nombre del archivo).
+set -euo pipefail
+
+label=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --label)
+      label="${2:?falta el texto de --label}"
+      shift 2
+      ;;
+    *)
+      echo "argumento desconocido: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+: "${AGE_RECIPIENT:?falta AGE_RECIPIENT}"
+: "${RCLONE_DEST:?falta RCLONE_DEST}"
+: "${BACKUP_DIR:?falta BACKUP_DIR}"
+
+if [ ! -d "$BACKUP_DIR" ]; then
+  echo "no existe BACKUP_DIR: $BACKUP_DIR" >&2
+  exit 1
+fi
+
+shopt -s nullglob
+dumps=("${BACKUP_DIR}"/agencia-*.dump)
+if [ "${#dumps[@]}" -eq 0 ]; then
+  echo "no hay dumps en $BACKUP_DIR" >&2
+  exit 1
+fi
+
+latest="$(ls -1t "${BACKUP_DIR}"/agencia-*.dump | head -1)"
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+suffix=""
+if [ -n "$label" ]; then
+  safe="$(printf '%s' "$label" | tr -c 'A-Za-z0-9._-' '-')"
+  suffix="-${safe}"
+fi
+encrypted="${BACKUP_DIR}/agencia-${stamp}${suffix}.dump.age"
+age -r "$AGE_RECIPIENT" -o "$encrypted" "$latest"
+rclone copyto "$encrypted" "${RCLONE_DEST}/$(basename "$encrypted")"
+
+if [ -n "${HEALTHCHECKS_URL:-}" ]; then
+  curl -fsS --max-time 10 -o /dev/null "$HEALTHCHECKS_URL"
+fi

@@ -1,0 +1,7 @@
+[Unit]
+Description=Cifra y sube el backup de la agencia
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/agencia/backup.env
+ExecStart=/usr/local/sbin/agencia-backup
