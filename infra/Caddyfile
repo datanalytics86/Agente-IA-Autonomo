@@ -1,12 +1,13 @@
 # Sitio público en /. /api, /webhooks, /demo y /u van a la api.
 # /admin va al dashboard estático (servicio web).
 # X-Robots-Tag solo en /demo, no en el resto del sitio.
+# HSTS solo en el sitio TLS. Sin preload.
 {
 	admin off
 	auto_https off
 }
 
-:80 {
+(agencia) {
 	encode gzip
 	header {
 		X-Content-Type-Options nosniff
@@ -55,4 +56,14 @@
 		try_files {path} /index.html
 		file_server
 	}
+}
+
+:80 {
+	import agencia
+}
+
+https:// {
+	import agencia
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	tls internal
 }
