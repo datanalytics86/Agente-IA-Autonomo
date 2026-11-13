@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Tres casos de iptables con comandos falsos: ok, FORWARD DROP y mezcla.
+# iptables falso: el caso sano (backend iptables sobre nft), FORWARD DROP,
+# reglas legacy y la mezcla real (dockerd nftables con alternativa legacy).
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -15,31 +16,25 @@ write_bin() {
   chmod +x "${dir}/${name}"
 }
 
-run_case() {
-  local name="$1"
-  local dir="${base}/${name}"
-  mkdir -p "$dir"
-  shift
-  # remaining args are name=body pairs written by the caller via env files
-  PATH="${dir}:${PATH}" BOOTSTRAP_OS_ID=ubuntu BOOTSTRAP_OS_VERSION=24.04 \
-    bash "$script" --check-only
+common() {
+  local dir="$1"
+  write_bin "$dir" iptables 'echo "iptables v1.8.10 (nf_tables)"'
+  write_bin "$dir" iptables-legacy-save 'exit 0'
+  write_bin "$dir" iptables-legacy 'echo "-P FORWARD ACCEPT"'
 }
 
 okdir="${base}/ok"
 mkdir -p "$okdir"
-write_bin "$okdir" iptables 'echo "iptables v1.8.10 (nf_tables)"'
+common "$okdir"
 write_bin "$okdir" update-alternatives 'echo "Value: /usr/sbin/iptables-nft"'
-write_bin "$okdir" iptables-legacy-save 'exit 0'
-write_bin "$okdir" iptables-legacy 'echo "-P FORWARD ACCEPT"'
-write_bin "$okdir" docker 'exit 0'
+write_bin "$okdir" docker 'echo "Firewall Backend: iptables"'
 PATH="${okdir}:/usr/bin:/bin" BOOTSTRAP_OS_ID=ubuntu BOOTSTRAP_OS_VERSION=24.04 \
   bash "$script" --check-only
 
 dropdir="${base}/drop"
 mkdir -p "$dropdir"
-write_bin "$dropdir" iptables 'echo "iptables v1.8.10 (nf_tables)"'
+common "$dropdir"
 write_bin "$dropdir" update-alternatives 'echo "Value: /usr/sbin/iptables-nft"'
-write_bin "$dropdir" iptables-legacy-save 'exit 0'
 write_bin "$dropdir" iptables-legacy 'echo "-P FORWARD DROP"'
 if PATH="${dropdir}:/usr/bin:/bin" BOOTSTRAP_OS_ID=ubuntu BOOTSTRAP_OS_VERSION=24.04 \
   bash "$script" --check-only; then
@@ -47,16 +42,25 @@ if PATH="${dropdir}:/usr/bin:/bin" BOOTSTRAP_OS_ID=ubuntu BOOTSTRAP_OS_VERSION=2
   exit 1
 fi
 
+legacydir="${base}/legacy"
+mkdir -p "$legacydir"
+common "$legacydir"
+write_bin "$legacydir" update-alternatives 'echo "Value: /usr/sbin/iptables-nft"'
+write_bin "$legacydir" iptables-legacy-save 'echo "-A DOCKER -j RETURN"'
+if PATH="${legacydir}:/usr/bin:/bin" BOOTSTRAP_OS_ID=ubuntu BOOTSTRAP_OS_VERSION=24.04 \
+  bash "$script" --check-only; then
+  echo "una regla DOCKER en legacy debió abortar" >&2
+  exit 1
+fi
+
 mixdir="${base}/mix"
 mkdir -p "$mixdir"
-write_bin "$mixdir" iptables 'echo "iptables v1.8.10 (nf_tables)"'
-write_bin "$mixdir" update-alternatives 'echo "Value: /usr/sbin/iptables-nft"'
-write_bin "$mixdir" iptables-legacy-save 'exit 0'
-write_bin "$mixdir" iptables-legacy 'echo "-P FORWARD ACCEPT"'
-write_bin "$mixdir" docker 'echo "Firewall Backend: iptables"'
-if PATH="${mixdir}:/usr/bin:/bin" BOOTSTRAP_OS_ID=ubuntu BOOTSTRAP_OS_VERSION=24.04 \
+common "$mixdir"
+write_bin "$mixdir" update-alternatives 'echo "Value: /usr/sbin/iptables-legacy"'
+write_bin "$mixdir" docker 'echo "Firewall Backend: nftables"'
+if PATH="${mixdir}:/usr/bin:/bin" BOOTSTRAP_OS_ID=debian BOOTSTRAP_OS_VERSION=12 \
   bash "$script" --check-only; then
-  echo "la mezcla de backends debió abortar" >&2
+  echo "dockerd nftables con alternativa legacy debió abortar" >&2
   exit 1
 fi
 
