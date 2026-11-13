@@ -30,7 +30,7 @@ Todo umbral vive aquí y puede taparse en runtime con `settings_kv` (kill switch
 | ADMIN_BASE_URL | `http://localhost:8080/admin` |
 | CORS_ORIGINS | `http://localhost:8080,http://localhost:4321` |
 
-`INTERNAL_CHECK_NETS` vacío: una IP privada no abre `/api/internal/domain-check`. En Compose el default del servicio es `172.16.0.0/12,10.0.0.0/8` para que Caddy pregunte por la red interna. `INTERNAL_CHECK_TOKEN` es la otra vía. `INTERNAL_CHECK_PER_MINUTE` default 60. El header `X-Forwarded-For` no autoriza.
+`INTERNAL_CHECK_NETS` vacío en la app: una IP privada no abre `/api/internal/domain-check`. En Compose el default es solo `172.30.210.10`, la IP fija de Caddy, no un rango privado. `INTERNAL_CHECK_TOKEN` es la otra vía. `INTERNAL_CHECK_PER_MINUTE` default 60. El header `X-Forwarded-For` no autoriza.
 
 ### Agencia
 

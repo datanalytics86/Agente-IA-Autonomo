@@ -12,8 +12,8 @@ x-engine-env: &engine-env
   TZ: ${TZ:-America/Santiago}
   PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost}
   ADMIN_BASE_URL: ${ADMIN_BASE_URL:-http://localhost/admin}
-  # Caddy (red Docker) puede llamar domain-check. Una IP privada no alcanza si esto está vacío.
-  INTERNAL_CHECK_NETS: ${INTERNAL_CHECK_NETS:-172.16.0.0/12,10.0.0.0/8}
+  # Solo la IP fija de Caddy. Un rango privado ancho no autoriza domain-check.
+  INTERNAL_CHECK_NETS: ${INTERNAL_CHECK_NETS:-172.30.210.10}
 
 services:
   db:
@@ -69,6 +69,9 @@ services:
 
   caddy:
     image: caddy:2
+    networks:
+      default:
+        ipv4_address: 172.30.210.10
     depends_on:
       - api
       - web
@@ -79,6 +82,13 @@ services:
       - ../apps/site/dist:/srv/site:ro
       - caddy_data:/data
       - caddy_config:/config
+
+networks:
+  default:
+    # Puede chocar con otra red del host. Si pasa, cambia la ipam y INTERNAL_CHECK_NETS juntos.
+    ipam:
+      config:
+        - subnet: 172.30.210.0/24
 
 volumes:
   pgdata:

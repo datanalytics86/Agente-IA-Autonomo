@@ -27,8 +27,9 @@
 	}
 
 	# No se publica. Caddy llama a http://api:8000/api/internal/domain-check
-	# por la red de Compose (on-demand TLS). El sitio :80 responde 404.
-	@internal path /api/internal /api/internal/*
+	# por la red de Compose. El sitio :80 responde 404, también si el path
+	# cambia de mayúsculas, trae %2F o un segmento ".".
+	@internal path_regexp (?i)^/+api(?:/|\.|%2[fF])*internal(?:/|$)
 	handle @internal {
 		respond 404
 	}
