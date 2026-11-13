@@ -37,7 +37,7 @@ services:
       PGHOST: db
       PGPORT: "5432"
       PGUSER: ${POSTGRES_USER:-agencia}
-      PGPASSWORD: ${POSTGRES_PASSWORD:-agencia}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?}
       PGDATABASE: ${POSTGRES_DB:-agencia}
       ENGINE_OUTPUT_DIR: /engine-output
       BACKUP_DIR: /backups
