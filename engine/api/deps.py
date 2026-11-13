@@ -183,7 +183,14 @@ def _host_only(value: str) -> str:
 
 
 def client_address(peer: str, forwarded: str | None) -> str:
-    """IP del cliente. X-Forwarded-For solo si el par TCP es un proxy de la lista."""
+    """Elige la IP del cliente a partir de un par y de X-Forwarded-For.
+
+    ``peer`` es quien habla con este proceso. Con uvicorn en
+    ``proxy_headers`` y el proxy en la lista, ``request.client.host``
+    ya no es ese par TCP: uvicorn lo reemplazó por el cliente que el
+    proxy declaró. Si ese valor sigue siendo un proxy de la lista, se
+    recorre el header desde la derecha. Si no, se ignora el header.
+    """
     current = (peer or "").strip()
     if current == "":
         return "unknown"
@@ -202,6 +209,13 @@ def client_address(peer: str, forwarded: str | None) -> str:
 
 
 def client_ip(request: Request) -> str:
+    """IP del rate limit.
+
+    Detrás de Caddy, con ``proxy_headers``, ``request.client.host`` es
+    el cliente reenviado y no la IP de Caddy. Un request que no pasó
+    por un proxy de ``FORWARDED_ALLOW_IPS`` conserva el par TCP y un
+    ``X-Forwarded-For`` inventado no cambia el cubo.
+    """
     peer = ""
     if request.client is not None and request.client.host:
         peer = request.client.host
