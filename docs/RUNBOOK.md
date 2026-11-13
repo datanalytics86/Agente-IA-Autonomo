@@ -102,3 +102,7 @@ Copia de seguridad: `infra/scripts/backup.ps1` o `backup.sh`. Conservan 14 archi
 ## Producción
 
 Seguir `docs/GO_LIVE.md`. No completar nombre, RUT ni dirección en el código: van por entorno cuando el dueño los tenga. No hay envíos reales ni cobros reales en este runbook.
+
+## Host nuevo
+
+`infra/scripts/bootstrap-host.sh --check-only` verifica Debian 12 o Ubuntu 24.04. Abortar solo si hay reglas en iptables-legacy, `-P FORWARD DROP` en legacy, o dockerd en nftables con la alternativa puesta en iptables-legacy. Docker con `Firewall Backend: iptables` y la alternativa en `iptables-nft` es el caso normal. Sin `--check-only` instala iptables antes de ese chequeo, crea el usuario `deploy`, deja `/opt/agencia` en `deploy:deploy` modo 750 (el `.env` queda 600 de deploy), instala la llave de `DEPLOY_PUBKEY` si existe, Docker CE desde el repo de la distro y, si están en el árbol, el sudoers y los units de backup. El grupo `docker` equivale a root. No lo corras en una máquina que no sea el VPS.
