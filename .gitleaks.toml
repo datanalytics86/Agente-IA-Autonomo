@@ -1,0 +1,12 @@
+title = "Agente IA Autonomo"
+
+[extend]
+useDefault = true
+
+# Un solo hallazgo histórico. El archivo ya no está en el árbol.
+# conditions dentro del allowlist se evalúan en AND: ruta, commit y secreto.
+[[allowlists]]
+description = "infra/.env.ci en 589a37a: SECRET_KEY de prueba, no es una credencial"
+paths = ['''(^|/)infra/\.env\.ci$''']
+commits = ["589a37a09e43ab997999e543eab044fadb11a929"]
+regexes = ['''ci-secret-key-de-prueba-no-es-prod-32''']
