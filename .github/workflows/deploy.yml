@@ -1,0 +1,24 @@
+# Desactivado. No corre en push ni en pull_request.
+# workflow_dispatch deja el archivo visible; if: false impide que el job arranque
+# aunque alguien pulse "Run workflow". No hay secretos en este archivo.
+#
+# Para encenderlo más adelante haría falta, fuera de este repo:
+# - Host: el VPS del dueño (Docker y el checkout del compose). No hay hostname aquí.
+# - Secretos de GitHub: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY, DEPLOY_PATH.
+# - El .env de la aplicación vive en ese host, no en el workflow.
+
+name: deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - name: No desplegar
+        run: echo "workflow desactivado"
