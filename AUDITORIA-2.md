@@ -66,9 +66,9 @@ Starlette 1.10, al importar `TestClient` sin `httpx2`, emite: `Using httpx with 
 
 `gitleaks` sobre el historial encontró tres `generic-api-key`. Ninguno está en el árbol actual.
 
-1. `infra/.env.ci:13` en `589a37a09e43ab997999e543eab044fadb11a929`. El archivo dice que son valores de prueba. Lo marcado es `SECRET_KEY=ci-secret-key-de-prueba-no-es-prod-32`. Al lado están `POSTGRES_PASSWORD=agencia-ci` y `ADMIN_PASSWORD=clave-de-prueba`, que la regla no marcó. Son dummy. El archivo ya no existe en `main`. El PR #25 deja `.gitleaks.toml` que solo ignora ese valor si coinciden la ruta, ese commit y el secreto. No se reescribió la historia.
-2. `engine/tests/test_config.py` en `49c46f9`: `SECRET_KEY=raiz-secret-key-de-produccion-32` dentro de un test que escribe un `.env` temporal. El archivo actual usa `"x" * 32`. Sigue en el historial. No entra en el allowlist.
-3. `engine/tests/test_payments.py:73` en `ec401614`: `secret="mp-secret"` en un test de firma. Dummy. No entra en el allowlist.
+1. `infra/.env.ci:13` en `589a37a09e43ab997999e543eab044fadb11a929`. El archivo dice que son valores de prueba. Lo marcado es `SECRET_KEY=<redactado>`. Al lado están `POSTGRES_PASSWORD=agencia-ci` y `ADMIN_PASSWORD=clave-de-prueba`, que la regla no marcó. Son dummy. El archivo ya no existe en `main`. El PR #25 deja `.gitleaks.toml` que solo ignora ese valor si coinciden la ruta, ese commit y el secreto. No se reescribió la historia.
+2. `engine/tests/test_config.py` en `49c46f9`: `SECRET_KEY=<redactado>` dentro de un test que escribe un `.env` temporal. El archivo actual usa `"x" * 32`. Sigue en el historial. No entra en el allowlist.
+3. `engine/tests/test_payments.py:73` en `ec401614`: `secret="<redactado>"` en un test de firma. Dummy. No entra en el allowlist.
 
 Un `gitleaks detect` con el config nuevo reporta 2, no 3. Sin el config, siguen siendo 3.
 
