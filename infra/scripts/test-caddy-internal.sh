@@ -8,12 +8,17 @@ trap 'if [ -f "$tmp/caddy.pid" ]; then kill "$(cat "$tmp/caddy.pid")" 2>/dev/nul
 
 mkdir -p "$tmp/site"
 printf '<html>sitio</html>\n' > "$tmp/site/index.html"
+# El sitio https:// del compose de prueba escucha :443. Este chequeo solo
+# mira el HTTP, en un puerto alto, para no pedir root.
 sed \
   -e 's#^:80 {#:8088 {#' \
+  -e 's#^http://:80 {#http://:8088 {#' \
   -e 's#reverse_proxy api:8000#respond "proxied" 200#' \
   -e 's#reverse_proxy web:80#respond "web" 200#' \
   -e "s#root \\* /srv/site#root * $tmp/site#" \
-  "$root/infra/Caddyfile" > "$tmp/Caddyfile"
+  "$root/infra/Caddyfile" \
+  | awk '/^https:\/\// { skip=1 } skip && /^}/ { skip=0; next } !skip { print }' \
+  > "$tmp/Caddyfile"
 
 caddy start --config "$tmp/Caddyfile" --adapter caddyfile --pidfile "$tmp/caddy.pid" >/dev/null
 sleep 0.3
