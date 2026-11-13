@@ -12,6 +12,8 @@ x-engine-env: &engine-env
   TZ: ${TZ:-America/Santiago}
   PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost}
   ADMIN_BASE_URL: ${ADMIN_BASE_URL:-http://localhost/admin}
+  # FORWARDED_ALLOW_IPS no va aquí: environment pisa al env_file.
+  # El default está en infra/compose.defaults.env y el .env de la raíz lo tapa.
   # Solo la IP fija de Caddy. Un rango privado ancho no autoriza domain-check.
   INTERNAL_CHECK_NETS: ${INTERNAL_CHECK_NETS:-172.30.210.10}
 
@@ -40,6 +42,8 @@ services:
     # Alias, no merge key: Compose v2 (Go) no siempre acepta `<<`.
     environment: *engine-env
     env_file:
+      - path: compose.defaults.env
+        required: true
       - path: ../.env
         required: false
     depends_on:
@@ -54,6 +58,8 @@ services:
       dockerfile: infra/Dockerfile.engine
     environment: *engine-env
     env_file:
+      - path: compose.defaults.env
+        required: true
       - path: ../.env
         required: false
     # El Dockerfile documenta el CMD de la api. El worker lo sustituye.
@@ -85,7 +91,9 @@ services:
 
 networks:
   default:
-    # Puede chocar con otra red del host. Si pasa, cambia la ipam y INTERNAL_CHECK_NETS juntos.
+    # 172.30.210.0/24 puede chocar con una VPN u otro Compose del mismo host.
+    # Si el up falla, cambia la ipam junto con FORWARDED_ALLOW_IPS e INTERNAL_CHECK_NETS
+    # en el .env de la raíz (pisa a infra/compose.defaults.env).
     ipam:
       config:
         - subnet: 172.30.210.0/24

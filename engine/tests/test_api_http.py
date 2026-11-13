@@ -384,21 +384,50 @@ def test_action_scout_encola_job_run(client: TestClient) -> None:
         assert rows[0].status == "queued"
 
 
-def test_login_rate_limit(client: TestClient) -> None:
+def test_login_rate_limit_ignora_xff_de_un_cliente_directo(client: TestClient) -> None:
+    for index in range(5):
+        response = client.post(
+            "/api/auth/login",
+            json={"email": _EMAIL, "password": "mala"},
+            headers={"X-Forwarded-For": f"203.0.113.{index}"},
+        )
+        assert response.status_code == 401
+    blocked = client.post(
+        "/api/auth/login",
+        json={"email": "otro@example.com", "password": "mala"},
+        headers={"X-Forwarded-For": "198.51.100.20"},
+    )
+    assert blocked.status_code == 429
+    assert blocked.json()["error"]["code"] == "rate_limited"
+
+
+def test_login_rate_limit_usa_la_ip_del_proxy_conocido(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FORWARDED_ALLOW_IPS", "testclient")
+    reset_settings()
+    reset_login_attempts()
     for _ in range(5):
         response = client.post(
             "/api/auth/login",
             json={"email": _EMAIL, "password": "mala"},
+            headers={"X-Forwarded-For": "1.1.1.1, 203.0.113.10"},
         )
         assert response.status_code == 401
-    blocked = client.post("/api/auth/login", json={"email": _EMAIL, "password": "mala"})
+    blocked = client.post(
+        "/api/auth/login",
+        json={"email": _EMAIL, "password": "clave-distinta"},
+        headers={"X-Forwarded-For": "198.51.100.8, 203.0.113.10"},
+    )
     assert blocked.status_code == 429
-    assert blocked.json()["error"]["code"] == "rate_limited"
     other = client.post(
         "/api/auth/login",
-        json={"email": "otro@example.com", "password": "mala"},
+        json={"email": _EMAIL, "password": "mala"},
+        headers={"X-Forwarded-For": "1.1.1.1, 203.0.113.11"},
     )
     assert other.status_code == 401
+    reset_settings()
+    reset_login_attempts()
 
 
 def test_dos_diagnosticos_no_chocan_el_id_del_correo(client: TestClient) -> None:

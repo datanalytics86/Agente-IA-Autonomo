@@ -157,6 +157,7 @@ class Settings(BaseSettings):
     internal_check_token: str = ""
     internal_check_nets: str = ""
     internal_check_per_minute: int = 60
+    forwarded_allow_ips: str = "127.0.0.1"
     sentry_dsn: str = ""
 
     hosting_provider: Literal["caddy", "cloudflare_pages"] = "caddy"

@@ -137,6 +137,14 @@ jobs:
           npm run build
           npm test
 
+  backup-output:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Volumen engine_output dentro del backup
+        run: bash infra/scripts/test-backup-output.sh
+
   openapi:
     runs-on: ubuntu-latest
     steps:
@@ -189,3 +197,52 @@ jobs:
 
       - name: Paths internos no llegan al proxy
         run: bash infra/scripts/test-caddy-internal.sh
+
+  postgres-restore:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: agencia
+          POSTGRES_PASSWORD: agencia
+          POSTGRES_DB: agencia
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agencia -d agencia"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Esquema Alembic y semilla demo
+        working-directory: engine
+        env:
+          DATABASE_URL: postgresql+psycopg://agencia:agencia@127.0.0.1:5432/agencia
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e . --no-deps
+          python -m alembic upgrade head
+          python main.py --mode seed
+
+      - name: Restore con el cliente de Postgres 16
+        run: |
+          set -euo pipefail
+          docker run --rm --network host --entrypoint bash \
+            -e PGHOST=127.0.0.1 \
+            -e PGPORT=5432 \
+            -e PGUSER=agencia \
+            -e PGPASSWORD=agencia \
+            -e PGDATABASE=agencia \
+            -v "$PWD:/work" \
+            -w /work \
+            postgres:16 \
+            infra/scripts/ci-restore-probe.sh
