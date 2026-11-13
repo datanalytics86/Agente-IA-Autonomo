@@ -29,7 +29,8 @@ fi
 
 pg_dump --format=custom --no-owner --file="$dump" --dbname="$src_db"
 psql -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${temp_db}"
-pg_restore --no-owner --no-acl --exit-on-error --dbname="$temp_db" "$dump"
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+bash "$script_dir/restore.sh" "$dump" "$temp_db"
 
 write_counts() {
   local db="$1"
