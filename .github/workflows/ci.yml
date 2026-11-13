@@ -183,6 +183,20 @@ jobs:
           print("openapi ok:", ", ".join(required))
           PY
 
+  agencia-backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck y falsos de rclone
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          shellcheck infra/scripts/agencia-backup infra/scripts/test-agencia-backup.sh
+          bash infra/scripts/test-agencia-backup.sh
+          sudo visudo -cf infra/sudoers.d/agencia-backup
+
   caddy-internal:
     runs-on: ubuntu-latest
     steps:

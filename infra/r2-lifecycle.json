@@ -1,0 +1,10 @@
+{
+  "Rules": [
+    {
+      "ID": "agencia-backups-30d",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "" },
+      "Expiration": { "Days": 30 }
+    }
+  ]
+}

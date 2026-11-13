@@ -1,0 +1,10 @@
+[Unit]
+Description=Backup diario de la agencia a las 03:15
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 America/Santiago
+Persistent=true
+Unit=agencia-backup.service
+
+[Install]
+WantedBy=timers.target
