@@ -7,6 +7,9 @@
 {
 	admin off
 	auto_https disable_redirects
+	# curl a la IP no manda SNI. Sin esto el handshake del :443 publicado
+	# responde "tlsv1 alert internal error".
+	default_sni 127.0.0.1
 }
 
 (agencia) {
