@@ -28,7 +28,9 @@ services:
 
   caddy:
     image: ghcr.io/datanalytics86/agente-ia-autonomo-edge:${IMAGE_TAG:?}
-    depends_on: !reset [api]
+    # !reset deja el campo en cero y pierde la lista. !override reemplaza [api, web].
+    depends_on: !override
+      - api
     environment:
       ACME_EMAIL: ${ACME_EMAIL:?}
       SITE_ADDRESS: ${SITE_ADDRESS:?}

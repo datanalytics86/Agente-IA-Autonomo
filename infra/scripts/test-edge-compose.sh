@@ -22,17 +22,19 @@ import yaml
 
 doc = yaml.safe_load(open("/tmp/edge-compose.yml", encoding="utf-8"))
 caddy = doc["services"]["caddy"]
-depends = caddy.get("depends_on") or {}
-if isinstance(depends, list):
+depends = caddy.get("depends_on")
+if depends is None:
+    names = []
+elif isinstance(depends, list):
     names = depends
 elif isinstance(depends, dict):
     names = list(depends)
 else:
     names = []
 if "web" in names:
-    raise SystemExit(f"caddy depende de web: {depends}")
+    raise SystemExit(f"caddy depende de web: {depends!r}")
 if "api" not in names:
-    raise SystemExit(f"caddy no depende de api: {depends}")
+    raise SystemExit(f"caddy no depende de api: {depends!r}")
 for mount in caddy.get("volumes") or []:
     text = mount if isinstance(mount, str) else str(mount)
     if "/etc/caddy/Caddyfile" in text or "/srv/site" in text:
