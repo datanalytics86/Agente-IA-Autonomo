@@ -196,6 +196,22 @@ jobs:
 
       - name: Guard de ALLOW_LIVE
         run: bash infra/scripts/test-deploy-guard.sh
+
+  caddy-internal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Caddy
+        run: |
+          set -euo pipefail
+          curl -sSfL "https://github.com/caddyserver/caddy/releases/download/v2.10.2/caddy_2.10.2_linux_amd64.tar.gz" -o /tmp/caddy.tgz
+          tar -xzf /tmp/caddy.tgz -C /tmp caddy
+          sudo mv /tmp/caddy /usr/local/bin/caddy
+
+      - name: Paths internos no llegan al proxy
+        run: bash infra/scripts/test-caddy-internal.sh
+
   postgres-restore:
     runs-on: ubuntu-latest
     services:
