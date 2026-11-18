@@ -197,6 +197,14 @@ jobs:
           bash infra/scripts/test-agencia-backup.sh
           sudo visudo -cf infra/sudoers.d/agencia-backup
 
+  caddy-hsts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: HSTS en el 443 publicado
+        run: bash infra/scripts/test-hsts.sh
+
   caddy-internal:
     runs-on: ubuntu-latest
     steps:
