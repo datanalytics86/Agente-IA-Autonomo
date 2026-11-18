@@ -16,17 +16,17 @@ must_fail() {
 
 must_fail env -u IMAGE_TAG -u POSTGRES_PASSWORD -u APP_MODE -u PUBLIC_BASE_URL docker compose
 must_fail env -u POSTGRES_PASSWORD IMAGE_TAG=abc APP_MODE=live PUBLIC_BASE_URL=https://agencia.example docker compose
-must_fail env -u IMAGE_TAG POSTGRES_PASSWORD=abcdef0123456789 APP_MODE=live PUBLIC_BASE_URL=https://agencia.example docker compose
+must_fail env -u IMAGE_TAG POSTGRES_PASSWORD=0000000000000000000000000000000000000000 APP_MODE=live PUBLIC_BASE_URL=https://agencia.example docker compose
 
 envfile="$(mktemp)"
 trap 'rm -f "$envfile"' EXIT
 : >"$envfile"
-must_fail env -u APP_MODE IMAGE_TAG=abc POSTGRES_PASSWORD=abcdef0123456789 \
+must_fail env -u APP_MODE IMAGE_TAG=abc POSTGRES_PASSWORD=0000000000000000000000000000000000000000 \
   PUBLIC_BASE_URL=https://agencia.example AGENCIA_ENV_FILE="$envfile" docker compose
-must_fail env -u PUBLIC_BASE_URL IMAGE_TAG=abc POSTGRES_PASSWORD=abcdef0123456789 \
+must_fail env -u PUBLIC_BASE_URL IMAGE_TAG=abc POSTGRES_PASSWORD=0000000000000000000000000000000000000000 \
   APP_MODE=live AGENCIA_ENV_FILE="$envfile" docker compose
 
-IMAGE_TAG=abc POSTGRES_PASSWORD=abcdef0123456789 APP_MODE=live \
+IMAGE_TAG=abc POSTGRES_PASSWORD=0000000000000000000000000000000000000000 APP_MODE=live \
   PUBLIC_BASE_URL=https://agencia.example AGENCIA_ENV_FILE="$envfile" \
   ACME_EMAIL=ci@example.com SITE_ADDRESS=https://agencia.example \
   SITE_DOMAIN=agencia.example PUBLIC_ORIGIN=https://agencia.example \
@@ -60,5 +60,34 @@ for name in ("api", "worker"):
     url = env.get("DATABASE_URL", "")
     if not url_ok.fullmatch(url):
         raise SystemExit(f"{name} DATABASE_URL no es usuario/clave-hex/host: {url}")
+    if not service.get("healthcheck"):
+        raise SystemExit(f"{name} no tiene healthcheck")
+if not services["caddy"].get("healthcheck"):
+    raise SystemExit("caddy no tiene healthcheck")
 print("compose prod ok")
 PY
+
+if docker compose -f infra/docker-compose.prod.yml config >/tmp/compose-out.yml 2>/tmp/compose-err.txt; then
+  echo "docker-compose.prod.yml solo no debe configurar" >&2
+  exit 1
+fi
+if ! grep -q 'neither an image nor a build context' /tmp/compose-err.txt; then
+  echo "se esperaba el error de db sin imagen" >&2
+  cat /tmp/compose-err.txt >&2
+  exit 1
+fi
+
+tag="0000000000000000000000000000000000000000"
+base="$(mktemp -d)"
+rel="$base/releases/${tag}/infra"
+mkdir -p "$rel/scripts"
+cp infra/docker-compose.yml infra/docker-compose.prod.yml infra/compose.defaults.env "$rel/"
+cp infra/scripts/backup.sh "$rel/scripts/"
+: >"$base/.env"
+cd "$base"
+IMAGE_TAG=abc POSTGRES_PASSWORD=0000000000000000000000000000000000000000 \
+  APP_MODE=live PUBLIC_BASE_URL=https://agencia.example AGENCIA_ENV_FILE="$base/.env" \
+  docker compose -p agencia --env-file .env \
+  -f "releases/${tag}/infra/docker-compose.yml" \
+  -f "releases/${tag}/infra/docker-compose.prod.yml" config >/dev/null
+echo "compose release ok"
