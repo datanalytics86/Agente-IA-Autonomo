@@ -1,0 +1,11 @@
+[Unit]
+Description=Cifra y sube el backup de la agencia
+
+[Service]
+Type=oneshot
+User=root
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+EnvironmentFile=/etc/agencia/backup.env
+ExecStart=/usr/local/sbin/agencia-backup
