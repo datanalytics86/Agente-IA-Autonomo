@@ -96,8 +96,5 @@ jobs:
         run: |
           set -euo pipefail
           # shellcheck disable=SC2029
-          ssh "$TARGET" bash /opt/agencia/deploy-remote.sh \
-            "$IMAGE_TAG" \
-            "$BACKUP_FIRST" \
-            "$ALLOW_LIVE" \
-            "$PUBLIC_URL"
+          ssh "$TARGET" \
+            "IMAGE_TAG='${IMAGE_TAG}' BACKUP_FIRST='${BACKUP_FIRST}' ALLOW_LIVE='${ALLOW_LIVE}' PUBLIC_URL='${PUBLIC_URL}' bash /opt/agencia/deploy-remote.sh"

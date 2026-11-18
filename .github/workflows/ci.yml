@@ -191,7 +191,12 @@ jobs:
       - name: actionlint
         run: |
           set -euo pipefail
-          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ver=1.7.12
+          sha=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+          curl -fsSL -o actionlint.tar.gz \
+            "https://github.com/rhysd/actionlint/releases/download/v${ver}/actionlint_${ver}_linux_amd64.tar.gz"
+          echo "${sha}  actionlint.tar.gz" | sha256sum -c
+          tar -xzf actionlint.tar.gz actionlint
           ./actionlint -color
 
       - name: Guard de ALLOW_LIVE

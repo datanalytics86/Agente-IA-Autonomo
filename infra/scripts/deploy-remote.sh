@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Corre en el host. Argumentos: tag, backup_first, allow_live, public_url.
-# No recibe secretos por la línea de comandos. El pull de GHCR es sin login.
+# Corre en el host. Lee IMAGE_TAG, BACKUP_FIRST, ALLOW_LIVE y PUBLIC_URL
+# del entorno. No van en el argv de ssh. No recibe secretos.
+# El pull de GHCR es sin login.
 set -euo pipefail
 
-tag="${1:?falta el tag}"
-backup_first="${2:?falta backup_first}"
-allow_live="${3:?falta allow_live}"
-public_url="${4:?falta public_url}"
+tag="${IMAGE_TAG:?falta IMAGE_TAG}"
+backup_first="${BACKUP_FIRST:?falta BACKUP_FIRST}"
+allow_live="${ALLOW_LIVE:?falta ALLOW_LIVE}"
+public_url="${PUBLIC_URL:?falta PUBLIC_URL}"
 
 if [[ ! "$tag" =~ ^[0-9a-f]{40}$ ]]; then
   echo "tag invalido" >&2

@@ -26,7 +26,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: deploy-${{ github.event.inputs.target || 'pipeline' }}
+  group: deploy-caller-${{ github.event.inputs.target || 'pipeline' }}
   cancel-in-progress: false
 
 env:

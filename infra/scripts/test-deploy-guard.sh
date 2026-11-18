@@ -29,6 +29,8 @@ printf 'DRY_RUN=true\nOUTREACH_ENABLED=true\n' > "$tmp/outreach.env"
 reject outreach
 printf 'DRY_RUN=true\nexport OUTREACH_ENABLED="true"\n' > "$tmp/outreach-quoted.env"
 reject outreach-quoted
+printf 'DRY_RUN=true\nOUTREACH_ENABLED=yes\n' > "$tmp/outreach-yes.env"
+reject outreach-yes
 
 printf 'DRY_RUN=true\nOUTREACH_ENABLED=false\n' > "$tmp/shadow.env"
 ALLOW_LIVE=false bash "$guard" "$tmp/shadow.env"
