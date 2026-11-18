@@ -1,0 +1,25 @@
+title = "Agente IA Autonomo"
+
+[extend]
+useDefault = true
+
+# Gitleaks 8.2x usa OR si falta condition. AND exige ruta, commit y secreto.
+# targetRules evita el atajo global: con paths en el allowlist global, 8.2x
+# no lee el archivo y cualquier secreto de esa ruta queda tapado.
+[[allowlists]]
+description = "infra/.env.ci en 589a37a: solo esta cadena. No es una credencial."
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''(^|/)infra/\.env\.ci$''']
+commits = ["589a37a09e43ab997999e543eab044fadb11a929"]
+regexes = ['''^ci-secret-key-de-prueba-no-es-prod-32$''']
+
+# ec401614 y el árbol actual tienen el mismo falso positivo. El secreto
+# capturado es exactamente x_signature= (valor vacío). path+regex en AND
+# cubren el commit y el archivo de hoy; otro valor en el mismo archivo no.
+[[allowlists]]
+description = "test_payments.py: falso positivo del x_signature vacío (ec401614 y el árbol actual)."
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''(^|/)engine/tests/test_payments\.py$''']
+regexes = ['''^x_signature=$''']

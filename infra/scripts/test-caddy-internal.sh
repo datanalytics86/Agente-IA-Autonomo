@@ -45,4 +45,14 @@ reject '/api/./internal/domain-check'
 public="$(curl -s -o "$tmp/body" -w '%{http_code}' --path-as-is http://127.0.0.1:8088/api/public/paquetes)"
 test "$public" = "200"
 grep -q proxied "$tmp/body"
+
+fake="$(curl -s -o "$tmp/body" -w '%{http_code}' --path-as-is http://127.0.0.1:8088/pago/fake/abc)"
+test "$fake" = "200"
+grep -q proxied "$tmp/body"
+
+curl -s -o "$tmp/body" --path-as-is http://127.0.0.1:8088/pago/exito >/dev/null
+if grep -q proxied "$tmp/body"; then
+  echo "/pago/exito no debe ir a la API" >&2
+  exit 1
+fi
 echo "caddy internal ok"
