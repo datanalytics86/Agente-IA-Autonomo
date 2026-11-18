@@ -206,6 +206,28 @@ jobs:
       - name: iptables falso
         run: bash infra/scripts/test-bootstrap-host.sh
 
+  deploy-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: actionlint
+        run: |
+          set -euo pipefail
+          ver=1.7.12
+          sha=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+          curl -fsSL -o actionlint.tar.gz \
+            "https://github.com/rhysd/actionlint/releases/download/v${ver}/actionlint_${ver}_linux_amd64.tar.gz"
+          echo "${sha}  actionlint.tar.gz" | sha256sum -c
+          tar -xzf actionlint.tar.gz actionlint
+          ./actionlint -color
+
+      - name: Guard de ALLOW_LIVE
+        run: bash infra/scripts/test-deploy-guard.sh
+
+      - name: Layout del release
+        run: bash infra/scripts/test-deploy-layout.sh
+
   agencia-backup:
     runs-on: ubuntu-latest
     steps:

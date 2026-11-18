@@ -1,0 +1,100 @@
+# Reusable. También queda skipped si vars.DEPLOY_ENABLED no es 'true'.
+# checkout v4.4.0.
+
+name: deploy-target
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        type: string
+        required: true
+      image_tag:
+        type: string
+        required: true
+      backup_first:
+        type: boolean
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: deploy-host-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    environment:
+      name: ${{ inputs.target }}
+      url: ${{ vars.PUBLIC_URL }}
+    timeout-minutes: 20
+    steps:
+      - name: Validar image_tag
+        id: tag
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "image_tag invalido" >&2
+            exit 1
+          fi
+          echo "tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          sparse-checkout: |
+            infra/docker-compose.yml
+            infra/docker-compose.prod.yml
+            infra/compose.defaults.env
+            infra/scripts/backup.sh
+            infra/scripts/deploy-guard.sh
+            infra/scripts/deploy-remote.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Preparar SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'TARGET=%s@%s\n' "$SSH_USER" "$SSH_HOST" >> "$GITHUB_ENV"
+
+      - name: Subir compose y scripts
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2029
+          ssh -o BatchMode=yes "$TARGET" mkdir -p "/opt/agencia/releases/${IMAGE_TAG}/infra/scripts"
+          # shellcheck disable=SC2029
+          scp infra/docker-compose.yml infra/docker-compose.prod.yml infra/compose.defaults.env \
+            "$TARGET:/opt/agencia/releases/${IMAGE_TAG}/infra/"
+          # shellcheck disable=SC2029
+          scp infra/scripts/backup.sh \
+            "$TARGET:/opt/agencia/releases/${IMAGE_TAG}/infra/scripts/"
+          scp infra/scripts/deploy-guard.sh infra/scripts/deploy-remote.sh \
+            "$TARGET:/opt/agencia/"
+
+      - name: Deploy
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+          BACKUP_FIRST: ${{ inputs.backup_first }}
+          ALLOW_LIVE: ${{ vars.ALLOW_LIVE || 'false' }}
+          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2029
+          ssh -o BatchMode=yes "$TARGET" \
+            "IMAGE_TAG='${IMAGE_TAG}' BACKUP_FIRST='${BACKUP_FIRST}' ALLOW_LIVE='${ALLOW_LIVE}' PUBLIC_URL='${PUBLIC_URL}' bash /opt/agencia/deploy-remote.sh"
