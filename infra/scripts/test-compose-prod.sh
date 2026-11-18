@@ -75,8 +75,8 @@ if IMAGE_TAG=abc POSTGRES_PASSWORD=0000000000000000000000000000000000000000 \
   echo "docker-compose.prod.yml solo no debe configurar" >&2
   exit 1
 fi
-if ! grep -q 'neither an image nor a build context' /tmp/compose-err.txt; then
-  echo "se esperaba el error de db sin imagen" >&2
+if ! grep -Eq 'neither an image nor a build context|undefined volume' /tmp/compose-err.txt; then
+  echo "se esperaba que el prod solo no sea un proyecto válido" >&2
   cat /tmp/compose-err.txt >&2
   exit 1
 fi
