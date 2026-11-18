@@ -15,7 +15,6 @@ if [[ ! "$tag" =~ ^[0-9a-f]{40}$ ]]; then
 fi
 
 cd /opt/agencia
-rel="releases/${tag}/infra"
 prev="$(cat current_tag 2>/dev/null || true)"
 test -f .env || { echo "Falta /opt/agencia/.env"; exit 1; }
 

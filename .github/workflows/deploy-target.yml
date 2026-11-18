@@ -77,7 +77,7 @@ jobs:
         run: |
           set -euo pipefail
           # shellcheck disable=SC2029
-          ssh "$TARGET" mkdir -p "/opt/agencia/releases/${IMAGE_TAG}/infra/scripts"
+          ssh -o BatchMode=yes "$TARGET" mkdir -p "/opt/agencia/releases/${IMAGE_TAG}/infra/scripts"
           # shellcheck disable=SC2029
           scp infra/docker-compose.yml infra/docker-compose.prod.yml infra/compose.defaults.env \
             "$TARGET:/opt/agencia/releases/${IMAGE_TAG}/infra/"
@@ -96,5 +96,5 @@ jobs:
         run: |
           set -euo pipefail
           # shellcheck disable=SC2029
-          ssh "$TARGET" \
+          ssh -o BatchMode=yes "$TARGET" \
             "IMAGE_TAG='${IMAGE_TAG}' BACKUP_FIRST='${BACKUP_FIRST}' ALLOW_LIVE='${ALLOW_LIVE}' PUBLIC_URL='${PUBLIC_URL}' bash /opt/agencia/deploy-remote.sh"

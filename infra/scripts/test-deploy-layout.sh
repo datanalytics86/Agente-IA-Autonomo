@@ -18,7 +18,12 @@ cp "$root/infra/scripts/backup.sh" "$rel/scripts/"
 printf 'DRY_RUN=true\nOUTREACH_ENABLED=false\n' > "$base/.env"
 
 cd "$base"
-POSTGRES_PASSWORD=0000000000000000000000000000000000000000 docker compose -p agencia --env-file .env \
+IMAGE_TAG=abc POSTGRES_PASSWORD=0000000000000000000000000000000000000000 \
+  APP_MODE=live PUBLIC_BASE_URL=https://agencia.example \
+  AGENCIA_ENV_FILE="$base/.env" \
+  ACME_EMAIL=ci@example.com SITE_ADDRESS=https://agencia.example \
+  SITE_DOMAIN=agencia.example PUBLIC_ORIGIN=https://agencia.example \
+  docker compose -p agencia --env-file .env \
   -f "releases/${tag}/infra/docker-compose.yml" \
   -f "releases/${tag}/infra/docker-compose.prod.yml" config >/dev/null
 echo "deploy layout ok"
