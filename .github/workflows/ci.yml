@@ -198,6 +198,14 @@ jobs:
       - name: iptables falso
         run: bash infra/scripts/test-bootstrap-host.sh
 
+  caddy-hsts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: HSTS en el 443 publicado
+        run: bash infra/scripts/test-hsts.sh
+
   caddy-internal:
     runs-on: ubuntu-latest
     steps:
