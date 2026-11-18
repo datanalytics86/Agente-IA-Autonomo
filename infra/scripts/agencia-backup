@@ -4,7 +4,9 @@
 # BACKUP_DIR es el directorio del volumen agencia_backups en el host.
 # AGENCIA_BACKUP_ENV y AGENCIA_COMPOSE_DIR solo los usa la prueba.
 # La regla de retención en R2 está en infra/r2-lifecycle.json (30 días).
-set -euo pipefail
+# Cómo armar el remoto rclone, sin crear la cuenta: infra/rclone-r2.md.
+# set -E: el trap ERR también corre si falla una función.
+set -eEuo pipefail
 
 env_file="${AGENCIA_BACKUP_ENV:-/etc/agencia/backup.env}"
 if [ -f "$env_file" ]; then
@@ -50,9 +52,14 @@ if [ ! -d "$BACKUP_DIR" ]; then
   exit 1
 fi
 
+# El deploy deja los dos compose en releases/<sha>/infra (mismo layout que el punto 6).
+# Sin current_tag todavía no hay release: es el primer deploy, no hay nada que respaldar.
 if [ -n "${AGENCIA_COMPOSE_DIR:-}" ]; then
   compose_dir="$AGENCIA_COMPOSE_DIR"
   image_tag="${IMAGE_TAG:-ci}"
+elif [ ! -f /opt/agencia/current_tag ]; then
+  echo "sin current_tag: primer deploy, se omite el backup"
+  exit 0
 else
   image_tag="$(tr -d '[:space:]' < /opt/agencia/current_tag)"
   compose_dir="/opt/agencia/releases/${image_tag}/infra"

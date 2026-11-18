@@ -59,6 +59,20 @@ RCLONE_DEST=r2:agencia-backups-prod
 BACKUP_DIR=$tmp/backups
 HEALTHCHECKS_URL=https://hc.example/ping
 EOF
+
+# Primer deploy: hay variables, pero todavía no existe current_tag.
+if ! env -i PATH="$tmp/bin:/usr/bin:/bin" \
+  AGENCIA_BACKUP_ENV="$tmp/backup.env" \
+  bash "$script"; then
+  echo "sin current_tag el backup no debe abortar" >&2
+  exit 1
+fi
+if [ -f "$log" ] && grep -q rclone "$log"; then
+  echo "sin current_tag no debe llamar a rclone" >&2
+  exit 1
+fi
+rm -f "$log"
+
 for i in $(seq 1 16); do
   printf 'old\n' > "$tmp/backups/old-${i}.age"
   touch -d "2020-01-01 00:00:$((i % 60)) UTC" "$tmp/backups/old-${i}.age"
