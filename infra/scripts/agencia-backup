@@ -42,6 +42,15 @@ on_err() {
   exit "$code"
 }
 trap on_err ERR
+shred_plain() {
+  if [ -z "${BACKUP_DIR:-}" ] || [ ! -d "$BACKUP_DIR" ]; then
+    return 0
+  fi
+  shopt -s nullglob
+  rm -f -- "${BACKUP_DIR}"/*.dump "${BACKUP_DIR}"/*-output.tar
+  shopt -u nullglob
+}
+trap shred_plain EXIT
 
 : "${AGE_RECIPIENT:?falta AGE_RECIPIENT}"
 : "${RCLONE_DEST:?falta RCLONE_DEST}"
@@ -110,7 +119,12 @@ encrypt_and_upload() {
   local name="$2"
   local encrypted="${BACKUP_DIR}/${name}"
   age -r "$AGE_RECIPIENT" -o "$encrypted" "$src"
-  rclone copyto "$encrypted" "${RCLONE_DEST}/$(basename "$encrypted")"
+  local base
+  base="$(basename "$encrypted")"
+  rclone copyto "$encrypted" "${RCLONE_DEST}/daily/${base}"
+  if [ "${AGENCIA_BACKUP_DAY:-$(date -u +%d)}" = "01" ]; then
+    rclone copyto "$encrypted" "${RCLONE_DEST}/monthly/${base}"
+  fi
 }
 
 encrypt_and_upload "$dump" "agencia-${stamp}${suffix}.dump.age"

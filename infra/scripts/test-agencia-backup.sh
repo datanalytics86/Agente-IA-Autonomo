@@ -81,12 +81,19 @@ done
 env -i PATH="$tmp/bin:/usr/bin:/bin" \
   AGENCIA_BACKUP_ENV="$tmp/backup.env" \
   AGENCIA_COMPOSE_DIR="$tmp/infra" \
+  AGENCIA_BACKUP_DAY=01 \
   bash "$script" --label "pre-deploy-abc"
 
 grep -q 'nuevo-dump' "$tmp/backups"/*.dump.age
 grep -q 'nuevo-tar' "$tmp/backups"/*-output.tar.age
 grep -q 'rclone ' "$log"
+grep -q '/daily/' "$log"
+grep -q '/monthly/' "$log"
 grep -q 'agencia-.*-output.tar.age' "$log"
+if find "$tmp/backups" \( -name '*.dump' -o -name '*.tar' \) | grep -q .; then
+  echo "quedó un dump o un tar en claro" >&2
+  exit 1
+fi
 grep -q 'https://hc.example/ping' "$log"
 if grep -q '/fail' "$log"; then
   echo "el éxito no debe pegarle a /fail" >&2

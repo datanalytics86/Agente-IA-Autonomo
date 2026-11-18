@@ -13,4 +13,6 @@ rclone config create r2 s3 \
   acl private
 ```
 
-El archivo queda en `/root/.config/rclone/rclone.conf` (root 600), porque `agencia-backup` corre como root. La retención de objetos está en `infra/r2-lifecycle.json` y se aplica en el bucket, no desde este script.
+El archivo queda en `/root/.config/rclone/rclone.conf` (root 600), porque `agencia-backup` corre como root.
+
+Cada corrida sube a `daily/`. El día 01 del mes también copia a `monthly/`. La retención del bucket está en `infra/r2-lifecycle.json`: 30 días en `daily/` y 365 días (12 meses) en `monthly/`. Se aplica en el bucket, no desde este script.
