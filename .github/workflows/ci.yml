@@ -115,7 +115,7 @@ jobs:
         with:
           node-version: "22"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         if: hashFiles('apps/site/package-lock.json') != ''
         with:
           path: ~/.npm
