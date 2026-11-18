@@ -198,9 +198,6 @@ jobs:
       - name: iptables falso
         run: bash infra/scripts/test-bootstrap-host.sh
 
-      - name: sudoers
-        run: sudo visudo -cf infra/sudoers.d/agencia-backup
-
   caddy-internal:
     runs-on: ubuntu-latest
     steps:

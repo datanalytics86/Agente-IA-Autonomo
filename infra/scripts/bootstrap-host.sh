@@ -91,8 +91,14 @@ if [ -n "${DEPLOY_PUBKEY:-}" ]; then
 fi
 
 if [ ! -f /etc/ssh/sshd_config.d/99-agencia.conf ]; then
-  printf '%s\n' 'PasswordAuthentication no' 'PermitRootLogin prohibit-password' \
-    > /etc/ssh/sshd_config.d/99-agencia.conf
+  # Sin llave de deploy, prohibir la contraseña deja el host sin entrada.
+  if [ -n "${DEPLOY_PUBKEY:-}" ]; then
+    printf '%s\n' 'PasswordAuthentication no' 'PermitRootLogin prohibit-password' \
+      > /etc/ssh/sshd_config.d/99-agencia.conf
+  else
+    printf '%s\n' 'PermitRootLogin prohibit-password' \
+      > /etc/ssh/sshd_config.d/99-agencia.conf
+  fi
 fi
 if [ -n "${DEPLOY_PUBKEY:-}" ]; then
   sshd -t
@@ -151,7 +157,11 @@ if [ -f "$infra_dir/scripts/agencia-backup" ]; then
 fi
 if [ -f "$infra_dir/systemd/agencia-backup.service" ]; then
   install -o root -g root -m 644 "$infra_dir/systemd/agencia-backup.service" /etc/systemd/system/agencia-backup.service
+fi
+if [ -f "$infra_dir/systemd/agencia-backup.timer" ]; then
   install -o root -g root -m 644 "$infra_dir/systemd/agencia-backup.timer" /etc/systemd/system/agencia-backup.timer
+fi
+if [ -f /etc/agencia/backup.env ] && [ -f /etc/systemd/system/agencia-backup.timer ]; then
   systemctl daemon-reload
   systemctl enable --now agencia-backup.timer
 fi

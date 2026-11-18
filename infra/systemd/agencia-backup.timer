@@ -1,9 +1,0 @@
-[Unit]
-Description=Backup diario de la agencia
-
-[Timer]
-OnCalendar=*-*-* 03:15:00 America/Santiago
-Persistent=true
-
-[Install]
-WantedBy=timers.target
