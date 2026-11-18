@@ -145,6 +145,14 @@ jobs:
       - name: Volumen engine_output dentro del backup
         run: bash infra/scripts/test-backup-output.sh
 
+  compose-prod:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compose de producción exige tag y clave
+        run: bash infra/scripts/test-compose-prod.sh
+
   openapi:
     runs-on: ubuntu-latest
     steps:
