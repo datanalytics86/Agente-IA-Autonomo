@@ -18,7 +18,7 @@ cp "$root/infra/scripts/backup.sh" "$rel/scripts/"
 printf 'DRY_RUN=true\nOUTREACH_ENABLED=false\n' > "$base/.env"
 
 cd "$base"
-POSTGRES_PASSWORD=abcdef0123456789 docker compose -p agencia --env-file .env \
+POSTGRES_PASSWORD=0000000000000000000000000000000000000000 docker compose -p agencia --env-file .env \
   -f "releases/${tag}/infra/docker-compose.yml" \
   -f "releases/${tag}/infra/docker-compose.prod.yml" config >/dev/null
 echo "deploy layout ok"
