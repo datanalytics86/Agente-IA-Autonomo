@@ -55,6 +55,11 @@
 		reverse_proxy api:8000
 	}
 
+	@pago_fake path /pago/fake /pago/fake/*
+	handle @pago_fake {
+		reverse_proxy api:8000
+	}
+
 	handle /admin {
 		redir * /admin/ 308
 	}
