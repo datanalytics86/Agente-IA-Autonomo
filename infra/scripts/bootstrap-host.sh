@@ -98,7 +98,8 @@ if [ -n "${DEPLOY_PUBKEY:-}" ]; then
   chmod 600 /home/deploy/.ssh/authorized_keys
 fi
 
-apt-get install -y age rclone openssh-server
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y age rclone openssh-server
 
 install -d -m 755 /etc/ssh/sshd_config.d
 if [ ! -f /etc/ssh/sshd_config.d/99-agencia.conf ]; then
