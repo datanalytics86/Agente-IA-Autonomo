@@ -76,9 +76,12 @@ jobs:
           IMAGE_TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -euo pipefail
-          ssh "$TARGET" "mkdir -p /opt/agencia/releases/${IMAGE_TAG}/infra/scripts"
+          # shellcheck disable=SC2029
+          ssh "$TARGET" mkdir -p "/opt/agencia/releases/${IMAGE_TAG}/infra/scripts"
+          # shellcheck disable=SC2029
           scp infra/docker-compose.yml infra/docker-compose.prod.yml infra/compose.defaults.env \
             "$TARGET:/opt/agencia/releases/${IMAGE_TAG}/infra/"
+          # shellcheck disable=SC2029
           scp infra/scripts/backup.sh \
             "$TARGET:/opt/agencia/releases/${IMAGE_TAG}/infra/scripts/"
           scp infra/scripts/deploy-guard.sh infra/scripts/deploy-remote.sh \
