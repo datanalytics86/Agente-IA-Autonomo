@@ -1,0 +1,16 @@
+{
+  "Rules": [
+    {
+      "ID": "agencia-daily-30",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "daily/" },
+      "Expiration": { "Days": 30 }
+    },
+    {
+      "ID": "agencia-monthly-12",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "monthly/" },
+      "Expiration": { "Days": 365 }
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+# El usuario deploy solo puede lanzar este script, sin contraseña.
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/agencia-backup
