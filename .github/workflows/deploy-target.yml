@@ -19,7 +19,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: deploy-${{ inputs.target }}
+  group: deploy-host-${{ inputs.target }}
   cancel-in-progress: false
 
 jobs:
@@ -33,12 +33,26 @@ jobs:
       url: ${{ vars.PUBLIC_URL }}
     timeout-minutes: 20
     steps:
+      - name: Validar image_tag
+        id: tag
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "image_tag invalido" >&2
+            exit 1
+          fi
+          echo "tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ inputs.image_tag }}
+          ref: ${{ steps.tag.outputs.tag }}
           sparse-checkout: |
+            infra/docker-compose.yml
             infra/docker-compose.prod.yml
-            infra/Caddyfile.prod
+            infra/compose.defaults.env
+            infra/scripts/backup.sh
             infra/scripts/deploy-guard.sh
             infra/scripts/deploy-remote.sh
           sparse-checkout-cone-mode: false
@@ -57,24 +71,30 @@ jobs:
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           printf 'TARGET=%s@%s\n' "$SSH_USER" "$SSH_HOST" >> "$GITHUB_ENV"
 
-      - name: Subir compose, Caddyfile y scripts
+      - name: Subir compose y scripts
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -euo pipefail
-          ssh "$TARGET" "mkdir -p /opt/agencia/releases/${{ inputs.image_tag }}"
-          scp infra/docker-compose.prod.yml infra/Caddyfile.prod \
-            "$TARGET:/opt/agencia/releases/${{ inputs.image_tag }}/"
+          ssh "$TARGET" "mkdir -p /opt/agencia/releases/${IMAGE_TAG}/infra/scripts"
+          scp infra/docker-compose.yml infra/docker-compose.prod.yml infra/compose.defaults.env \
+            "$TARGET:/opt/agencia/releases/${IMAGE_TAG}/infra/"
+          scp infra/scripts/backup.sh \
+            "$TARGET:/opt/agencia/releases/${IMAGE_TAG}/infra/scripts/"
           scp infra/scripts/deploy-guard.sh infra/scripts/deploy-remote.sh \
             "$TARGET:/opt/agencia/"
 
       - name: Deploy
         env:
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+          BACKUP_FIRST: ${{ inputs.backup_first }}
           ALLOW_LIVE: ${{ vars.ALLOW_LIVE || 'false' }}
           PUBLIC_URL: ${{ vars.PUBLIC_URL }}
         run: |
           set -euo pipefail
           # shellcheck disable=SC2029
           ssh "$TARGET" bash /opt/agencia/deploy-remote.sh \
-            "${{ inputs.image_tag }}" \
-            "${{ inputs.backup_first }}" \
+            "$IMAGE_TAG" \
+            "$BACKUP_FIRST" \
             "$ALLOW_LIVE" \
             "$PUBLIC_URL"

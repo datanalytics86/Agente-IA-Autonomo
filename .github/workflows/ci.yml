@@ -197,6 +197,9 @@ jobs:
       - name: Guard de ALLOW_LIVE
         run: bash infra/scripts/test-deploy-guard.sh
 
+      - name: Layout del release
+        run: bash infra/scripts/test-deploy-layout.sh
+
   caddy-internal:
     runs-on: ubuntu-latest
     steps:
