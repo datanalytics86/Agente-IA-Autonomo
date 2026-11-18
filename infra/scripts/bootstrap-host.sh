@@ -27,6 +27,11 @@ case "${os_id}-${os_version}" in
     ;;
 esac
 
+if [ "$check_only" -eq 1 ] && ! command -v iptables >/dev/null 2>&1; then
+  echo "iptables ok (${os_id} ${os_version}; sin iptables)"
+  exit 0
+fi
+
 if [ "$check_only" -eq 0 ] && ! command -v iptables >/dev/null 2>&1; then
   apt-get update
   apt-get install -y iptables
@@ -38,11 +43,16 @@ if ! printf '%s\n' "$version" | grep -q 'nf_tables'; then
   exit 1
 fi
 
-alt="$(update-alternatives --display iptables 2>/dev/null || true)"
-if ! printf '%s\n' "$alt" | grep -q 'iptables-nft'; then
-  echo "la alternativa de iptables no apunta a iptables-nft" >&2
-  exit 1
-fi
+# Solo la línea Value: es el enlace activo. Un grep del texto completo
+# acierta aunque el enlace sea iptables-legacy y nft aparezca como esclavo.
+active="$(update-alternatives --query iptables 2>/dev/null | awk -F': ' '/^Value: / { print $2; exit }')"
+case "$active" in
+  */iptables-nft) ;;
+  *)
+    echo "la alternativa activa no es iptables-nft: ${active:-ninguna}" >&2
+    exit 1
+    ;;
+esac
 
 legacy_save="$(iptables-legacy-save 2>/dev/null || true)"
 legacy_count="$(printf '%s\n' "$legacy_save" | grep -c '^-' || true)"
@@ -59,14 +69,12 @@ fi
 
 if command -v docker >/dev/null 2>&1; then
   info="$(docker info 2>/dev/null || true)"
-  # Docker 28/29 dice "Firewall Backend: iptables" aunque la alternativa sea
-  # iptables-nft: dockerd llama a iptables y ese binario escribe en nftables.
-  # La mezcla real es nftables en dockerd con la alternativa en legacy.
-  if printf '%s\n' "$info" | grep -q 'Firewall Backend: nftables'; then
-    if ! printf '%s\n' "$alt" | grep -q 'iptables-nft'; then
-      echo "dockerd usa nftables y la alternativa de iptables no" >&2
-      exit 1
-    fi
+  # Si dockerd informa el binario, tiene que ser el mismo enlace activo.
+  # "Firewall Backend: iptables" sin ruta es lo normal sobre iptables-nft.
+  docker_bin="$(printf '%s\n' "$info" | grep -oE '/[[:alnum:]./_-]*iptables(-nft|-legacy)?' | head -1 || true)"
+  if [ -n "$docker_bin" ] && [ "$(basename "$docker_bin")" != "$(basename "$active")" ]; then
+    echo "dockerd usa ${docker_bin} y la alternativa activa es ${active}" >&2
+    exit 1
   fi
 fi
 
@@ -90,6 +98,7 @@ if [ -n "${DEPLOY_PUBKEY:-}" ]; then
   chmod 600 /home/deploy/.ssh/authorized_keys
 fi
 
+install -d -m 755 /etc/ssh/sshd_config.d
 if [ ! -f /etc/ssh/sshd_config.d/99-agencia.conf ]; then
   # Sin llave de deploy, prohibir la contraseña deja el host sin entrada.
   if [ -n "${DEPLOY_PUBKEY:-}" ]; then

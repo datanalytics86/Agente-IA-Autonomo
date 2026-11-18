@@ -53,6 +53,32 @@ if PATH="${legacydir}:/usr/bin:/bin" BOOTSTRAP_OS_ID=ubuntu BOOTSTRAP_OS_VERSION
   exit 1
 fi
 
+nodir="${base}/none"
+mkdir -p "$nodir"
+PATH="${nodir}:/usr/bin:/bin" BOOTSTRAP_OS_ID=debian BOOTSTRAP_OS_VERSION=12 \
+  bash "$script" --check-only
+
+sub="${base}/sub"
+mkdir -p "$sub"
+common "$sub"
+write_bin "$sub" update-alternatives 'echo "slave /usr/sbin/iptables-nft"; echo "Value: /usr/sbin/iptables-legacy"'
+if PATH="${sub}:/usr/bin:/bin" BOOTSTRAP_OS_ID=ubuntu BOOTSTRAP_OS_VERSION=24.04 \
+  bash "$script" --check-only; then
+  echo "un substring nft no debe tapar el enlace legacy" >&2
+  exit 1
+fi
+
+bindir="${base}/binmismatch"
+mkdir -p "$bindir"
+common "$bindir"
+write_bin "$bindir" update-alternatives 'echo "Value: /usr/sbin/iptables-nft"'
+write_bin "$bindir" docker 'echo "iptables binary: /usr/sbin/iptables-legacy"'
+if PATH="${bindir}:/usr/bin:/bin" BOOTSTRAP_OS_ID=ubuntu BOOTSTRAP_OS_VERSION=24.04 \
+  bash "$script" --check-only; then
+  echo "dockerd y la alternativa activa no coinciden" >&2
+  exit 1
+fi
+
 mixdir="${base}/mix"
 mkdir -p "$mixdir"
 common "$mixdir"
