@@ -44,6 +44,31 @@ exit 0
 EOF
 chmod +x "$tmp/bin/docker" "$tmp/bin/age" "$tmp/bin/rclone" "$tmp/bin/curl"
 
+expect_missing() {
+  local path="$1"
+  local needle="$2"
+  local out code
+  set +e
+  out="$(PATH="$path" /bin/bash "$script" 2>&1)"
+  code=$?
+  set -e
+  if [ "$code" -ne 1 ]; then
+    echo "sin $needle salió $code, se esperaba 1" >&2
+    printf '%s\n' "$out" >&2
+    exit 1
+  fi
+  if ! printf '%s\n' "$out" | grep -q "falta $needle"; then
+    echo "sin $needle no hubo un mensaje claro" >&2
+    printf '%s\n' "$out" >&2
+    exit 1
+  fi
+}
+
+mkdir -p "$tmp/empty" "$tmp/only-age"
+cp "$tmp/bin/age" "$tmp/only-age/age"
+expect_missing "$tmp/empty" age
+expect_missing "$tmp/only-age" rclone
+
 if PATH="$tmp/bin:/usr/bin:/bin" bash "$script"; then
   echo "debio fallar sin variables" >&2
   exit 1

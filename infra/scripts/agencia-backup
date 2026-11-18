@@ -8,6 +8,15 @@
 # set -E: el trap ERR también corre si falla una función.
 set -eEuo pipefail
 
+if ! command -v age >/dev/null 2>&1; then
+  echo "falta age" >&2
+  exit 1
+fi
+if ! command -v rclone >/dev/null 2>&1; then
+  echo "falta rclone" >&2
+  exit 1
+fi
+
 env_file="${AGENCIA_BACKUP_ENV:-/etc/agencia/backup.env}"
 if [ -f "$env_file" ]; then
   set -a
