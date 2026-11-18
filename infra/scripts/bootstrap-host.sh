@@ -99,7 +99,7 @@ if [ -n "${DEPLOY_PUBKEY:-}" ]; then
 fi
 
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y age rclone openssh-server
+DEBIAN_FRONTEND=noninteractive apt-get install -y age rclone openssh-server sudo
 
 install -d -m 755 /etc/ssh/sshd_config.d
 if [ ! -f /etc/ssh/sshd_config.d/99-agencia.conf ]; then
@@ -167,8 +167,15 @@ fi
 
 infra_dir="$(cd "$script_dir/.." && pwd)"
 if [ -f "$infra_dir/sudoers.d/agencia-backup" ]; then
+  if [ ! -d /etc/sudoers.d ]; then
+    install -d -m 750 /etc/sudoers.d
+  fi
   install -o root -g root -m 440 "$infra_dir/sudoers.d/agencia-backup" /etc/sudoers.d/agencia-backup
-  visudo -cf /etc/sudoers.d/agencia-backup
+  if ! visudo -cf /etc/sudoers.d/agencia-backup; then
+    rm -f /etc/sudoers.d/agencia-backup
+    echo "el sudoers de agencia-backup no es válido" >&2
+    exit 1
+  fi
 fi
 if [ -f "$infra_dir/scripts/agencia-backup" ]; then
   install -o root -g root -m 755 "$infra_dir/scripts/agencia-backup" /usr/local/sbin/agencia-backup

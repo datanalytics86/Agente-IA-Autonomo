@@ -90,4 +90,8 @@ if PATH="${mixdir}:/usr/bin:/bin" BOOTSTRAP_OS_ID=debian BOOTSTRAP_OS_VERSION=12
   exit 1
 fi
 
+grep -q 'apt-get install -y age rclone openssh-server sudo' "$script"
+grep -q 'install -d -m 750 /etc/sudoers.d' "$script"
+grep -q 'visudo -cf /etc/sudoers.d/agencia-backup' "$script"
+grep -q 'rm -f /etc/sudoers.d/agencia-backup' "$script"
 echo "bootstrap iptables ok"
