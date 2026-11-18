@@ -67,7 +67,7 @@ if not services["caddy"].get("healthcheck"):
 print("compose prod ok")
 PY
 
-if docker compose -f infra/docker-compose.prod.yml config >/tmp/compose-out.yml 2>/tmp/compose-err.txt; then
+if IMAGE_TAG=abc POSTGRES_PASSWORD=0000000000000000000000000000000000000000   APP_MODE=live PUBLIC_BASE_URL=https://agencia.example AGENCIA_ENV_FILE="$envfile"   docker compose -f infra/docker-compose.prod.yml config >/tmp/compose-out.yml 2>/tmp/compose-err.txt; then
   echo "docker-compose.prod.yml solo no debe configurar" >&2
   exit 1
 fi
