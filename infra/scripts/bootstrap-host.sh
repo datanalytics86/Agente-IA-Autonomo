@@ -137,7 +137,8 @@ fi
 # El grupo docker equivale a root.
 usermod -aG docker deploy || true
 
-apt-get install -y unattended-upgrades
+	apt-get install -y unattended-upgrades
+	apt-get install -y age rclone
 if [ "$os_id" = "debian" ] && [ ! -f /etc/apt/apt.conf.d/20auto-upgrades ]; then
   printf '%s\n' \
     'APT::Periodic::Update-Package-Lists "1";' \
