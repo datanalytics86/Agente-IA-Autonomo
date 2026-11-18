@@ -28,6 +28,8 @@ must_fail env -u PUBLIC_BASE_URL IMAGE_TAG=abc POSTGRES_PASSWORD=000000000000000
 
 IMAGE_TAG=abc POSTGRES_PASSWORD=0000000000000000000000000000000000000000 APP_MODE=live \
   PUBLIC_BASE_URL=https://agencia.example AGENCIA_ENV_FILE="$envfile" \
+  ACME_EMAIL=ci@example.com SITE_ADDRESS=https://agencia.example \
+  SITE_DOMAIN=agencia.example PUBLIC_ORIGIN=https://agencia.example \
   docker compose "${files[@]}" config >/tmp/compose-out.yml
 
 python3 - <<'PY'
@@ -65,12 +67,16 @@ if not services["caddy"].get("healthcheck"):
 print("compose prod ok")
 PY
 
-if IMAGE_TAG=abc POSTGRES_PASSWORD=0000000000000000000000000000000000000000   APP_MODE=live PUBLIC_BASE_URL=https://agencia.example AGENCIA_ENV_FILE="$envfile"   docker compose -f infra/docker-compose.prod.yml config >/tmp/compose-out.yml 2>/tmp/compose-err.txt; then
+if IMAGE_TAG=abc POSTGRES_PASSWORD=0000000000000000000000000000000000000000 \
+  APP_MODE=live PUBLIC_BASE_URL=https://agencia.example AGENCIA_ENV_FILE="$envfile" \
+  ACME_EMAIL=ci@example.com SITE_ADDRESS=https://agencia.example \
+  SITE_DOMAIN=agencia.example PUBLIC_ORIGIN=https://agencia.example \
+  docker compose -f infra/docker-compose.prod.yml config >/tmp/compose-out.yml 2>/tmp/compose-err.txt; then
   echo "docker-compose.prod.yml solo no debe configurar" >&2
   exit 1
 fi
-if ! grep -q 'neither an image nor a build context' /tmp/compose-err.txt; then
-  echo "se esperaba el error de db sin imagen" >&2
+if ! grep -Eq 'neither an image nor a build context|undefined volume' /tmp/compose-err.txt; then
+  echo "se esperaba que el prod solo no sea un proyecto válido" >&2
   cat /tmp/compose-err.txt >&2
   exit 1
 fi
@@ -85,6 +91,8 @@ cp infra/scripts/backup.sh "$rel/scripts/"
 cd "$base"
 IMAGE_TAG=abc POSTGRES_PASSWORD=0000000000000000000000000000000000000000 \
   APP_MODE=live PUBLIC_BASE_URL=https://agencia.example AGENCIA_ENV_FILE="$base/.env" \
+  ACME_EMAIL=ci@example.com SITE_ADDRESS=https://agencia.example \
+  SITE_DOMAIN=agencia.example PUBLIC_ORIGIN=https://agencia.example \
   docker compose -p agencia --env-file .env \
   -f "releases/${tag}/infra/docker-compose.yml" \
   -f "releases/${tag}/infra/docker-compose.prod.yml" config >/dev/null
