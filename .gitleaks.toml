@@ -23,3 +23,19 @@ condition = "AND"
 targetRules = ["generic-api-key"]
 paths = ['''(^|/)engine/tests/test_payments\.py$''']
 regexes = ['''^x_signature=$''']
+
+[[allowlists]]
+description = "Placeholder hex de tests viejos. Solo esos commits; otro archivo o commit sigue siendo hallazgo."
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = [
+  '''(^|/)infra/scripts/test-compose-prod\.sh$''',
+  '''(^|/)infra/scripts/test-edge-compose\.sh$''',
+  '''(^|/)infra/scripts/test-deploy-layout\.sh$''',
+]
+commits = [
+  "f80624cea3c5b0a42a15b9357e823660e4dae2ca",
+  "28ec07ae901fc68196dba6437c7a75425bae1693",
+  "0de8ca1f8832df6c9ef01e32c9ee2e46d4c38c84",
+]
+regexes = ['''^abcdef0123456789$''']
