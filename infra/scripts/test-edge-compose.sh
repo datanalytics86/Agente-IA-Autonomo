@@ -9,6 +9,7 @@ trap 'rm -f "$envfile"' EXIT
 : >"$envfile"
 
 IMAGE_TAG=abc POSTGRES_PASSWORD=abcdef0123456789 \
+  APP_MODE=live PUBLIC_BASE_URL=https://agencia.example \
   ACME_EMAIL=ci@example.com \
   SITE_ADDRESS=http://127.0.0.1:8088 \
   SITE_DOMAIN=example.test \

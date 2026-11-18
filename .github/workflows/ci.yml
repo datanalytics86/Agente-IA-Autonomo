@@ -271,6 +271,20 @@ jobs:
             -v "$PWD/infra/Caddyfile.prod:/etc/caddy/Caddyfile:ro" \
             caddy:2 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
+      - name: Validar Caddyfile.prod con basic auth de staging
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -e ACME_EMAIL=ci@example.com \
+            -e SITE_ADDRESS=http://127.0.0.1:8088 \
+            -e SITE_DOMAIN=example.test \
+            -e PUBLIC_ORIGIN=http://127.0.0.1:8088 \
+            -e EDGE_AUTH=staging_auth \
+            -e STAGING_USER=ci \
+            -e 'STAGING_HASH=$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy' \
+            -v "$PWD/infra/Caddyfile.prod:/etc/caddy/Caddyfile:ro" \
+            caddy:2 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
       - name: Construir la imagen edge sin publicarla
         run: docker build -f infra/Dockerfile.edge -t agencia-edge:ci .
 

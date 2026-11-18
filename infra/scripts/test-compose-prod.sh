@@ -28,6 +28,8 @@ must_fail env -u PUBLIC_BASE_URL IMAGE_TAG=abc POSTGRES_PASSWORD=abcdef012345678
 
 IMAGE_TAG=abc POSTGRES_PASSWORD=abcdef0123456789 APP_MODE=live \
   PUBLIC_BASE_URL=https://agencia.example AGENCIA_ENV_FILE="$envfile" \
+  ACME_EMAIL=ci@example.com SITE_ADDRESS=https://agencia.example \
+  SITE_DOMAIN=agencia.example PUBLIC_ORIGIN=https://agencia.example \
   docker compose "${files[@]}" config >/tmp/compose-out.yml
 
 python3 - <<'PY'

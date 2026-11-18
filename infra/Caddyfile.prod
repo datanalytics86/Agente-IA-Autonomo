@@ -10,6 +10,9 @@
 (noauth) {
 }
 
+# STAGING_HASH es un hash bcrypt. En el .env va entre comillas simples,
+# STAGING_HASH='$2a$...', porque si no el shell se come los $.
+# Si el valor se escribe en un compose, cada $ se escribe $$.
 (staging_auth) {
 	basic_auth {
 		{$STAGING_USER} {$STAGING_HASH}

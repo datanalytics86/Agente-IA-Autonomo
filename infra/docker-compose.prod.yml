@@ -71,6 +71,7 @@ services:
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?}
       EDGE_AUTH: ${EDGE_AUTH:-noauth}
       STAGING_USER: ${STAGING_USER:-}
+      # Hash bcrypt. En .env, comillas simples. En este archivo, $$ por cada $.
       STAGING_HASH: ${STAGING_HASH:-}
     ports: !override
       - "80:80"
