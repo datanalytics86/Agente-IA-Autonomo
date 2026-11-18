@@ -98,6 +98,8 @@ if [ -n "${DEPLOY_PUBKEY:-}" ]; then
   chmod 600 /home/deploy/.ssh/authorized_keys
 fi
 
+apt-get install -y age rclone openssh-server
+
 install -d -m 755 /etc/ssh/sshd_config.d
 if [ ! -f /etc/ssh/sshd_config.d/99-agencia.conf ]; then
   # Sin llave de deploy, prohibir la contraseña deja el host sin entrada.
@@ -110,6 +112,12 @@ if [ ! -f /etc/ssh/sshd_config.d/99-agencia.conf ]; then
   fi
 fi
 if [ -n "${DEPLOY_PUBKEY:-}" ]; then
+  if ! command -v sshd >/dev/null 2>&1; then
+    echo "no se encontró sshd" >&2
+    exit 1
+  fi
+  # sshd -t lo exige. Con systemd lo crea el servicio; en una imagen limpia todavía no está.
+  install -d -m 755 /run/sshd
   sshd -t
   systemctl reload ssh || service ssh reload
 fi
@@ -137,8 +145,7 @@ fi
 # El grupo docker equivale a root.
 usermod -aG docker deploy || true
 
-	apt-get install -y unattended-upgrades
-	apt-get install -y age rclone
+apt-get install -y unattended-upgrades
 if [ "$os_id" = "debian" ] && [ ! -f /etc/apt/apt.conf.d/20auto-upgrades ]; then
   printf '%s\n' \
     'APT::Periodic::Update-Package-Lists "1";' \
