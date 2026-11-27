@@ -655,6 +655,35 @@ def test_pipeline_no_encola_correo_suprimido(session: Session) -> None:
     assert stored.status == "opt_out"
 
 
+def test_buzones_genericos_son_la_lista_fija() -> None:
+    from core.suppression import generic_local_part
+
+    generic = (
+        "contacto",
+        "info",
+        "consultas",
+        "atencion",
+        "administracion",
+        "gerencia",
+        "estudio",
+        "correo",
+        "oficina",
+        "secretaria",
+        "recepcion",
+        "hola",
+        "ventas",
+        "comercial",
+        "abogados",
+        "contabilidad",
+        "admin",
+    )
+    for local in generic:
+        assert generic_local_part(f"{local}@estudio.cl")
+    assert generic_local_part("Atención@estudio.cl")
+    assert generic_local_part("persona@estudio.cl") is False
+    assert generic_local_part("hello@estudio.cl") is False
+
+
 def test_baja_de_contacto_suprime_el_estudio(session: Session) -> None:
     from core.suppression import record_opt_out
 
@@ -667,7 +696,7 @@ def test_baja_de_contacto_suprime_el_estudio(session: Session) -> None:
     repo = SuppressionRepository(session)
     assert repo.contains("email", "contacto@estudio.test")
     assert repo.contains("lead", "place-estudio")
-    assert repo.contains("domain", "estudio.test") is False
+    assert repo.contains("domain", "estudio.test")
 
 
 def test_reimport_del_place_sigue_suprimido(session: Session) -> None:

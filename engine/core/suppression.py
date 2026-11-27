@@ -11,22 +11,38 @@ from db.repositories import SuppressionRepository
 
 _GENERIC_LOCAL = frozenset(
     {
+        "abogados",
         "admin",
+        "administracion",
+        "atencion",
         "comercial",
-        "contact",
+        "consultas",
+        "contabilidad",
         "contacto",
-        "hello",
+        "correo",
+        "estudio",
+        "gerencia",
         "hola",
         "info",
-        "office",
         "oficina",
         "recepcion",
-        "sales",
         "secretaria",
-        "soporte",
-        "support",
         "ventas",
     }
+)
+_PUBLIC_MAIL_NAMES = (
+    "gmail",
+    "googlemail",
+    "hotmail",
+    "icloud",
+    "live",
+    "msn",
+    "outlook",
+    "yahoo",
+)
+_PUBLIC_MAIL_SUFFIXES = ("com", "cl", "es", "com.cl", "com.es")
+PUBLIC_EMAIL_DOMAINS = frozenset(
+    f"{name}.{suffix}" for name in _PUBLIC_MAIL_NAMES for suffix in _PUBLIC_MAIL_SUFFIXES
 )
 
 
@@ -40,6 +56,11 @@ def generic_local_part(email: str) -> bool:
     if "@" not in email:
         return False
     return _fold(email.split("@", 1)[0]) in _GENERIC_LOCAL
+
+
+def public_email_domain(domain: str) -> bool:
+    """True si el dominio es un correo público (gmail, hotmail y variantes)."""
+    return _fold(domain).rstrip(".") in PUBLIC_EMAIL_DOMAINS
 
 
 def is_suppressed(session: Session, lead: object) -> bool:
@@ -78,17 +99,17 @@ def record_opt_out(
     channel: str,
     reason: str,
 ) -> list[Suppression]:
-    """Guarda el correo. Un buzón genérico también cierra el estudio.
-
-    Una baja no crea kind=domain: persona@gmail.com no puede apagar Gmail.
-    """
+    """Cierra el correo y el estudio. El dominio también, salvo un correo público."""
     repo = SuppressionRepository(session)
     rows: list[Suppression] = []
     email = (lead.contact_email or "").strip()
     if email:
         rows.append(repo.add("email", email, reason=reason, source=channel))
-    if email and generic_local_part(email):
-        place_id = (lead.place_id or "").strip() or lead.id
-        if place_id:
-            rows.append(repo.add("lead", place_id, reason=reason, source=channel))
+    place_id = (lead.place_id or "").strip() or lead.id
+    if place_id:
+        rows.append(repo.add("lead", place_id, reason=reason, source=channel))
+    if "@" in email:
+        domain = email.split("@", 1)[1].strip()
+        if domain and not public_email_domain(domain):
+            rows.append(repo.add("domain", domain, reason=reason, source=channel))
     return rows

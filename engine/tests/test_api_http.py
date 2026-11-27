@@ -368,7 +368,22 @@ def test_baja_suprime_el_email_y_no_el_dominio(client: TestClient) -> None:
     assert response.status_code == 200, response.text
     with session_scope() as session:
         kinds = {row.kind for row in session.scalars(select(Suppression))}
-    assert kinds == {"email"}
+    assert kinds == {"email", "lead"}
+    assert "domain" not in kinds
+
+
+def test_baja_de_dominio_propio_tambien_cierra_el_dominio(client: TestClient) -> None:
+    from api.security import make_baja_token
+    from db.models import Suppression
+
+    with session_scope() as session:
+        lead = _lead(session, contact_email="persona@estudio.cl", status="enviado")
+        token = make_baja_token(lead.id)
+    response = client.post("/api/public/baja", json={"token": token})
+    assert response.status_code == 200, response.text
+    with session_scope() as session:
+        kinds = {row.kind for row in session.scalars(select(Suppression))}
+    assert kinds == {"email", "lead", "domain"}
 
 
 def test_action_scout_encola_job_run(client: TestClient) -> None:

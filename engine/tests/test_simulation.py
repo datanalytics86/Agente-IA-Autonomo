@@ -65,6 +65,42 @@ def test_python_m_simulation_cli_llama_a_main(monkeypatch: pytest.MonkeyPatch) -
     assert seen == [{"days": 14, "seed": 42}]
 
 
+def test_python_m_simulation_cli_acepta_days(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[dict[str, object]] = []
+
+    def fake(*_args: object, **kwargs: object) -> int:
+        seen.append(kwargs)
+        return 0
+
+    monkeypatch.setattr("simulation.loop.run_simulation", fake)
+    import sys
+
+    monkeypatch.setattr(sys, "argv", ["simulation.cli", "--days", "3"])
+    sys.modules.pop("simulation.cli", None)
+    import runpy
+
+    with pytest.raises(SystemExit) as caught:
+        runpy.run_module("simulation.cli", run_name="__main__")
+    assert caught.value.code == 0
+    assert seen == [{"days": 3, "seed": 42}]
+
+
+def test_python_m_simulation_cli_rechaza_days_invalido(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "simulation.loop.run_simulation",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("no debe simular")),
+    )
+    import sys
+
+    monkeypatch.setattr(sys, "argv", ["simulation.cli", "--days", "0"])
+    sys.modules.pop("simulation.cli", None)
+    import runpy
+
+    with pytest.raises(SystemExit) as caught:
+        runpy.run_module("simulation.cli", run_name="__main__")
+    assert caught.value.code not in (0, None)
+
+
 def test_simulacion_no_abre_sockets(block_network: None, tmp_path: Path) -> None:
     report = tmp_path / "reporte_seed42_d3.md"
     code = run_simulation(
