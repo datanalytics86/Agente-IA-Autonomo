@@ -31,7 +31,13 @@ _EMAIL_RE = re.compile(
     r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.){1,8}"
     r"[A-Za-z]{2,24}\b"
 )
-_PHONE_RE = re.compile(r"(?<!\d)(?:\+?56[\s.\-]*)?(?:9|2)[\s.\-]*\d{4}[\s.\-]*\d{4}(?!\d)")
+_PHONE_RE = re.compile(
+    r"(?<!\d)(?:\+?56[\s.\-]*)?(?:"
+    r"9[\s.\-]*\d{4}[\s.\-]*\d{4}"
+    r"|2[\s.\-]*\d{4}[\s.\-]*\d{4}"
+    r"|[2-7]\d[\s.\-]*\d{3}[\s.\-]*\d{4}"
+    r")(?!\d)"
+)
 _URL_RE = re.compile(r"(?i)(?:https?://[^\s<>\"']+|//[^\s<>\"']+)")
 _OPT_OUT_PHRASES = (
     "no me escriban",
