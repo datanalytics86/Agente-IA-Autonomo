@@ -421,6 +421,29 @@ def test_baja_con_punto_final_matchea_el_correo_sin_punto(client: TestClient) ->
     assert "domain" not in kinds
 
 
+def test_baja_con_url_invalida_se_guarda(client: TestClient) -> None:
+    from api.security import make_baja_token
+    from core.suppression import is_suppressed, normalize_host
+    from db.repositories import SuppressionRepository
+
+    assert normalize_host("http://[::1") == ""
+    with session_scope() as session:
+        lead = _lead(
+            session,
+            contact_email="persona@estudio.cl",
+            website_url="http://[::1",
+        )
+        lead_id = lead.id
+        token = make_baja_token(lead.id)
+    response = client.post("/api/public/baja", json={"token": token})
+    assert response.status_code == 200, response.text
+    with session_scope() as session:
+        lead = session.get(Lead, lead_id)
+        assert lead is not None
+        assert is_suppressed(session, lead) is True
+        assert SuppressionRepository(session).contains("email", "persona@estudio.cl") is True
+
+
 def test_baja_de_dominio_propio_tambien_cierra_el_dominio(client: TestClient) -> None:
     from api.security import make_baja_token
     from db.models import Suppression

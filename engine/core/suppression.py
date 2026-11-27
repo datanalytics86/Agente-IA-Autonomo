@@ -53,21 +53,26 @@ def _fold(value: str) -> str:
 _SECOND_LEVEL = frozenset({"com", "co", "net", "org", "gob", "edu", "gov"})
 
 
-def _hostname(value: str) -> str:
-    text = value.strip()
-    if not text:
-        return ""
-    if "@" in text and "://" not in text and not text.startswith("//"):
-        text = text.rsplit("@", 1)[1].strip()
-    if "://" not in text and not text.startswith("//"):
-        text = "//" + text
-    host = (urlsplit(text).hostname or "").strip().lower().rstrip(".")
-    if not host:
-        return ""
+def normalize_host(value: str) -> str:
+    """Host en minúsculas e IDNA, sin punto final. Nunca levanta."""
     try:
+        text = (value or "").strip()
+        if not text:
+            return ""
+        if "@" in text and "://" not in text and not text.startswith("//"):
+            text = text.rsplit("@", 1)[1].strip()
+        if "://" not in text and not text.startswith("//"):
+            text = "//" + text
+        host = (urlsplit(text).hostname or "").strip().lower().rstrip(".")
+        if not host:
+            return ""
         return host.encode("idna").decode("ascii")
-    except UnicodeError:
+    except Exception:
         return ""
+
+
+def _hostname(value: str) -> str:
+    return normalize_host(value)
 
 
 def normalize_domain(value: str) -> str:
