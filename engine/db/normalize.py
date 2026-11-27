@@ -6,7 +6,7 @@ import hashlib
 import re
 import unicodedata
 
-CONTACT_KINDS = frozenset({"email", "domain", "instagram", "linkedin", "phone"})
+CONTACT_KINDS = frozenset({"email", "domain", "instagram", "lead", "linkedin", "phone"})
 
 _SCHEME = re.compile(r"^[a-z][a-z0-9+.-]*://")
 
@@ -27,6 +27,8 @@ def normalize_contact(kind: str, raw_value: str) -> str:
         return _normalize_domain(raw_value)
     if kind == "instagram":
         return raw_value.strip().lstrip("@").lower()
+    if kind == "lead":
+        return raw_value.strip()
     if kind == "linkedin":
         value = _strip_scheme(raw_value.strip().lower()).rstrip("/")
         if value.startswith("www."):

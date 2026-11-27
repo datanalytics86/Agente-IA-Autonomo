@@ -234,6 +234,56 @@ def test_run_cycle_no_crea_leads_y_respeta_cuota(
     assert Orchestrator().snapshot()["total"] == before
 
 
+def test_el_scout_no_recrea_un_place_suprimido(env: Path, block_network: None) -> None:
+    from agents.scout import _take_one
+    from integrations.pagespeed.base import WebsiteAudit
+    from integrations.places.base import PlaceHit
+
+    class Source:
+        def search(self, commune: str, category_slug: str, limit: int) -> list[PlaceHit]:
+            return [
+                PlaceHit(
+                    place_id="place-estudio",
+                    name="Estudio Norte",
+                    formatted_address="Av 1",
+                    business_status="OPERATIONAL",
+                    rating=4.8,
+                    user_rating_count=40,
+                )
+            ]
+
+    class Auditor:
+        def audit(self, url: str | None) -> WebsiteAudit:
+            return WebsiteAudit(
+                opportunity_score=40,
+                contact_email="otro@correo.test",
+                contact_email_source_url="https://estudio.test/contacto",
+                instagram_handle="estudionorte",
+            )
+
+    with session_scope() as session:
+        SuppressionRepository(session).add(
+            "lead",
+            "place-estudio",
+            reason="baja",
+            source="email",
+        )
+        found = _take_one(
+            AgentContext(session),
+            Source(),  # type: ignore[arg-type]
+            Auditor(),  # type: ignore[arg-type]
+            "Providencia",
+            "estudio-contable",
+            "outbound_demo",
+            set(),
+            set(),
+            forced=False,
+        )
+        rows = LeadRepository(session).list(limit=10)
+    assert found is None
+    assert rows == []
+
+
 def test_borrador_suprimido_no_crea_mensaje(env: Path, block_network: None) -> None:
     with session_scope() as session:
         SuppressionRepository(session).add(
@@ -253,8 +303,10 @@ def test_borrador_suprimido_no_crea_mensaje(env: Path, block_network: None) -> N
         )
         draft = ensure_draft(AgentContext(session, lead_id=lead.id))
         rows = MessageRepository(session).list(lead_id=lead.id)
+        stored = LeadRepository(session).get(lead.id)
     assert draft is None
     assert rows == []
+    assert stored is not None and stored.status == "opt_out"
 
 
 def test_el_borrador_lleva_el_pie_legal(env: Path, block_network: None) -> None:

@@ -633,7 +633,7 @@ def test_pipeline_no_encola_correo_suprimido(session: Session) -> None:
         "email",
         "ya-suprimido@example.test",
         reason="baja",
-        source="baja",
+        source="email",
     )
     lead = _lead(
         session,
@@ -641,10 +641,70 @@ def test_pipeline_no_encola_correo_suprimido(session: Session) -> None:
         business="Taller Sur",
         contact_email="ya-suprimido@example.test",
         contact_email_source_url="https://taller.test/contacto",
+        instagram_handle="tallersur",
+        linkedin_url="https://www.linkedin.com/in/tallersur",
+        phone_public="+56911112222",
     )
     ctx = _ctx(session, datetime(2026, 3, 20, 11, 0, tzinfo=TZ))
     job_pipeline(ctx)
     assert MessageRepository(session).list(lead_id=lead.id) == []
+    stored = LeadRepository(session).get(lead.id)
+    assert stored is not None
+    assert stored.status == "opt_out"
+
+
+def test_baja_de_contacto_suprime_el_estudio(session: Session) -> None:
+    from core.suppression import record_opt_out
+
+    lead = _lead(
+        session,
+        contact_email="contacto@estudio.test",
+        place_id="place-estudio",
+    )
+    record_opt_out(session, lead, channel="email", reason="baja")
+    repo = SuppressionRepository(session)
+    assert repo.contains("email", "contacto@estudio.test")
+    assert repo.contains("lead", "place-estudio")
+    assert repo.contains("domain", "estudio.test") is False
+
+
+def test_reimport_del_place_sigue_suprimido(session: Session) -> None:
+    SuppressionRepository(session).add(
+        "lead",
+        "place-estudio",
+        reason="baja",
+        source="email",
+    )
+
+    class Source:
+        def search(self, commune: str, category_slug: str, limit: int) -> list[PlaceHit]:
+            return [
+                PlaceHit(
+                    place_id="place-estudio",
+                    name="Estudio Norte",
+                    formatted_address="Av 1",
+                    commune="Providencia",
+                    city="Santiago",
+                    category="estudio-contable",
+                    website_uri=None,
+                    rating=4.8,
+                    user_rating_count=40,
+                    business_status="OPERATIONAL",
+                    email="otro@correo.test",
+                    instagram_handle="estudionorte",
+                    linkedin_url=None,
+                    phone_public="+56922223333",
+                    estimated_value_clp=350_000,
+                    opportunity_score=80,
+                    scenario="test",
+                    email_source_url="https://estudio.test/contacto",
+                )
+            ]
+
+    ctx = _ctx(session, datetime(2026, 3, 20, 11, 0, tzinfo=TZ))
+    ctx.ports.places = Source()  # type: ignore[assignment]
+    assert job_scout(ctx) == 0
+    assert LeadRepository(session).list(limit=20) == []
 
 
 def test_place_sin_email_no_se_mapea() -> None:

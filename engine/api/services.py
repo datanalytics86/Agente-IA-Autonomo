@@ -39,6 +39,7 @@ from core.config import ENGINE_DIR, get_settings
 from core.hitl import needs_value_review
 from core.states import STATUSES, TRANSITIONS
 from core.states import transition as transition_lead
+from core.suppression import record_opt_out
 from db.models import (
     Approval,
     Artifact,
@@ -430,9 +431,7 @@ def apply_baja(session: Session, token: str) -> dict[str, bool]:
     lead = session.get(Lead, read_baja_token(token))
     if lead is None:
         raise ApiError(404, "not_found", "token desconocido")
-    repo = SuppressionRepository(session)
-    if lead.contact_email:
-        repo.add("email", lead.contact_email, reason="baja", source="unsubscribe")
+    record_opt_out(session, lead, channel="email", reason="baja")
     if "opt_out" in TRANSITIONS.get(lead.status, frozenset()):
         transition_lead(session, lead, "opt_out", actor="sistema", reason="baja solicitada")
     EventRepository(session).append(

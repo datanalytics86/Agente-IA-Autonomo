@@ -233,6 +233,10 @@ class Suppression(Base):
     __tablename__ = "suppression"
     __table_args__ = (
         UniqueConstraint("kind", "value_hash", name="uq_suppression_kind_value_hash"),
+        CheckConstraint(
+            "kind IN ('email', 'domain', 'phone', 'instagram', 'linkedin', 'lead')",
+            name="ck_suppression_kind",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=new_id)

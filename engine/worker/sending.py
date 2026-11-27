@@ -11,13 +11,13 @@ from core.compliance import is_opt_out, looks_like_injection
 from core.config import get_settings
 from core.hitl import channel_should_pause, needs_value_review
 from core.states import TRANSITIONS, transition
+from core.suppression import is_suppressed, record_opt_out
 from db.models import Lead, Message
 from db.repositories import (
     EventRepository,
     LeadRepository,
     MessageRepository,
     SettingsRepository,
-    SuppressionRepository,
 )
 from worker.approvals import ensure_approval
 from worker.copywriter import MANUAL_CHANNELS, outreach_parts
@@ -110,14 +110,7 @@ def _sent_today(session: Session, now: datetime) -> list[Message]:
 
 
 def _suppressed(session: Session, lead: Lead) -> bool:
-    repo = SuppressionRepository(session)
-    email = lead.contact_email or ""
-    if email and repo.contains("email", email):
-        return True
-    domain = _domain(email)
-    if domain and repo.contains("domain", domain):
-        return True
-    return False
+    return is_suppressed(session, lead)
 
 
 def _stopped(session: Session, lead: Lead) -> bool:
@@ -332,15 +325,9 @@ def apply_inbound(ctx: JobContext, mails: list[InboundMail]) -> int:
 
 
 def _suppress(ctx: JobContext, lead: Lead, body: str) -> None:
-    repo = SuppressionRepository(ctx.session)
-    email = lead.contact_email or ""
-    if email:
-        row = repo.add("email", email, reason="opt-out", source="inbound")
+    rows = record_opt_out(ctx.session, lead, channel="email", reason="opt-out")
+    for row in rows:
         patch_fields(ctx.session, row, created_at=ctx.clock.now())
-        domain = _domain(email)
-        if domain:
-            domain_row = repo.add("domain", domain, reason="opt-out", source="inbound")
-            patch_fields(ctx.session, domain_row, created_at=ctx.clock.now())
     EventRepository(ctx.session).append(
         agent="inbound_poll",
         level="info",

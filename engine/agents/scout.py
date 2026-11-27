@@ -14,6 +14,7 @@ from agents.copy import register_agent_fallbacks
 from agents.runtime import iter_leads, log_event, prepare_db, start_of_local_day
 from core.config import get_settings
 from core.errors import DuplicateLeadError
+from core.suppression import is_suppressed
 from db.models import Lead as DbLead
 from db.normalize import normalize_business
 from db.repositories import LeadRepository, SettingsRepository
@@ -173,6 +174,8 @@ def _take_one(
         if key in known_names:
             continue
         lead = _build_lead(hit, commune, category, origin, auditor, forced)
+        if is_suppressed(ctx.session, lead):
+            continue
         try:
             LeadRepository(ctx.session).add(lead)
         except DuplicateLeadError:
