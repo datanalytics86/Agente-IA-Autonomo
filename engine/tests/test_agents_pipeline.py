@@ -25,6 +25,7 @@ from db.models import Approval, Event, Lead, Message
 from db.repositories import EventRepository, LeadRepository, MessageRepository
 from db.session import create_all, reset_engine, session_scope
 
+_FUENTE = "https://cafe.test/contacto"
 _BODY = (
     "Hola:\n\n"
     "No aparece un sitio propio de Café Andes en Providencia.\n\n"
@@ -32,6 +33,11 @@ _BODY = (
     "Si no es de interés, responde BAJA y no volvemos a escribir.\n"
     "Detalle en http://localhost/agendar.\n"
     "Agencia Andina\n"
+    "DEEP PRO BUSINESS SOLUTIONS SpA\n"
+    "RUT 77.923.111-9\n"
+    "Antonio Bellet 193, of. 1210, Providencia\n"
+    "nicolas.andrade@deeppro.cl\n"
+    f"obtuvimos su correo de {_FUENTE}, de acceso público, asociado a su negocio\n"
 )
 
 
@@ -79,6 +85,7 @@ def _lead(session: Session, **overrides: Any) -> Lead:
         "estimated_value_clp": 350_000,
         "high_value": False,
         "tone": "tu",
+        "contact_email_source_url": _FUENTE,
         "diagnosis": {"pitch_subject": "Sitio", "pitch_body": _BODY},
     }
     data.update(overrides)

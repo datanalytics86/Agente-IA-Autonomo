@@ -88,6 +88,7 @@ def _lead_view(lead: Lead) -> dict[str, object]:
         "linkedin_url": lead.linkedin_url,
         "website_url": lead.website_url,
         "business": lead.business,
+        "contact_email_source_url": lead.contact_email_source_url,
     }
 
 
@@ -181,6 +182,9 @@ def _lead_from_hit(ctx: JobContext, hit: PlaceHit) -> Lead:
         rating=hit.rating,
         reviews=hit.user_rating_count,
         contact_email=hit.email,
+        contact_email_source_url=(
+            f"https://{hit.email.split('@', 1)[1]}/" if hit.email and "@" in hit.email else None
+        ),
         instagram_handle=hit.instagram_handle,
         linkedin_url=hit.linkedin_url,
         phone_public=hit.phone_public,

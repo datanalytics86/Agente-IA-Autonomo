@@ -62,9 +62,13 @@ class CheckerAgent:
                 "linkedin_url": lead.linkedin_url,
                 "website_url": lead.website_url,
                 "business": lead.business,
+                "contact_email_source_url": lead.contact_email_source_url,
             },
             {
                 "agency_name": settings.agency_name,
+                "agency_legal_name": settings.agency_legal_name,
+                "agency_rut": settings.agency_rut,
+                "agency_address": settings.agency_address,
                 "price_min_clp": settings.price_min_clp,
                 "price_max_clp": settings.price_max_clp,
                 "public_base_url": settings.public_base_url,
