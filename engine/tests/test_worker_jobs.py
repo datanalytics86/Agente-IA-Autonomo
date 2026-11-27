@@ -682,8 +682,7 @@ def test_el_extracto_enmascara_600_800_y_rut_sin_guion() -> None:
     from core.suppression import clean_opt_out_text
 
     texto = clean_opt_out_text(
-        "Llamen al 600 123 4567 o al 800 123 4567. "
-        "Rut 12345678K y Peña12.345.678-5."
+        "Llamen al 600 123 4567 o al 800 123 4567. Rut 12345678K y Peña12.345.678-5."
     )
     assert texto is not None
     assert "[teléfono]" in texto
