@@ -193,10 +193,14 @@ def record_opt_out(
     channel: str,
     reason: str,
     text: str | None = None,
+    verbatim: bool = False,
 ) -> list[Suppression]:
     """Cierra el correo y el estudio. El dominio solo si es el del sitio."""
     repo = SuppressionRepository(session)
-    detail = clean_opt_out_text(text)
+    if verbatim:
+        detail = (text or "")[:_DETAIL_MAX] or None
+    else:
+        detail = clean_opt_out_text(text)
     rows: list[Suppression] = []
     email = normalize_email(lead.contact_email or "")
     if email:

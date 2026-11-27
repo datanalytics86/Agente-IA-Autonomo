@@ -740,6 +740,20 @@ def test_registrable_domain_cubre_tld_de_dos_niveles(raw: str, expected: str) ->
     assert registrable_domain(normalize_domain(raw)) == expected
 
 
+def test_el_hash_de_la_baja_web_no_se_enmascara(session: Session) -> None:
+    from core.suppression import record_opt_out
+
+    texto = "baja web vía enlace; token_sha256=213558609e07e03b"
+    lead = _lead(
+        session,
+        business="Hash Web",
+        contact_email="persona@estudio.cl",
+        place_id="place-hash-web",
+    )
+    rows = record_opt_out(session, lead, channel="web", reason="baja", text=texto, verbatim=True)
+    assert next(row.detail for row in rows if row.kind == "email") == texto
+
+
 def test_baja_de_com_cl_cierra_el_dominio_registrable(session: Session) -> None:
     from core.suppression import record_opt_out
 

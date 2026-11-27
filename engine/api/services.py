@@ -438,6 +438,7 @@ def apply_baja(session: Session, token: str) -> dict[str, bool]:
         channel="web",
         reason="baja",
         text=f"baja web vía enlace; token_sha256={token_hash}",
+        verbatim=True,
     )
     if "opt_out" in TRANSITIONS.get(lead.status, frozenset()):
         transition_lead(session, lead, "opt_out", actor="sistema", reason="baja solicitada")
