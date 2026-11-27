@@ -91,6 +91,15 @@ if PATH="${mixdir}:/usr/bin:/bin" BOOTSTRAP_OS_ID=debian BOOTSTRAP_OS_VERSION=12
 fi
 
 grep -q 'apt-get install -y age rclone openssh-server sudo' "$script"
+python3 - "$script" <<'PY'
+import sys
+from pathlib import Path
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+apt = text.find("openssh-server sudo")
+made = text.find("install -d -m 755 /run/sshd", apt)
+if apt < 0 or made < 0 or made - apt > 250:
+    raise SystemExit("/run/sshd tiene que crearse al instalar sshd, sin DEPLOY_PUBKEY")
+PY
 grep -q 'install -d -m 750 /etc/sudoers.d' "$script"
 grep -q 'visudo -cf /etc/sudoers.d/agencia-backup' "$script"
 grep -q 'rm -f /etc/sudoers.d/agencia-backup' "$script"

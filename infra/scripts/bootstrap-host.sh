@@ -100,6 +100,8 @@ fi
 
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y age rclone openssh-server sudo
+# sshd -t lo exige. Con systemd lo crea el servicio; en una imagen limpia todavía no está.
+install -d -m 755 /run/sshd
 
 install -d -m 755 /etc/ssh/sshd_config.d
 if [ ! -f /etc/ssh/sshd_config.d/99-agencia.conf ]; then
@@ -117,7 +119,6 @@ if [ -n "${DEPLOY_PUBKEY:-}" ]; then
     echo "no se encontró sshd" >&2
     exit 1
   fi
-  # sshd -t lo exige. Con systemd lo crea el servicio; en una imagen limpia todavía no está.
   install -d -m 755 /run/sshd
   sshd -t
   systemctl reload ssh || service ssh reload

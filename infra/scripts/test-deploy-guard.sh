@@ -63,5 +63,12 @@ if "/opt/agencia/logs/" not in remote:
     raise SystemExit("los logs de contenedores tienen que quedar en el host")
 if "docker-compose.yml" not in remote or "docker-compose.prod.yml" not in remote:
     raise SystemExit("el deploy tiene que usar los dos compose")
+if texts[1].count("scp -o BatchMode=yes") < 3:
+    raise SystemExit("los scp tienen que ir con BatchMode=yes")
+ci = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+if "caddy hash-password" not in ci:
+    raise SystemExit("el hash de staging tiene que salir de caddy hash-password")
+if "N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy" in ci:
+    raise SystemExit("el bcrypt de staging no debe ir fijo en el workflow")
 print("deploy guard ok")
 PY

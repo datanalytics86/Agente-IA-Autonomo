@@ -16,6 +16,13 @@ if [ -f "$env_file" ]; then
   set +a
 fi
 
+for cmd in age rclone docker; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "falta $cmd" >&2
+    exit 1
+  fi
+done
+
 label=""
 while [ $# -gt 0 ]; do
   case "$1" in

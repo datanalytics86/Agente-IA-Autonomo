@@ -60,6 +60,18 @@ BACKUP_DIR=$tmp/backups
 HEALTHCHECKS_URL=https://hc.example/ping
 EOF
 
+mkdir -p "$tmp/bin-nodocker"
+cp "$tmp/bin/age" "$tmp/bin/rclone" "$tmp/bin/curl" "$tmp/bin-nodocker/"
+ln -s "$(command -v bash)" "$tmp/bin-nodocker/bash"
+if env -i PATH="$tmp/bin-nodocker" \
+  AGENCIA_BACKUP_ENV="$tmp/backup.env" \
+  AGENCIA_COMPOSE_DIR="$tmp/infra" \
+  bash "$script" >"$tmp/nodocker" 2>&1; then
+  echo "sin docker el backup debe abortar" >&2
+  exit 1
+fi
+grep -q 'falta docker' "$tmp/nodocker"
+
 # Primer deploy: hay variables, pero todavía no existe current_tag.
 if ! env -i PATH="$tmp/bin:/usr/bin:/bin" \
   AGENCIA_BACKUP_ENV="$tmp/backup.env" \
