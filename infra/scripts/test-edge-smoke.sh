@@ -66,6 +66,7 @@ printf '%s' "$portal" | grep -q 'id="portal"'
 missing_code="$(curl -sS -o /tmp/edge-noexiste.html -w '%{http_code}' --max-time 2 http://127.0.0.1:8088/noexiste/)"
 test "$missing_code" = "404"
 test "$(cat /tmp/edge-noexiste.html)" != "$home"
+printf '%s' "$(cat /tmp/edge-noexiste.html)" | grep -q 'Página no encontrada'
 slash_code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:8088/privacidad)"
 test "$slash_code" = "308"
 if curl -fsS --max-time 2 http://127.0.0.1:8088/api/internal/domain-check; then
