@@ -2,7 +2,7 @@
 
 Orden obligatorio. No marques un paso sin haberlo hecho. El sistema funciona en demo sin ninguno de estos datos.
 
-1. **Identidad.** Completar `AGENCY_NAME`, `AGENCY_LEGAL_NAME`, `AGENCY_RUT`, `AGENCY_EMAIL`, `AGENCY_ADDRESS`.
+1. **Identidad.** `AGENCY_NAME` es DEEP PRO CONSULTORES SpA y `AGENCY_LEGAL_NAME` es DEEP PRO BUSINESS SOLUTIONS SpA. `AGENCY_RUT` es 77.923.111-9. Domicilio, representante y correo de contacto ya están. El correo de privacidad es el de contacto, nicolas.andrade@deeppro.cl.
 2. **SII.** Inicio de actividades y método de boleta o factura electrónica. Cada pago abre una tarea HITL para emitir el documento. Integración automática: pendiente de decisión del contador.
 3. **Revisión legal.** Leer `docs/compliance/REVISION_LEGAL.md` con un abogado (privacidad, términos, consentimiento, baja).
 4. **Dominios.** Un `.cl` en NIC Chile para el sitio y un dominio secundario solo para outreach.

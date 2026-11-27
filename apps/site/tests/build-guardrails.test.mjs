@@ -42,11 +42,65 @@ async function html() {
   return source;
 }
 
-test('el build muestra el placeholder y no inventa un RUT', async () => {
-  const source = await html();
-  assert.match(source, /\[datos de la agencia\]/);
-  assert.doesNotMatch(source, /\d{1,2}\.\d{3}\.\d{3}-[\dkK]/);
-  assert.equal(source.includes('T14'), false);
+const legalPages = ['privacidad', 'terminos', 'baja', 'derechos'];
+
+const identity = [
+  'DEEP PRO CONSULTORES SpA',
+  'DEEP PRO BUSINESS SOLUTIONS SpA',
+  '77.923.111-9',
+  'Antonio Bellet 193, of. 1210, Providencia',
+  'Nicolás Andrade Socías',
+  'nicolas.andrade@deeppro.cl',
+];
+
+test('el footer y cada página legal muestran la identidad de Deep Pro', async () => {
+  const home = await readFile(join(root, 'index.html'), 'utf8');
+  const footer = home.match(/<footer[\s\S]*<\/footer>/)?.[0] ?? '';
+  for (const value of identity) assert.match(footer, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(home, /property="og:site_name" content="DEEP PRO CONSULTORES SpA"/);
+  for (const page of legalPages) {
+    const htmlPage = await readFile(join(root, page, 'index.html'), 'utf8');
+    for (const value of identity) {
+      assert.match(htmlPage, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), page);
+    }
+  }
+  assert.equal(home.includes('T14'), false);
+});
+
+const ALLOWED_RUT = '77.923.111-9';
+const RUT_RE = /\b\d{1,2}[.\s]?\d{3}[.\s]?\d{3}\s*-\s*[\dkK]\b/g;
+const PHONE_RE = /(?:\+?56[\s.-]*)?\b9[\s.-]*\d{4}[\s.-]*\d{4}\b/g;
+
+function normalizeRut(value) {
+  return value.replace(/[.\s]/g, '');
+}
+
+function assertPublicContact(source) {
+  const allowed = normalizeRut(ALLOWED_RUT);
+  const ruts = source.match(RUT_RE) ?? [];
+  for (const rut of ruts) {
+    if (normalizeRut(rut) !== allowed) {
+      throw new Error(`RUT no permitido: ${rut}`);
+    }
+  }
+  const phones = source.match(PHONE_RE) ?? [];
+  if (phones.length > 0) {
+    throw new Error(`teléfono chileno: ${phones.join(', ')}`);
+  }
+}
+
+test('el build solo publica el RUT de la agencia y ningún teléfono', async () => {
+  assertPublicContact(await html());
+});
+
+test('un RUT ajeno falla el guardrail', () => {
+  assert.throws(
+    () => assertPublicContact(`dato 12.345.678-5 y ${ALLOWED_RUT}`),
+    /RUT no permitido: 12\.345\.678-5/,
+  );
+  for (const sample of ['912345678', '9-1234-5678', '12345678-5', '12 345 678-5']) {
+    assert.throws(() => assertPublicContact(sample), /RUT no permitido|teléfono chileno/, sample);
+  }
 });
 
 test('textos públicos obligatorios y precios', async () => {
@@ -79,7 +133,20 @@ test('JSON-LD ProfessionalService no inventa address', async () => {
   for (const block of blocks) {
     const data = JSON.parse(block[1]);
     assert.equal(data['@type'], 'ProfessionalService');
-    if (!configuredAddress) assert.equal(Object.hasOwn(data, 'address'), false);
+    const configuredName = (
+      process.env.PUBLIC_AGENCY_NAME ||
+      process.env.AGENCY_NAME ||
+      'DEEP PRO CONSULTORES SpA'
+    ).trim();
+    const configuredLegal = (
+      process.env.PUBLIC_AGENCY_LEGAL_NAME ||
+      process.env.AGENCY_LEGAL_NAME ||
+      'DEEP PRO BUSINESS SOLUTIONS SpA'
+    ).trim();
+    assert.equal(data.name, configuredName);
+    assert.equal(data.legalName, configuredLegal);
+    const street = configuredAddress || 'Antonio Bellet 193, of. 1210, Providencia';
+    assert.equal(data.address.streetAddress, street);
   }
 });
 

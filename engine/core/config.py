@@ -89,11 +89,11 @@ class Settings(BaseSettings):
     admin_base_url: str = "http://localhost:8080/admin"
     cors_origins: str = "http://localhost:8080,http://localhost:4321"
 
-    agency_name: str = ""
-    agency_legal_name: str = ""
-    agency_rut: str = ""
-    agency_email: str = ""
-    agency_address: str = ""
+    agency_name: str = "DEEP PRO CONSULTORES SpA"
+    agency_legal_name: str = "DEEP PRO BUSINESS SOLUTIONS SpA"
+    agency_rut: str = "77.923.111-9"
+    agency_email: str = "nicolas.andrade@deeppro.cl"
+    agency_address: str = "Antonio Bellet 193, of. 1210, Providencia"
 
     xai_api_key: str = Field(
         default="",

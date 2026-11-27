@@ -50,6 +50,24 @@ for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
   sleep 1
 done
 test "$ok" = "1"
+home="$(curl -fsS --max-time 2 http://127.0.0.1:8088/)"
+priv="$(curl -fsS --max-time 2 http://127.0.0.1:8088/privacidad/)"
+term="$(curl -fsS --max-time 2 http://127.0.0.1:8088/terminos/)"
+baja="$(curl -fsS --max-time 2 http://127.0.0.1:8088/baja/)"
+portal="$(curl -fsS --max-time 2 http://127.0.0.1:8088/proyecto/abc123)"
+test "$priv" != "$home"
+test "$term" != "$home"
+printf '%s' "$priv" | grep -q '<title>Privacidad'
+printf '%s' "$term" | grep -q '<title>Términos'
+printf '%s' "$priv" | grep -q '77.923.111-9'
+printf '%s' "$term" | grep -q '77.923.111-9'
+printf '%s' "$baja" | grep -q '<title>Baja'
+printf '%s' "$portal" | grep -q 'id="portal"'
+missing_code="$(curl -sS -o /tmp/edge-noexiste.html -w '%{http_code}' --max-time 2 http://127.0.0.1:8088/noexiste/)"
+test "$missing_code" = "404"
+test "$(cat /tmp/edge-noexiste.html)" != "$home"
+slash_code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:8088/privacidad)"
+test "$slash_code" = "308"
 if curl -fsS --max-time 2 http://127.0.0.1:8088/api/internal/domain-check; then
   echo "domain-check no debe publicarse" >&2
   exit 1

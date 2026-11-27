@@ -1,6 +1,6 @@
 # Preguntas para revisión legal
 
-Esto no es un dictamen. No habilita el outreach, no interpreta la ley en nombre de la agencia y no reemplaza a un abogado con inscripción vigente en Chile. Las respuestas tienen que venir por escrito, con la identidad real de la agencia (razón social, RUT, domicilio, correo). Hoy esos datos están vacíos a propósito.
+Esto no es un dictamen. No habilita el outreach, no interpreta la ley en nombre de la agencia y no reemplaza a un abogado con inscripción vigente en Chile. Las respuestas tienen que venir por escrito, con la identidad real de la agencia (razón social, RUT, domicilio, correo). La razón social es DEEP PRO BUSINESS SOLUTIONS SpA, RUT 77.923.111-9, domicilio Antonio Bellet 193, of. 1210, Providencia, representante Nicolás Andrade Socías y correo nicolas.andrade@deeppro.cl. El correo de privacidad es nicolas.andrade@deeppro.cl.
 
 Fecha del borrador: 4 de octubre de 2026.
 

@@ -1,10 +1,11 @@
 ---
-import { IDENTITY_PLACEHOLDER, agency, isConfigured } from '../data/agency';
+import { agency, isConfigured } from '../data/agency';
 
 const payload: Record<string, unknown> = {
   '@context': 'https://schema.org',
   '@type': 'ProfessionalService',
-  name: isConfigured(agency.name) ? agency.name : IDENTITY_PLACEHOLDER,
+  name: agency.name,
+  legalName: agency.legalName,
   description: 'Diseño y publicación de landings para pymes locales en Chile.',
   areaServed: 'CL',
   serviceType: 'Landing page para pymes',

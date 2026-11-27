@@ -36,7 +36,7 @@ Todo umbral vive aquí y puede taparse en runtime con `settings_kv` (kill switch
 
 ### Agencia
 
-`AGENCY_NAME`, `AGENCY_LEGAL_NAME`, `AGENCY_RUT`, `AGENCY_EMAIL`, `AGENCY_ADDRESS`. Todas vacías. La UI muestra el placeholder «completa los datos de la agencia». Prohibido inventar nombre, RUT o dirección.
+`AGENCY_NAME` default DEEP PRO CONSULTORES SpA. `AGENCY_LEGAL_NAME` default DEEP PRO BUSINESS SOLUTIONS SpA. `AGENCY_RUT` default 77.923.111-9. `AGENCY_EMAIL` default nicolas.andrade@deeppro.cl. `AGENCY_ADDRESS` default Antonio Bellet 193, of. 1210, Providencia. El correo de privacidad es el mismo `AGENCY_EMAIL`.
 
 ### LLM
 

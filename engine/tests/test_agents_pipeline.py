@@ -16,15 +16,21 @@ from agents.checker import CheckerAgent
 from agents.context import AgentContext
 from agents.mobile import MobileAgent
 from agents.pipeline import Orchestrator
-from agents.pitcher import PitcherAgent, choose_channel
+from agents.pitcher import PitcherAgent, choose_channel, ensure_draft
 from agents.reporter import ReporterAgent
 from agents.schemas import JudgeVerdict
 from agents.scout import ScoutAgent
 from core.config import reset_settings
 from db.models import Approval, Event, Lead, Message
-from db.repositories import EventRepository, LeadRepository, MessageRepository
+from db.repositories import (
+    EventRepository,
+    LeadRepository,
+    MessageRepository,
+    SuppressionRepository,
+)
 from db.session import create_all, reset_engine, session_scope
 
+_FUENTE = "https://cafe.test/contacto"
 _BODY = (
     "Hola:\n\n"
     "No aparece un sitio propio de Café Andes en Providencia.\n\n"
@@ -32,6 +38,11 @@ _BODY = (
     "Si no es de interés, responde BAJA y no volvemos a escribir.\n"
     "Detalle en http://localhost/agendar.\n"
     "Agencia Andina\n"
+    "DEEP PRO BUSINESS SOLUTIONS SpA\n"
+    "RUT 77.923.111-9\n"
+    "Antonio Bellet 193, of. 1210, Providencia\n"
+    "nicolas.andrade@deeppro.cl\n"
+    f"obtuvimos su correo de {_FUENTE}, de acceso público, asociado a su negocio\n"
 )
 
 
@@ -79,6 +90,7 @@ def _lead(session: Session, **overrides: Any) -> Lead:
         "estimated_value_clp": 350_000,
         "high_value": False,
         "tone": "tu",
+        "contact_email_source_url": _FUENTE,
         "diagnosis": {"pitch_subject": "Sitio", "pitch_body": _BODY},
     }
     data.update(overrides)
@@ -131,6 +143,36 @@ def test_temas_mapean_rubros_y_no_filtran_el_id() -> None:
         assert "&lt;script&gt;" in html
         assert "lead_" not in html
         assert "Testimonio" not in html
+
+
+def test_la_final_no_lleva_rut_ni_razon_social() -> None:
+    common = {
+        "business": "Clínica Los Aromos",
+        "commune": "Ñuñoa",
+        "city": "Santiago",
+        "category": "clinica-dental",
+        "hero_title": "Clínica Los Aromos",
+        "hero_subtitle": "Atención en Ñuñoa.",
+        "services": [],
+        "faqs": [],
+        "about": "El local.",
+        "rating": 4.8,
+        "reviews": 20,
+        "booking_link": None,
+        "token": "preview-token",
+        "expires": "2026-11-01",
+        "agency_name": "DEEP PRO CONSULTORES SpA",
+        "agency_legal_name": "DEEP PRO BUSINESS SOLUTIONS SpA",
+        "agency_rut": "77.923.111-9",
+    }
+    demo = render_theme("servicios", demo=True, **common)
+    final = render_theme("servicios", demo=False, **common)
+    assert "DEEP PRO CONSULTORES SpA" in demo
+    assert "77.923.111-9" not in demo
+    assert "77.923.111-9" not in final
+    assert "DEEP PRO BUSINESS SOLUTIONS SpA" not in final
+    assert "DEEP PRO" not in final
+    assert "Clínica Los Aromos · Ñuñoa" in final
 
 
 def test_run_demo_deja_html_y_el_alto_valor_en_revision(
@@ -190,6 +232,52 @@ def test_run_cycle_no_crea_leads_y_respeta_cuota(
     before = Orchestrator().snapshot()["total"]
     Orchestrator().run_cycle()
     assert Orchestrator().snapshot()["total"] == before
+
+
+def test_borrador_suprimido_no_crea_mensaje(env: Path, block_network: None) -> None:
+    with session_scope() as session:
+        SuppressionRepository(session).add(
+            "email",
+            "ya-suprimido@example.test",
+            reason="baja",
+            source="baja",
+        )
+        lead = _lead(
+            session,
+            contact_email="ya-suprimido@example.test",
+            contact_email_source_url="https://taller.test/contacto",
+            diagnosis={
+                "pitch_subject": "Propuesta comercial: landing para Taller Sur",
+                "pitch_body": "Hola. Te escribo de Agencia Andina. Responde BAJA.",
+            },
+        )
+        draft = ensure_draft(AgentContext(session, lead_id=lead.id))
+        rows = MessageRepository(session).list(lead_id=lead.id)
+    assert draft is None
+    assert rows == []
+
+
+def test_el_borrador_lleva_el_pie_legal(env: Path, block_network: None) -> None:
+    with session_scope() as session:
+        lead = _lead(
+            session,
+            contact_email="hola@cafe.test",
+            diagnosis={
+                "pitch_subject": "Propuesta comercial: landing para Café Andes",
+                "pitch_body": (
+                    "Hola. Te escribo de Agencia Andina. "
+                    "La landing queda en 350.000 CLP. "
+                    "Si no es de interés, responde BAJA."
+                ),
+            },
+        )
+        draft = ensure_draft(AgentContext(session, lead_id=lead.id))
+    assert draft is not None
+    assert "DEEP PRO BUSINESS SOLUTIONS SpA" in draft.body_text
+    assert f"obtuvimos su correo de {_FUENTE}, de acceso público, asociado a su negocio" in (
+        draft.body_text
+    )
+    assert "http://localhost/baja" in draft.body_text
 
 
 def test_pitcher_un_canal_y_email_simulado(env: Path, block_network: None) -> None:

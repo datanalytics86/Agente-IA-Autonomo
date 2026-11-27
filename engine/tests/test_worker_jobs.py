@@ -14,17 +14,22 @@ from sqlalchemy.orm import Session
 from core.compliance import check_rules
 from core.config import reset_settings
 from db.models import Approval, Artifact, JobRun, Lead, LlmCall, Message, Project
-from db.repositories import LeadRepository, MessageRepository, SettingsRepository
+from db.repositories import (
+    LeadRepository,
+    MessageRepository,
+    SettingsRepository,
+    SuppressionRepository,
+)
 from db.session import create_all, reset_engine, session_scope
 from worker.clock import FakeClock
 from worker.copywriter import agency_label, checker_settings, outreach_parts
 from worker.defaults import EmptySource, GuardedOutreach, build_default_ports
-from worker.funnel import _charge_llm, _ensure_artifact
+from worker.funnel import _charge_llm, _ensure_artifact, job_pipeline, job_scout
 from worker.jobs import JOBS
 from worker.maintenance import job_demo_expiry, job_postventa, job_retention
-from worker.ports import InboundMail, JobContext, SendResult
+from worker.ports import InboundMail, JobContext, PlaceHit, SendResult
 from worker.runner import drain_queued, execute
-from worker.sending import apply_inbound, job_outreach, job_warmup
+from worker.sending import apply_inbound, job_followups, job_outreach, job_warmup
 
 TZ = ZoneInfo("America/Santiago")
 
@@ -88,10 +93,12 @@ def _lead(session: Session, **overrides: object) -> Lead:
 
 
 def _queued(session: Session, lead: Lead, **overrides: object) -> Message:
+    source = "https://andes-ejemplo.cl/contacto"
     subject, text, body = outreach_parts(
         business=lead.business,
         commune=lead.commune,
         step=1,
+        source=source,
     )
     result = check_rules(
         {
@@ -103,7 +110,11 @@ def _queued(session: Session, lead: Lead, **overrides: object) -> Message:
             "suppressed": False,
             "recipient_suppressed": False,
         },
-        {"contact_email": lead.contact_email, "business": lead.business},
+        {
+            "contact_email": lead.contact_email,
+            "business": lead.business,
+            "contact_email_source_url": source,
+        },
         checker_settings(),
     )
     assert result.approved, result.reasons
@@ -137,29 +148,44 @@ def _ctx(session: Session, moment: datetime, outreach: object | None = None) -> 
     )
 
 
-def test_sin_nombre_no_inventa_agencia(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_html_conserva_los_saltos_del_pie(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("AGENCY_NAME", raising=False)
     reset_settings()
-    assert agency_label() == ""
-    subject, text, body = outreach_parts(business="Café Andes", commune="Ñuñoa", step=1)
-    result = check_rules(
-        {
-            "body": text,
-            "body_html": body,
-            "channel": "email_outreach",
-            "subject": subject,
-            "direction": "out",
-        },
-        {"business": "Café Andes"},
-        checker_settings(),
+    _subject, text, body = outreach_parts(
+        business="Café Andes",
+        commune="Ñuñoa",
+        step=1,
+        source="https://cafe.cl/contacto",
     )
-    assert result.approved is False
+    assert "<br>" in body
+    assert body.startswith("<p>") and body.endswith("</p>")
+    for line in text.split("\n"):
+        assert html_escape_line(line) in body
+
+
+def html_escape_line(line: str) -> str:
+    return line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def test_sin_nombre_usa_deeppro(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("AGENCY_NAME", raising=False)
+    reset_settings()
+    assert agency_label() == "DEEP PRO CONSULTORES SpA"
+    _subject, text, body = outreach_parts(business="Café Andes", commune="Ñuñoa", step=1)
+    assert "DEEP PRO CONSULTORES SpA" in text
+    assert "DEEP PRO CONSULTORES SpA" in body
 
 
 def test_borrador_pasa_el_checker(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AGENCY_NAME", "Agencia Andina")
     reset_settings()
-    subject, text, body = outreach_parts(business="Café Andes", commune="Ñuñoa", step=2)
+    source = "https://andes-ejemplo.cl/contacto"
+    subject, text, body = outreach_parts(
+        business="Café Andes",
+        commune="Ñuñoa",
+        step=2,
+        source=source,
+    )
     result = check_rules(
         {
             "body": text,
@@ -168,7 +194,7 @@ def test_borrador_pasa_el_checker(monkeypatch: pytest.MonkeyPatch) -> None:
             "subject": subject,
             "direction": "out",
         },
-        {"business": "Café Andes"},
+        {"business": "Café Andes", "contact_email_source_url": source},
         checker_settings(),
     )
     assert result.approved, result.reasons
@@ -183,6 +209,23 @@ def test_kill_switch_no_envia(session: Session) -> None:
     assert ctx.ports.outreach.sent == []  # type: ignore[attr-defined]
     stored = MessageRepository(session).list(lead_id=lead.id)[0]
     assert stored.status == "queued"
+
+
+def test_email_suprimido_no_recibe_mas(session: Session) -> None:
+    lead = _lead(session)
+    SuppressionRepository(session).add(
+        "email",
+        lead.contact_email or "",
+        reason="baja",
+        source="baja",
+    )
+    _queued(session, lead)
+    box = MemoryOutreach()
+    ctx = _ctx(session, datetime(2026, 3, 3, 10, 0, tzinfo=TZ), box)
+    assert job_outreach(ctx) == 0
+    assert box.sent == []
+    stored = MessageRepository(session).list(lead_id=lead.id)[0]
+    assert stored.status == "blocked"
 
 
 def test_envio_dentro_de_ventana_marca_enviado(session: Session) -> None:
@@ -418,6 +461,190 @@ def test_no_inventa_costo_ni_archivo_ni_entrega(session: Session, tmp_path: Path
     rows = list(session.scalars(select(Artifact)).all())
     assert len(rows) == 1
     assert rows[0].path == str(real)
+
+
+def _origen(**overrides: object) -> object:
+    class Hit:
+        place_id = "place-1"
+        name = "Café Norte"
+        formatted_address = "Av 1"
+        commune = "Providencia"
+        city = "Santiago"
+        category = "cafeteria"
+        website_uri = None
+        rating = 4.8
+        user_rating_count = 40
+        business_status = "OPERATIONAL"
+        email = "hola@negocio.cl"
+        instagram_handle = None
+        linkedin_url = None
+        phone_public = None
+        estimated_value_clp = 350_000
+        opportunity_score = 80
+        scenario = "test"
+        unsafe_text = ""
+
+    hit = Hit()
+    for key, value in overrides.items():
+        setattr(hit, key, value)
+    return hit
+
+
+def _mensaje_del_hit(session: Session, **overrides: object) -> tuple[Lead, Message]:
+    from worker.defaults import place_from_source
+    from worker.funnel import _lead_from_hit, _queue_messages
+
+    mapped = place_from_source(_origen(**overrides), commune="Providencia", category="cafeteria")
+    assert mapped is not None
+    ctx = _ctx(session, datetime(2026, 3, 3, 12, 0, tzinfo=TZ))
+    lead = LeadRepository(session).add(_lead_from_hit(ctx, mapped))
+    _queue_messages(ctx, lead)
+    messages = MessageRepository(session).list(lead_id=lead.id)
+    assert len(messages) == 1
+    return lead, messages[0]
+
+
+def test_http_source_sin_host_es_none() -> None:
+    from worker.defaults import _http_source
+
+    assert _http_source("http://") is None
+    assert _http_source("https://") is None
+
+
+def test_http_source_con_control_es_none() -> None:
+    from worker.defaults import _http_source
+
+    assert _http_source("https://negocio.cl/contacto\n") is None
+    assert _http_source("https://nego\x00cio.cl/") is None
+
+
+def test_hit_sin_fuente_se_rechaza(session: Session) -> None:
+    from worker.defaults import place_from_source
+
+    dropped = place_from_source(
+        _origen(email_source_url="ftp://negocio.cl/contacto"),
+        commune="Providencia",
+        category="cafeteria",
+    )
+    assert dropped is not None
+    assert dropped.email_source_url is None
+    lead, message = _mensaje_del_hit(session)
+    assert lead.contact_email_source_url is None
+    assert message.status == "rejected"
+    rules = message.check_result["rules"]["reasons"]
+    assert "el lead no tiene fuente del correo" in rules
+
+
+def test_gmail_sin_fuente_no_entra_al_pie(session: Session) -> None:
+    lead, message = _mensaje_del_hit(session, email="persona@gmail.com")
+    assert lead.contact_email_source_url is None
+    assert message.status == "rejected"
+    assert "gmail.com" not in message.body_text
+    assert "gmail.com" not in (message.body_html or "")
+
+
+def test_hit_con_fuente_real_la_muestra_en_el_pie(session: Session) -> None:
+    source = "https://negocio.cl/contacto"
+    lead, message = _mensaje_del_hit(session, email_source_url=source)
+    assert lead.contact_email_source_url == source
+    assert message.status == "queued"
+    assert source in message.body_text
+    assert f"obtuvimos su correo de {source}, de acceso público, asociado a su negocio" in (
+        message.body_text
+    )
+
+
+def test_followup_no_crea_mensaje_si_esta_suprimido(session: Session) -> None:
+    SuppressionRepository(session).add(
+        "email",
+        "ya-suprimido@example.test",
+        reason="baja",
+        source="baja",
+    )
+    lead = _lead(
+        session,
+        status="enviado",
+        business="Taller Sur",
+        contact_email="ya-suprimido@example.test",
+        contact_email_source_url="https://taller.test/contacto",
+    )
+    MessageRepository(session).add(
+        Message(
+            lead_id=lead.id,
+            thread_id=lead.id,
+            direction="out",
+            channel="email_outreach",
+            sequence_step=1,
+            status="sent",
+            subject="Propuesta comercial: landing para Taller Sur",
+            body_text="primer envío",
+            sent_at=datetime(2026, 3, 2, 15, 0, tzinfo=TZ),
+        )
+    )
+    ctx = _ctx(session, datetime(2026, 3, 20, 11, 0, tzinfo=TZ))
+    assert job_followups(ctx) == 0
+    rows = MessageRepository(session).list(lead_id=lead.id)
+    assert len(rows) == 1
+    assert rows[0].sequence_step == 1
+    assert rows[0].status == "sent"
+
+
+def test_scout_no_crea_lead_suprimido(session: Session) -> None:
+    SuppressionRepository(session).add(
+        "email",
+        "ya-suprimido@example.test",
+        reason="baja",
+        source="baja",
+    )
+
+    class Source:
+        def search(self, commune: str, category_slug: str, limit: int) -> list[PlaceHit]:
+            return [
+                PlaceHit(
+                    place_id="place-suprimido",
+                    name="Taller Sur",
+                    formatted_address="Av 1",
+                    commune="Providencia",
+                    city="Santiago",
+                    category="taller-mecanico",
+                    website_uri=None,
+                    rating=4.8,
+                    user_rating_count=40,
+                    business_status="OPERATIONAL",
+                    email="ya-suprimido@example.test",
+                    instagram_handle=None,
+                    linkedin_url=None,
+                    phone_public=None,
+                    estimated_value_clp=350_000,
+                    opportunity_score=80,
+                    scenario="test",
+                    email_source_url="https://taller.test/contacto",
+                )
+            ]
+
+    ctx = _ctx(session, datetime(2026, 3, 20, 11, 0, tzinfo=TZ))
+    ctx.ports.places = Source()  # type: ignore[assignment]
+    assert job_scout(ctx) == 0
+    assert LeadRepository(session).list(limit=20) == []
+
+
+def test_pipeline_no_encola_correo_suprimido(session: Session) -> None:
+    SuppressionRepository(session).add(
+        "email",
+        "ya-suprimido@example.test",
+        reason="baja",
+        source="baja",
+    )
+    lead = _lead(
+        session,
+        status="video",
+        business="Taller Sur",
+        contact_email="ya-suprimido@example.test",
+        contact_email_source_url="https://taller.test/contacto",
+    )
+    ctx = _ctx(session, datetime(2026, 3, 20, 11, 0, tzinfo=TZ))
+    job_pipeline(ctx)
+    assert MessageRepository(session).list(lead_id=lead.id) == []
 
 
 def test_place_sin_email_no_se_mapea() -> None:

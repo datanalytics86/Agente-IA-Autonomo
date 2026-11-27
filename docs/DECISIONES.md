@@ -45,7 +45,7 @@ Quince slugs ASCII únicos, tabla en `docs/contracts/dominio.md`. Reemplazan los
 
 ## ADR-008 — Identidad de la agencia
 
-Nombre, razón social, RUT, email y dirección quedan vacíos. Textos legales usan el placeholder «[datos de la agencia]». No se inventan.
+Marca: DEEP PRO CONSULTORES SpA. Razón social: DEEP PRO BUSINESS SOLUTIONS SpA. RUT: 77.923.111-9. Domicilio: Antonio Bellet 193, of. 1210, Providencia. Representante: Nicolás Andrade Socías. Correo de contacto: nicolas.andrade@deeppro.cl. El correo de privacidad es nicolas.andrade@deeppro.cl.
 
 ## ADR-009 — Documento tributario
 

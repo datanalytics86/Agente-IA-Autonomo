@@ -25,9 +25,11 @@ from db.repositories import (
     PaymentRepository,
     ProjectRepository,
     SettingsRepository,
+    SuppressionRepository,
 )
 from worker.approvals import ensure_approval
 from worker.copywriter import MANUAL_CHANNELS, checker_settings, offer_price_clp, outreach_parts
+from worker.defaults import _http_source
 from worker.persist import patch_fields
 from worker.ports import JobContext, PlaceHit
 from worker.schedule import local_date, next_window_open
@@ -88,6 +90,7 @@ def _lead_view(lead: Lead) -> dict[str, object]:
         "linkedin_url": lead.linkedin_url,
         "website_url": lead.website_url,
         "business": lead.business,
+        "contact_email_source_url": lead.contact_email_source_url,
     }
 
 
@@ -121,6 +124,8 @@ def job_scout(ctx: JobContext) -> int:
         if hit.place_id in known:
             continue
         lead = _lead_from_hit(ctx, hit)
+        if _on_suppression_list(ctx.session, lead):
+            continue
         try:
             LeadRepository(ctx.session).add(lead)
         except DuplicateLeadError:
@@ -181,6 +186,7 @@ def _lead_from_hit(ctx: JobContext, hit: PlaceHit) -> Lead:
         rating=hit.rating,
         reviews=hit.user_rating_count,
         contact_email=hit.email,
+        contact_email_source_url=_http_source(hit.email_source_url),
         instagram_handle=hit.instagram_handle,
         linkedin_url=hit.linkedin_url,
         phone_public=hit.phone_public,
@@ -324,17 +330,35 @@ def _enter_pitch(ctx: JobContext, lead: Lead) -> bool:
     return True
 
 
+def _on_suppression_list(session: Session, lead: Lead) -> bool:
+    repo = SuppressionRepository(session)
+    email = (lead.contact_email or "").strip()
+    if email and repo.contains("email", email):
+        return True
+    if "@" not in email:
+        return False
+    domain = email.split("@", 1)[1].lower().strip()
+    return bool(domain and repo.contains("domain", domain))
+
+
 def _queue_messages(ctx: JobContext, lead: Lead) -> None:
     existing = MessageRepository(ctx.session).list(lead_id=lead.id, limit=20)
     if any(item.sequence_step == 1 and item.direction == "out" for item in existing):
+        return
+    send_email = bool(lead.contact_email) and not _on_suppression_list(ctx.session, lead)
+    send_manual = bool(
+        lead.instagram_handle or lead.linkedin_url or (lead.phone_public and not lead.contact_email)
+    )
+    if not send_email and not send_manual:
         return
     scheduled = next_window_open(ctx.clock.now())
     subject, text, body_html = outreach_parts(
         business=lead.business,
         commune=lead.commune,
         step=1,
+        source=lead.contact_email_source_url,
     )
-    if lead.contact_email:
+    if send_email:
         queue_outbound(
             ctx,
             lead,
