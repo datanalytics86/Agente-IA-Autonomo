@@ -101,7 +101,7 @@ Copia de seguridad: `infra/scripts/backup.ps1` o `backup.sh`. Conservan 14 archi
 
 ## Producción
 
-Seguir `docs/GO_LIVE.md`. El nombre y el RUT por defecto son Deeppro SpA, 77.923.111-9. Correo y dirección siguen por entorno. No hay envíos reales ni cobros reales en este runbook.
+Seguir `docs/GO_LIVE.md`. Marca DEEP PRO CONSULTORES SpA, razón social DEEP PRO BUSINESS SOLUTIONS SpA, RUT 77.923.111-9. No hay envíos reales ni cobros reales en este runbook.
 
 ## Host nuevo
 

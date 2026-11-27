@@ -12,7 +12,7 @@ La cola `state/queue.json` ya no se crea. El umbral de alto valor sale de `hitl_
 
 - `engine/`: agentes, API FastAPI, worker APScheduler (`America/Santiago`) y simulación con reloj falso. SQLite por defecto. Postgres 16 en el Compose.
 - `apps/web/`: panel React. Cookie HttpOnly y CSRF. Zustand solo de interfaz.
-- `apps/site/`: Astro. Identidad pública por defecto: Deeppro SpA, RUT 77.923.111-9. Correo y dirección siguen en `TODO(Deeppro)`.
+- `apps/site/`: Astro. Marca DEEP PRO CONSULTORES SpA. Razón social DEEP PRO BUSINESS SOLUTIONS SpA, RUT 77.923.111-9. El correo de privacidad sigue en `TODO(Deeppro): correo de privacidad`.
 - `infra/`: Dockerfile del motor, Compose y Caddy. En esta máquina no hay binario `docker`, así que ese stack no se levantó.
 
 Demo sin credenciales: `APP_MODE=demo`, `DRY_RUN=true`, `OUTREACH_ENABLED=false`, kill switch en falso. No hay envío real, ni cobro real, ni DM automático de Instagram o LinkedIn. Esos dos canales quedan en `manual_pending`.

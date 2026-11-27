@@ -44,15 +44,26 @@ async function html() {
 
 const legalPages = ['privacidad', 'terminos', 'baja', 'derechos'];
 
-test('el footer y cada página legal muestran Deeppro SpA y el RUT', async () => {
+const identity = [
+  'DEEP PRO CONSULTORES SpA',
+  'DEEP PRO BUSINESS SOLUTIONS SpA',
+  '77.923.111-9',
+  'Antonio Bellet 193, of. 1210, Providencia',
+  'Nicolás Andrade Socías',
+  'nicolas.andrade@deeppro.cl',
+  'TODO(Deeppro): correo de privacidad',
+];
+
+test('el footer y cada página legal muestran la identidad de Deep Pro', async () => {
   const home = await readFile(join(root, 'index.html'), 'utf8');
   const footer = home.match(/<footer[\s\S]*<\/footer>/)?.[0] ?? '';
-  assert.match(footer, /Deeppro SpA/);
-  assert.match(footer, /77\.923\.111-9/);
+  for (const value of identity) assert.match(footer, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(home, /property="og:site_name" content="DEEP PRO CONSULTORES SpA"/);
   for (const page of legalPages) {
     const htmlPage = await readFile(join(root, page, 'index.html'), 'utf8');
-    assert.match(htmlPage, /Deeppro SpA/, page);
-    assert.match(htmlPage, /77\.923\.111-9/, page);
+    for (const value of identity) {
+      assert.match(htmlPage, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), page);
+    }
   }
   assert.equal(home.includes('T14'), false);
 });
@@ -90,10 +101,17 @@ test('JSON-LD ProfessionalService no inventa address', async () => {
     const configuredName = (
       process.env.PUBLIC_AGENCY_NAME ||
       process.env.AGENCY_NAME ||
-      'Deeppro SpA'
+      'DEEP PRO CONSULTORES SpA'
+    ).trim();
+    const configuredLegal = (
+      process.env.PUBLIC_AGENCY_LEGAL_NAME ||
+      process.env.AGENCY_LEGAL_NAME ||
+      'DEEP PRO BUSINESS SOLUTIONS SpA'
     ).trim();
     assert.equal(data.name, configuredName);
-    if (!configuredAddress) assert.equal(Object.hasOwn(data, 'address'), false);
+    assert.equal(data.legalName, configuredLegal);
+    const street = configuredAddress || 'Antonio Bellet 193, of. 1210, Providencia';
+    assert.equal(data.address.streetAddress, street);
   }
 });
 

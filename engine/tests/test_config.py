@@ -58,9 +58,11 @@ def test_defaults_sin_entorno(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.maintenance_price_clp is None
     assert settings.booking_provider == "calcom"
     assert settings.hosting_provider == "caddy"
-    assert settings.agency_name == "Deeppro SpA"
-    assert settings.agency_legal_name == "Deeppro SpA"
+    assert settings.agency_name == "DEEP PRO CONSULTORES SpA"
+    assert settings.agency_legal_name == "DEEP PRO BUSINESS SOLUTIONS SpA"
     assert settings.agency_rut == "77.923.111-9"
+    assert settings.agency_email == "nicolas.andrade@deeppro.cl"
+    assert settings.agency_address == "Antonio Bellet 193, of. 1210, Providencia"
     assert settings.secret_key == ""
     assert settings.resolved_secret_key
     assert len(settings.scout_category_list) == 15

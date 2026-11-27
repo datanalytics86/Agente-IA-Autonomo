@@ -2,7 +2,7 @@
 
 No es un dictamen. No es base para encender envíos. Si el abogado no lo confirma por escrito, el resultado de este test sigue en pie: el outreach automático queda apagado.
 
-Fecha: 4 de octubre de 2026. Responsable: Deeppro SpA, RUT 77.923.111-9. Domicilio y correo siguen en `TODO(Deeppro)`. Hay que rehacer el test si cambian el volumen, la fuente de los datos, los canales o el país desde el que se trata.
+Fecha: 4 de octubre de 2026. Responsable: DEEP PRO BUSINESS SOLUTIONS SpA, RUT 77.923.111-9, Antonio Bellet 193, of. 1210, Providencia. El correo de privacidad sigue en `TODO(Deeppro): correo de privacidad`. Hay que rehacer el test si cambian el volumen, la fuente de los datos, los canales o el país desde el que se trata.
 
 ## 1. Tratamiento que se evalúa
 

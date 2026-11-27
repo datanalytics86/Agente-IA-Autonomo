@@ -1,7 +1,5 @@
 ---
-import { agency, isConfigured } from '../data/agency';
-
-const address = isConfigured(agency.address) ? agency.address : 'TODO(Deeppro): dirección';
+import { agency } from '../data/agency';
 ---
 
 <dl class="grid gap-3 text-sm sm:grid-cols-2">
@@ -18,14 +16,22 @@ const address = isConfigured(agency.address) ? agency.address : 'TODO(Deeppro): 
     <dd>{agency.rut}</dd>
   </div>
   <div>
-    <dt class="text-muted">Dirección</dt>
-    <dd>{address}</dd>
+    <dt class="text-muted">Representante legal</dt>
+    <dd>{agency.representative}</dd>
   </div>
-  <div class="sm:col-span-2">
+  <div>
+    <dt class="text-muted">Dirección</dt>
+    <dd>{agency.address}</dd>
+  </div>
+  <div>
     <dt class="text-muted">Correo</dt>
     <dd>{agency.email}</dd>
   </div>
+  <div class="sm:col-span-2">
+    <dt class="text-muted">Correo de privacidad</dt>
+    <dd>{agency.privacyEmail}</dd>
+  </div>
 </dl>
 <p class="mt-4 text-sm text-muted">
-  Lo marcado como TODO(Deeppro) todavía no está publicado. El nombre y el RUT no son marcadores.
+  {agency.privacyEmail} todavía no está publicado.
 </p>

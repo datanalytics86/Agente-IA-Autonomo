@@ -140,10 +140,10 @@ def _ctx(session: Session, moment: datetime, outreach: object | None = None) -> 
 def test_sin_nombre_usa_deeppro(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("AGENCY_NAME", raising=False)
     reset_settings()
-    assert agency_label() == "Deeppro SpA"
+    assert agency_label() == "DEEP PRO CONSULTORES SpA"
     _subject, text, body = outreach_parts(business="Café Andes", commune="Ñuñoa", step=1)
-    assert "Deeppro SpA" in text
-    assert "Deeppro SpA" in body
+    assert "DEEP PRO CONSULTORES SpA" in text
+    assert "DEEP PRO CONSULTORES SpA" in body
 
 
 def test_borrador_pasa_el_checker(monkeypatch: pytest.MonkeyPatch) -> None:
