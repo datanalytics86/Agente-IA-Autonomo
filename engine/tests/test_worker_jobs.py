@@ -1015,6 +1015,40 @@ def test_mail_y_correo_cierran_el_host(session: Session) -> None:
     assert SuppressionRepository(session).contains("domain", "bufete.cl") is True
 
 
+def test_los_dominios_que_faltaban_siguen_compartidos(session: Session) -> None:
+    from core.suppression import is_shared_host, record_opt_out
+
+    faltan = (
+        "gob.cl",
+        "yahoo.com.br",
+        "bol.com.br",
+        "web.de",
+        "orange.fr",
+        "terra.com",
+        "terra.es",
+        "telefonica.net",
+        "puc.cl",
+        "uahurtado.cl",
+        "uft.cl",
+        "ucsc.cl",
+        "yahoo.cl",
+        "yahoo.es",
+        "hotmail.cl",
+        "hotmail.es",
+        "live.com",
+        "msn.com",
+        "icloud.com",
+        "me.com",
+        "chile.com",
+        "pjud.cl",
+    )
+    assert all(is_shared_host(host) for host in faltan)
+    gob = _lead(session, business="Gobierno", contact_email="persona@gob.cl", place_id="place-gob")
+    assert "domain" not in {
+        row.kind for row in record_opt_out(session, gob, channel="email", reason="baja")
+    }
+
+
 def test_los_dominios_nuevos_siguen_compartidos(session: Session) -> None:
     from core.suppression import is_shared_host, record_opt_out
 
