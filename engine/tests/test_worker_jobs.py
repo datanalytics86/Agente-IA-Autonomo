@@ -655,6 +655,29 @@ def test_pipeline_no_encola_correo_suprimido(session: Session) -> None:
     assert stored.status == "opt_out"
 
 
+def test_lead_suprimido_sin_correo_no_abre_canal_manual(session: Session) -> None:
+    SuppressionRepository(session).add(
+        "instagram",
+        "tallersur",
+        reason="baja",
+        source="instagram",
+    )
+    lead = _lead(
+        session,
+        status="video",
+        business="Solo Instagram",
+        contact_email=None,
+        instagram_handle="tallersur",
+        linkedin_url=None,
+        phone_public=None,
+    )
+    ctx = _ctx(session, datetime(2026, 3, 20, 11, 0, tzinfo=TZ))
+    job_pipeline(ctx)
+    rows = MessageRepository(session).list(lead_id=lead.id)
+    assert rows == []
+    assert {row.channel for row in rows}.isdisjoint({"instagram", "linkedin", "whatsapp"})
+
+
 def test_el_extracto_enmascara_600_800_y_rut_sin_guion() -> None:
     from core.suppression import clean_opt_out_text
 
