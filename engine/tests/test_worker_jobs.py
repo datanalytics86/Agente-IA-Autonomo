@@ -720,6 +720,41 @@ def test_baja_de_contacto_suprime_el_estudio(session: Session) -> None:
     assert repo.contains("domain", "estudio.test") is False
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("estudio.cl", "estudio.cl"),
+        ("abogados.estudio.cl", "estudio.cl"),
+        ("www.estudio.com.cl", "estudio.com.cl"),
+        ("abogados.estudio.com.cl", "estudio.com.cl"),
+        ("tramites.municipio.gob.cl", "municipio.gob.cl"),
+        ("estudio.co.uk", "estudio.co.uk"),
+        ("www.estudio.com.ar:8080", "estudio.com.ar"),
+        ("abogados.estudio.co", "estudio.co"),
+    ],
+)
+def test_registrable_domain_cubre_tld_de_dos_niveles(raw: str, expected: str) -> None:
+    from core.suppression import normalize_domain, registrable_domain, website_domain
+
+    assert website_domain(raw) == expected
+    assert registrable_domain(normalize_domain(raw)) == expected
+
+
+def test_baja_de_com_cl_cierra_el_dominio_registrable(session: Session) -> None:
+    from core.suppression import record_opt_out
+
+    lead = _lead(
+        session,
+        business="Estudio Com Cl",
+        contact_email="persona@estudio.com.cl",
+        website_url="https://abogados.estudio.com.cl",
+        place_id="place-com-cl",
+    )
+    rows = record_opt_out(session, lead, channel="email", reason="baja")
+    assert {row.kind for row in rows} == {"email", "lead", "domain"}
+    assert SuppressionRepository(session).contains("domain", "estudio.com.cl") is True
+
+
 def test_dominio_registrable_ignora_puerto_www_userinfo_e_idn() -> None:
     from core.suppression import normalize_domain, registrable_domain, website_domain
 
