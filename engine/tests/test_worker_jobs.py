@@ -24,7 +24,7 @@ from db.session import create_all, reset_engine, session_scope
 from worker.clock import FakeClock
 from worker.copywriter import agency_label, checker_settings, outreach_parts
 from worker.defaults import EmptySource, GuardedOutreach, build_default_ports
-from worker.funnel import _charge_llm, _ensure_artifact
+from worker.funnel import _charge_llm, _ensure_artifact, job_pipeline
 from worker.jobs import JOBS
 from worker.maintenance import job_demo_expiry, job_postventa, job_retention
 from worker.ports import InboundMail, JobContext, SendResult
@@ -504,6 +504,20 @@ def _mensaje_del_hit(session: Session, **overrides: object) -> tuple[Lead, Messa
     return lead, messages[0]
 
 
+def test_http_source_sin_host_es_none() -> None:
+    from worker.defaults import _http_source
+
+    assert _http_source("http://") is None
+    assert _http_source("https://") is None
+
+
+def test_http_source_con_control_es_none() -> None:
+    from worker.defaults import _http_source
+
+    assert _http_source("https://negocio.cl/contacto\n") is None
+    assert _http_source("https://nego\x00cio.cl/") is None
+
+
 def test_hit_sin_fuente_se_rechaza(session: Session) -> None:
     from worker.defaults import place_from_source
 
@@ -538,6 +552,25 @@ def test_hit_con_fuente_real_la_muestra_en_el_pie(session: Session) -> None:
     assert f"obtuvimos su correo de {source}, de acceso público, asociado a su negocio" in (
         message.body_text
     )
+
+
+def test_pipeline_no_encola_correo_suprimido(session: Session) -> None:
+    SuppressionRepository(session).add(
+        "email",
+        "ya-suprimido@example.test",
+        reason="baja",
+        source="baja",
+    )
+    lead = _lead(
+        session,
+        status="video",
+        business="Taller Sur",
+        contact_email="ya-suprimido@example.test",
+        contact_email_source_url="https://taller.test/contacto",
+    )
+    ctx = _ctx(session, datetime(2026, 3, 20, 11, 0, tzinfo=TZ))
+    job_pipeline(ctx)
+    assert MessageRepository(session).list(lead_id=lead.id) == []
 
 
 def test_place_sin_email_no_se_mapea() -> None:

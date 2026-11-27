@@ -54,4 +54,19 @@ if curl -fsS --max-time 2 http://127.0.0.1:8088/api/internal/domain-check; then
   echo "domain-check no debe publicarse" >&2
   exit 1
 fi
+home="$(curl -fsS --max-time 2 http://127.0.0.1:8088/)"
+priv="$(curl -fsS --max-time 2 http://127.0.0.1:8088/privacidad/)"
+term="$(curl -fsS --max-time 2 http://127.0.0.1:8088/terminos/)"
+test "$priv" != "$home"
+test "$term" != "$home"
+printf '%s' "$priv" | grep -q '<title>Privacidad'
+printf '%s' "$term" | grep -q '<title>Términos'
+if printf '%s' "$priv" | grep -q 'Una landing clara para tu pyme'; then
+  echo "/privacidad/ devolvió la home" >&2
+  exit 1
+fi
+if printf '%s' "$term" | grep -q 'Una landing clara para tu pyme'; then
+  echo "/terminos/ devolvió la home" >&2
+  exit 1
+fi
 echo "edge smoke ok"

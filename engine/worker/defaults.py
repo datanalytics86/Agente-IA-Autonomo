@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import importlib
+import unicodedata
+from urllib.parse import urlsplit
 
 from core.compliance import CheckResult, check_rules
 from core.config import get_settings
@@ -87,13 +89,18 @@ class LogNotifier:
 
 
 def _http_source(value: object) -> str | None:
-    """Solo una URL http(s) que ya vino en el origen. Si no, no hay fuente."""
-    if not isinstance(value, str):
+    """Solo una URL http(s) con host, ya venida del origen. Si no, no hay fuente."""
+    if not isinstance(value, str) or _has_control(value):
         return None
     text = value.strip()
-    if text.lower().startswith(("https://", "http://")):
-        return text
-    return None
+    parts = urlsplit(text)
+    if parts.scheme not in {"http", "https"} or not parts.hostname:
+        return None
+    return text
+
+
+def _has_control(value: str) -> bool:
+    return any(unicodedata.category(char) == "Cc" for char in value)
 
 
 def place_from_source(hit: object, *, commune: str, category: str) -> PlaceHit | None:

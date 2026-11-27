@@ -25,6 +25,7 @@ from db.repositories import (
     PaymentRepository,
     ProjectRepository,
     SettingsRepository,
+    SuppressionRepository,
 )
 from worker.approvals import ensure_approval
 from worker.copywriter import MANUAL_CHANNELS, checker_settings, offer_price_clp, outreach_parts
@@ -327,9 +328,26 @@ def _enter_pitch(ctx: JobContext, lead: Lead) -> bool:
     return True
 
 
+def _on_suppression_list(session: Session, lead: Lead) -> bool:
+    repo = SuppressionRepository(session)
+    email = (lead.contact_email or "").strip()
+    if email and repo.contains("email", email):
+        return True
+    if "@" not in email:
+        return False
+    domain = email.split("@", 1)[1].lower().strip()
+    return bool(domain and repo.contains("domain", domain))
+
+
 def _queue_messages(ctx: JobContext, lead: Lead) -> None:
     existing = MessageRepository(ctx.session).list(lead_id=lead.id, limit=20)
     if any(item.sequence_step == 1 and item.direction == "out" for item in existing):
+        return
+    send_email = bool(lead.contact_email) and not _on_suppression_list(ctx.session, lead)
+    send_manual = bool(
+        lead.instagram_handle or lead.linkedin_url or (lead.phone_public and not lead.contact_email)
+    )
+    if not send_email and not send_manual:
         return
     scheduled = next_window_open(ctx.clock.now())
     subject, text, body_html = outreach_parts(
@@ -338,7 +356,7 @@ def _queue_messages(ctx: JobContext, lead: Lead) -> None:
         step=1,
         source=lead.contact_email_source_url,
     )
-    if lead.contact_email:
+    if send_email:
         queue_outbound(
             ctx,
             lead,
