@@ -79,12 +79,13 @@ jobs:
           # shellcheck disable=SC2029
           ssh -o BatchMode=yes "$TARGET" mkdir -p "/opt/agencia/releases/${IMAGE_TAG}/infra/scripts"
           # shellcheck disable=SC2029
-          scp infra/docker-compose.yml infra/docker-compose.prod.yml infra/compose.defaults.env \
+          scp -o BatchMode=yes infra/docker-compose.yml infra/docker-compose.prod.yml \
+            infra/compose.defaults.env \
             "$TARGET:/opt/agencia/releases/${IMAGE_TAG}/infra/"
           # shellcheck disable=SC2029
-          scp infra/scripts/backup.sh \
+          scp -o BatchMode=yes infra/scripts/backup.sh \
             "$TARGET:/opt/agencia/releases/${IMAGE_TAG}/infra/scripts/"
-          scp infra/scripts/deploy-guard.sh infra/scripts/deploy-remote.sh \
+          scp -o BatchMode=yes infra/scripts/deploy-guard.sh infra/scripts/deploy-remote.sh \
             "$TARGET:/opt/agencia/"
 
       - name: Deploy

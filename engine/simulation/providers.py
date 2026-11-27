@@ -143,7 +143,7 @@ def _hit(
         user_rating_count=28,
         business_status="OPERATIONAL",
         email=email,
-        email_source_url=(f"https://ficha.ejemplo.cl/sim-{index:04d}" if email else None),
+        email_source_url=(f"https://ficha.invalid/sim-{index:04d}" if email else None),
         instagram_handle=instagram,
         linkedin_url=linkedin,
         phone_public=phone,

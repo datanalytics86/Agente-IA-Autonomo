@@ -88,19 +88,16 @@ class LogNotifier:
         return None
 
 
-def _http_source(value: object) -> str | None:
-    """Solo una URL http(s) con host, ya venida del origen. Si no, no hay fuente."""
-    if not isinstance(value, str) or _has_control(value):
+def http_source(value: object) -> str | None:
+    """Solo una URL http(s) con host. Sin saltos de línea ni espacios."""
+    if not isinstance(value, str):
         return None
-    text = value.strip()
-    parts = urlsplit(text)
+    if any(char.isspace() or unicodedata.category(char) == "Cc" for char in value):
+        return None
+    parts = urlsplit(value)
     if parts.scheme not in {"http", "https"} or not parts.hostname:
         return None
-    return text
-
-
-def _has_control(value: str) -> bool:
-    return any(unicodedata.category(char) == "Cc" for char in value)
+    return value
 
 
 def place_from_source(hit: object, *, commune: str, category: str) -> PlaceHit | None:
@@ -148,7 +145,7 @@ def place_from_source(hit: object, *, commune: str, category: str) -> PlaceHit |
     linkedin = getattr(hit, "linkedin_url", None)
     scenario = getattr(hit, "scenario", None)
     unsafe = getattr(hit, "unsafe_text", None)
-    source = _http_source(getattr(hit, "email_source_url", None))
+    source = http_source(getattr(hit, "email_source_url", None))
     return PlaceHit(
         place_id=place_id.strip(),
         name=name.strip(),

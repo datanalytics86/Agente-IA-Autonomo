@@ -4,16 +4,15 @@ from __future__ import annotations
 
 import html
 
-from sqlalchemy.orm import Session
-
 from agents.context import AgentContext, AgentResult
 from agents.copy import register_agent_fallbacks
 from agents.runtime import add_business_days, log_event, set_column_status
 from core.compliance import legal_footer
 from core.config import get_settings
 from core.states import transition
+from core.suppression import is_suppressed
 from db.models import Message, utcnow
-from db.repositories import LeadRepository, MessageRepository, SuppressionRepository
+from db.repositories import LeadRepository, MessageRepository
 
 
 def choose_channel(lead: object) -> tuple[str, bool]:
@@ -49,12 +48,16 @@ def ensure_draft(ctx: AgentContext) -> Message | None:
     )
     if not body.strip():
         return None
-    channel, _manual = choose_channel(lead)
-    if channel == "email_outreach" and _email_suppressed(ctx.session, lead):
+    if is_suppressed(ctx.session, lead):
+        if lead.status == "pitch_listo":
+            transition(ctx.session, lead, "opt_out", actor="sistema", reason="suprimido")
         return None
+    channel, _manual = choose_channel(lead)
     if channel == "email_outreach":
         source = lead.contact_email_source_url
-        body = f"{body.rstrip()}\n\n{legal_footer(get_settings(), source)}"
+        footer = legal_footer(get_settings(), source)
+        if footer not in body:
+            body = f"{body.rstrip()}\n\n{footer}"
     body_html = "<p>" + "<br>".join(html.escape(line) for line in body.split("\n")) + "</p>"
     return repo.add(
         Message(
@@ -167,17 +170,6 @@ class PitcherAgent:
             events=[note],
             output={"sent": False, "channel": message.channel, "manual": True},
         )
-
-
-def _email_suppressed(session: Session, lead: object) -> bool:
-    repo = SuppressionRepository(session)
-    email = str(getattr(lead, "contact_email", None) or "").strip()
-    if not email:
-        return False
-    if repo.contains("email", email):
-        return True
-    domain = email.split("@", 1)[1].lower().strip() if "@" in email else ""
-    return bool(domain and repo.contains("domain", domain))
 
 
 def _schedule(ctx: AgentContext, lead: object) -> None:

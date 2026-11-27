@@ -13,7 +13,8 @@ from core.compliance import check_rules
 from core.config import ENGINE_DIR, get_settings
 from core.errors import DuplicateLeadError
 from core.hitl import needs_value_review
-from core.states import transition
+from core.states import TRANSITIONS, transition
+from core.suppression import is_suppressed
 from db.models import Artifact, Lead, Message, Order, Payment, Project
 from db.repositories import (
     ArtifactRepository,
@@ -25,11 +26,10 @@ from db.repositories import (
     PaymentRepository,
     ProjectRepository,
     SettingsRepository,
-    SuppressionRepository,
 )
 from worker.approvals import ensure_approval
 from worker.copywriter import MANUAL_CHANNELS, checker_settings, offer_price_clp, outreach_parts
-from worker.defaults import _http_source
+from worker.defaults import http_source
 from worker.persist import patch_fields
 from worker.ports import JobContext, PlaceHit
 from worker.schedule import local_date, next_window_open
@@ -124,7 +124,7 @@ def job_scout(ctx: JobContext) -> int:
         if hit.place_id in known:
             continue
         lead = _lead_from_hit(ctx, hit)
-        if _on_suppression_list(ctx.session, lead):
+        if is_suppressed(ctx.session, lead):
             continue
         try:
             LeadRepository(ctx.session).add(lead)
@@ -186,7 +186,7 @@ def _lead_from_hit(ctx: JobContext, hit: PlaceHit) -> Lead:
         rating=hit.rating,
         reviews=hit.user_rating_count,
         contact_email=hit.email,
-        contact_email_source_url=_http_source(hit.email_source_url),
+        contact_email_source_url=http_source(hit.email_source_url),
         instagram_handle=hit.instagram_handle,
         linkedin_url=hit.linkedin_url,
         phone_public=hit.phone_public,
@@ -316,6 +316,10 @@ def _ensure_artifact(ctx: JobContext, lead: Lead, kind: str, path: str) -> None:
 
 
 def _enter_pitch(ctx: JobContext, lead: Lead) -> bool:
+    if is_suppressed(ctx.session, lead):
+        if "opt_out" in TRANSITIONS.get(lead.status, frozenset()):
+            transition(ctx.session, lead, "opt_out", actor="sistema", reason="suprimido")
+        return True
     if needs_value_review(lead.estimated_value_clp) or lead.high_value:
         transition(ctx.session, lead, "revision", actor="agente", reason="deal alto valor")
         ensure_approval(
@@ -330,22 +334,13 @@ def _enter_pitch(ctx: JobContext, lead: Lead) -> bool:
     return True
 
 
-def _on_suppression_list(session: Session, lead: Lead) -> bool:
-    repo = SuppressionRepository(session)
-    email = (lead.contact_email or "").strip()
-    if email and repo.contains("email", email):
-        return True
-    if "@" not in email:
-        return False
-    domain = email.split("@", 1)[1].lower().strip()
-    return bool(domain and repo.contains("domain", domain))
-
-
 def _queue_messages(ctx: JobContext, lead: Lead) -> None:
+    if is_suppressed(ctx.session, lead):
+        return
     existing = MessageRepository(ctx.session).list(lead_id=lead.id, limit=20)
     if any(item.sequence_step == 1 and item.direction == "out" for item in existing):
         return
-    send_email = bool(lead.contact_email) and not _on_suppression_list(ctx.session, lead)
+    send_email = bool(lead.contact_email)
     send_manual = bool(
         lead.instagram_handle or lead.linkedin_url or (lead.phone_public and not lead.contact_email)
     )

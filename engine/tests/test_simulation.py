@@ -46,6 +46,25 @@ def test_distribucion_inbound_esta_en_el_rango() -> None:
     assert silence / total == pytest.approx(0.86, abs=0.03)
 
 
+def test_python_m_simulation_cli_llama_a_main(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[dict[str, object]] = []
+
+    def fake(*_args: object, **kwargs: object) -> int:
+        seen.append(kwargs)
+        return 0
+
+    monkeypatch.setattr("simulation.loop.run_simulation", fake)
+    import sys
+
+    sys.modules.pop("simulation.cli", None)
+    import runpy
+
+    with pytest.raises(SystemExit) as caught:
+        runpy.run_module("simulation.cli", run_name="__main__")
+    assert caught.value.code == 0
+    assert seen == [{"days": 14, "seed": 42}]
+
+
 def test_simulacion_no_abre_sockets(block_network: None, tmp_path: Path) -> None:
     report = tmp_path / "reporte_seed42_d3.md"
     code = run_simulation(

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from core.config import get_settings
 from core.errors import TransitionError
 from db.models import Event, JobRun, Lead, LeadEvent
-from db.repositories import SettingsRepository, SuppressionRepository
+from db.repositories import SettingsRepository
 
 ACTORS = frozenset({"agente", "humano", "sistema", "webhook"})
 
@@ -197,20 +197,6 @@ def _video_enabled(session: Session) -> bool:
 
 
 def _contact_suppressed(session: Session, lead: Lead) -> bool:
-    repo = SuppressionRepository(session)
-    if lead.contact_email:
-        if repo.contains("email", lead.contact_email):
-            return True
-        if "@" in lead.contact_email:
-            domain = lead.contact_email.split("@", 1)[1]
-            if domain and repo.contains("domain", domain):
-                return True
-    if lead.website_url and repo.contains("domain", lead.website_url):
-        return True
-    if lead.instagram_handle and repo.contains("instagram", lead.instagram_handle):
-        return True
-    if lead.linkedin_url and repo.contains("linkedin", lead.linkedin_url):
-        return True
-    if lead.phone_public and repo.contains("phone", lead.phone_public):
-        return True
-    return False
+    from core.suppression import is_suppressed
+
+    return is_suppressed(session, lead)

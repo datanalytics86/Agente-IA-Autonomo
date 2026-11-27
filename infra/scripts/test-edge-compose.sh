@@ -40,5 +40,16 @@ for mount in caddy.get("volumes") or []:
     text = mount if isinstance(mount, str) else str(mount)
     if "/etc/caddy/Caddyfile" in text or "/srv/site" in text:
         raise SystemExit(f"caddy sigue montando el demo: {text}")
+base = yaml.safe_load(open("infra/docker-compose.yml", encoding="utf-8"))
+web_mounts = base["services"]["web"].get("volumes") or []
+if not any(
+    "nginx-web.conf" in item and "default.conf" in item for item in web_mounts
+):
+    raise SystemExit(f"nginx del panel no monta su conf: {web_mounts!r}")
+if base["services"]["caddy"].get("image") != "caddy:2.10.2":
+    raise SystemExit("caddy de desarrollo no está en 2.10.2")
+nginx = open("infra/nginx-web.conf", encoding="utf-8").read()
+if "try_files $uri $uri/ /index.html;" not in nginx:
+    raise SystemExit("falta el try_files del panel")
 print("edge compose ok")
 PY

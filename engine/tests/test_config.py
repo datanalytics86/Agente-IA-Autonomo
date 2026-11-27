@@ -31,6 +31,13 @@ def _clear_env(monkeypatch: pytest.MonkeyPatch) -> None:
     reset_settings()
 
 
+def test_env_vacio_no_pisa_el_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("AGENCY_NAME", "")
+    settings = Settings(_env_file=None)
+    assert settings.agency_name == "DEEP PRO CONSULTORES SpA"
+
+
 def test_defaults_sin_entorno(monkeypatch: pytest.MonkeyPatch) -> None:
     _clear_env(monkeypatch)
     settings = Settings(_env_file=None)
