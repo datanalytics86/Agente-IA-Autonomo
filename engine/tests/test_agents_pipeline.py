@@ -22,7 +22,12 @@ from agents.schemas import JudgeVerdict
 from agents.scout import ScoutAgent
 from core.config import reset_settings
 from db.models import Approval, Event, Lead, Message
-from db.repositories import EventRepository, LeadRepository, MessageRepository
+from db.repositories import (
+    EventRepository,
+    LeadRepository,
+    MessageRepository,
+    SuppressionRepository,
+)
 from db.session import create_all, reset_engine, session_scope
 
 _FUENTE = "https://cafe.test/contacto"
@@ -227,6 +232,29 @@ def test_run_cycle_no_crea_leads_y_respeta_cuota(
     before = Orchestrator().snapshot()["total"]
     Orchestrator().run_cycle()
     assert Orchestrator().snapshot()["total"] == before
+
+
+def test_borrador_suprimido_no_crea_mensaje(env: Path, block_network: None) -> None:
+    with session_scope() as session:
+        SuppressionRepository(session).add(
+            "email",
+            "ya-suprimido@example.test",
+            reason="baja",
+            source="baja",
+        )
+        lead = _lead(
+            session,
+            contact_email="ya-suprimido@example.test",
+            contact_email_source_url="https://taller.test/contacto",
+            diagnosis={
+                "pitch_subject": "Propuesta comercial: landing para Taller Sur",
+                "pitch_body": "Hola. Te escribo de Agencia Andina. Responde BAJA.",
+            },
+        )
+        draft = ensure_draft(AgentContext(session, lead_id=lead.id))
+        rows = MessageRepository(session).list(lead_id=lead.id)
+    assert draft is None
+    assert rows == []
 
 
 def test_el_borrador_lleva_el_pie_legal(env: Path, block_network: None) -> None:

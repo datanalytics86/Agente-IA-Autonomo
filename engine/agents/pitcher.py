@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import html
 
+from sqlalchemy.orm import Session
+
 from agents.context import AgentContext, AgentResult
 from agents.copy import register_agent_fallbacks
 from agents.runtime import add_business_days, log_event, set_column_status
@@ -11,7 +13,7 @@ from core.compliance import legal_footer
 from core.config import get_settings
 from core.states import transition
 from db.models import Message, utcnow
-from db.repositories import LeadRepository, MessageRepository
+from db.repositories import LeadRepository, MessageRepository, SuppressionRepository
 
 
 def choose_channel(lead: object) -> tuple[str, bool]:
@@ -48,6 +50,8 @@ def ensure_draft(ctx: AgentContext) -> Message | None:
     if not body.strip():
         return None
     channel, _manual = choose_channel(lead)
+    if channel == "email_outreach" and _email_suppressed(ctx.session, lead):
+        return None
     if channel == "email_outreach":
         source = lead.contact_email_source_url
         body = f"{body.rstrip()}\n\n{legal_footer(get_settings(), source)}"
@@ -163,6 +167,17 @@ class PitcherAgent:
             events=[note],
             output={"sent": False, "channel": message.channel, "manual": True},
         )
+
+
+def _email_suppressed(session: Session, lead: object) -> bool:
+    repo = SuppressionRepository(session)
+    email = str(getattr(lead, "contact_email", None) or "").strip()
+    if not email:
+        return False
+    if repo.contains("email", email):
+        return True
+    domain = email.split("@", 1)[1].lower().strip() if "@" in email else ""
+    return bool(domain and repo.contains("domain", domain))
 
 
 def _schedule(ctx: AgentContext, lead: object) -> None:

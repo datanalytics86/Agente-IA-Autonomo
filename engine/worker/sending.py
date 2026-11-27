@@ -389,6 +389,8 @@ def job_followups(ctx: JobContext) -> int:
                 continue
             if today < add_business_days(sent_day, days):
                 continue
+            if _suppressed(ctx.session, lead):
+                continue
             scheduled = ctx.clock.now()
             if not in_send_window(scheduled):
                 scheduled = next_window_open(scheduled)

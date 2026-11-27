@@ -124,6 +124,8 @@ def job_scout(ctx: JobContext) -> int:
         if hit.place_id in known:
             continue
         lead = _lead_from_hit(ctx, hit)
+        if _on_suppression_list(ctx.session, lead):
+            continue
         try:
             LeadRepository(ctx.session).add(lead)
         except DuplicateLeadError:

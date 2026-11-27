@@ -24,12 +24,12 @@ from db.session import create_all, reset_engine, session_scope
 from worker.clock import FakeClock
 from worker.copywriter import agency_label, checker_settings, outreach_parts
 from worker.defaults import EmptySource, GuardedOutreach, build_default_ports
-from worker.funnel import _charge_llm, _ensure_artifact, job_pipeline
+from worker.funnel import _charge_llm, _ensure_artifact, job_pipeline, job_scout
 from worker.jobs import JOBS
 from worker.maintenance import job_demo_expiry, job_postventa, job_retention
-from worker.ports import InboundMail, JobContext, SendResult
+from worker.ports import InboundMail, JobContext, PlaceHit, SendResult
 from worker.runner import drain_queued, execute
-from worker.sending import apply_inbound, job_outreach, job_warmup
+from worker.sending import apply_inbound, job_followups, job_outreach, job_warmup
 
 TZ = ZoneInfo("America/Santiago")
 
@@ -552,6 +552,80 @@ def test_hit_con_fuente_real_la_muestra_en_el_pie(session: Session) -> None:
     assert f"obtuvimos su correo de {source}, de acceso público, asociado a su negocio" in (
         message.body_text
     )
+
+
+def test_followup_no_crea_mensaje_si_esta_suprimido(session: Session) -> None:
+    SuppressionRepository(session).add(
+        "email",
+        "ya-suprimido@example.test",
+        reason="baja",
+        source="baja",
+    )
+    lead = _lead(
+        session,
+        status="enviado",
+        business="Taller Sur",
+        contact_email="ya-suprimido@example.test",
+        contact_email_source_url="https://taller.test/contacto",
+    )
+    MessageRepository(session).add(
+        Message(
+            lead_id=lead.id,
+            thread_id=lead.id,
+            direction="out",
+            channel="email_outreach",
+            sequence_step=1,
+            status="sent",
+            subject="Propuesta comercial: landing para Taller Sur",
+            body_text="primer envío",
+            sent_at=datetime(2026, 3, 2, 15, 0, tzinfo=TZ),
+        )
+    )
+    ctx = _ctx(session, datetime(2026, 3, 20, 11, 0, tzinfo=TZ))
+    assert job_followups(ctx) == 0
+    rows = MessageRepository(session).list(lead_id=lead.id)
+    assert len(rows) == 1
+    assert rows[0].sequence_step == 1
+    assert rows[0].status == "sent"
+
+
+def test_scout_no_crea_lead_suprimido(session: Session) -> None:
+    SuppressionRepository(session).add(
+        "email",
+        "ya-suprimido@example.test",
+        reason="baja",
+        source="baja",
+    )
+
+    class Source:
+        def search(self, commune: str, category_slug: str, limit: int) -> list[PlaceHit]:
+            return [
+                PlaceHit(
+                    place_id="place-suprimido",
+                    name="Taller Sur",
+                    formatted_address="Av 1",
+                    commune="Providencia",
+                    city="Santiago",
+                    category="taller-mecanico",
+                    website_uri=None,
+                    rating=4.8,
+                    user_rating_count=40,
+                    business_status="OPERATIONAL",
+                    email="ya-suprimido@example.test",
+                    instagram_handle=None,
+                    linkedin_url=None,
+                    phone_public=None,
+                    estimated_value_clp=350_000,
+                    opportunity_score=80,
+                    scenario="test",
+                    email_source_url="https://taller.test/contacto",
+                )
+            ]
+
+    ctx = _ctx(session, datetime(2026, 3, 20, 11, 0, tzinfo=TZ))
+    ctx.ports.places = Source()  # type: ignore[assignment]
+    assert job_scout(ctx) == 0
+    assert LeadRepository(session).list(limit=20) == []
 
 
 def test_pipeline_no_encola_correo_suprimido(session: Session) -> None:
