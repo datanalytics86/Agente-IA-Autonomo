@@ -86,6 +86,16 @@ class LogNotifier:
         return None
 
 
+def _http_source(value: object) -> str | None:
+    """Solo una URL http(s) que ya vino en el origen. Si no, no hay fuente."""
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if text.lower().startswith(("https://", "http://")):
+        return text
+    return None
+
+
 def place_from_source(hit: object, *, commune: str, category: str) -> PlaceHit | None:
     """Copia solo campos que ya vienen. Sin email, puntaje o valor no hay lead."""
     email = getattr(hit, "email", None)
@@ -131,6 +141,7 @@ def place_from_source(hit: object, *, commune: str, category: str) -> PlaceHit |
     linkedin = getattr(hit, "linkedin_url", None)
     scenario = getattr(hit, "scenario", None)
     unsafe = getattr(hit, "unsafe_text", None)
+    source = _http_source(getattr(hit, "email_source_url", None))
     return PlaceHit(
         place_id=place_id.strip(),
         name=name.strip(),
@@ -154,6 +165,7 @@ def place_from_source(hit: object, *, commune: str, category: str) -> PlaceHit |
         opportunity_score=score,
         scenario=scenario if isinstance(scenario, str) else "",
         unsafe_text=unsafe if isinstance(unsafe, str) else "",
+        email_source_url=source,
     )
 
 

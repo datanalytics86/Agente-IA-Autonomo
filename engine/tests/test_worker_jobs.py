@@ -463,6 +463,83 @@ def test_no_inventa_costo_ni_archivo_ni_entrega(session: Session, tmp_path: Path
     assert rows[0].path == str(real)
 
 
+def _origen(**overrides: object) -> object:
+    class Hit:
+        place_id = "place-1"
+        name = "Café Norte"
+        formatted_address = "Av 1"
+        commune = "Providencia"
+        city = "Santiago"
+        category = "cafeteria"
+        website_uri = None
+        rating = 4.8
+        user_rating_count = 40
+        business_status = "OPERATIONAL"
+        email = "hola@negocio.cl"
+        instagram_handle = None
+        linkedin_url = None
+        phone_public = None
+        estimated_value_clp = 350_000
+        opportunity_score = 80
+        scenario = "test"
+        unsafe_text = ""
+
+    hit = Hit()
+    for key, value in overrides.items():
+        setattr(hit, key, value)
+    return hit
+
+
+def _mensaje_del_hit(session: Session, **overrides: object) -> tuple[Lead, Message]:
+    from worker.defaults import place_from_source
+    from worker.funnel import _lead_from_hit, _queue_messages
+
+    mapped = place_from_source(_origen(**overrides), commune="Providencia", category="cafeteria")
+    assert mapped is not None
+    ctx = _ctx(session, datetime(2026, 3, 3, 12, 0, tzinfo=TZ))
+    lead = LeadRepository(session).add(_lead_from_hit(ctx, mapped))
+    _queue_messages(ctx, lead)
+    messages = MessageRepository(session).list(lead_id=lead.id)
+    assert len(messages) == 1
+    return lead, messages[0]
+
+
+def test_hit_sin_fuente_se_rechaza(session: Session) -> None:
+    from worker.defaults import place_from_source
+
+    dropped = place_from_source(
+        _origen(email_source_url="ftp://negocio.cl/contacto"),
+        commune="Providencia",
+        category="cafeteria",
+    )
+    assert dropped is not None
+    assert dropped.email_source_url is None
+    lead, message = _mensaje_del_hit(session)
+    assert lead.contact_email_source_url is None
+    assert message.status == "rejected"
+    rules = message.check_result["rules"]["reasons"]
+    assert "el lead no tiene fuente del correo" in rules
+
+
+def test_gmail_sin_fuente_no_entra_al_pie(session: Session) -> None:
+    lead, message = _mensaje_del_hit(session, email="persona@gmail.com")
+    assert lead.contact_email_source_url is None
+    assert message.status == "rejected"
+    assert "gmail.com" not in message.body_text
+    assert "gmail.com" not in (message.body_html or "")
+
+
+def test_hit_con_fuente_real_la_muestra_en_el_pie(session: Session) -> None:
+    source = "https://negocio.cl/contacto"
+    lead, message = _mensaje_del_hit(session, email_source_url=source)
+    assert lead.contact_email_source_url == source
+    assert message.status == "queued"
+    assert source in message.body_text
+    assert f"obtuvimos su correo de {source}, de acceso público, asociado a su negocio" in (
+        message.body_text
+    )
+
+
 def test_place_sin_email_no_se_mapea() -> None:
     from worker.defaults import place_from_source
 

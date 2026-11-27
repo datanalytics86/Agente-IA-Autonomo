@@ -7,6 +7,7 @@ import html
 from agents.context import AgentContext, AgentResult
 from agents.copy import register_agent_fallbacks
 from agents.runtime import add_business_days, log_event, set_column_status
+from core.compliance import legal_footer
 from core.config import get_settings
 from core.states import transition
 from db.models import Message, utcnow
@@ -47,6 +48,10 @@ def ensure_draft(ctx: AgentContext) -> Message | None:
     if not body.strip():
         return None
     channel, _manual = choose_channel(lead)
+    if channel == "email_outreach":
+        source = lead.contact_email_source_url
+        body = f"{body.rstrip()}\n\n{legal_footer(get_settings(), source)}"
+    body_html = "<p>" + "<br>".join(html.escape(line) for line in body.split("\n")) + "</p>"
     return repo.add(
         Message(
             lead_id=lead.id,
@@ -57,7 +62,7 @@ def ensure_draft(ctx: AgentContext) -> Message | None:
             status="checking",
             subject=subject,
             body_text=body,
-            body_html=f"<p>{html.escape(body)}</p>",
+            body_html=body_html,
         )
     )
 

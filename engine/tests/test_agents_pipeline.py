@@ -16,7 +16,7 @@ from agents.checker import CheckerAgent
 from agents.context import AgentContext
 from agents.mobile import MobileAgent
 from agents.pipeline import Orchestrator
-from agents.pitcher import PitcherAgent, choose_channel
+from agents.pitcher import PitcherAgent, choose_channel, ensure_draft
 from agents.reporter import ReporterAgent
 from agents.schemas import JudgeVerdict
 from agents.scout import ScoutAgent
@@ -227,6 +227,29 @@ def test_run_cycle_no_crea_leads_y_respeta_cuota(
     before = Orchestrator().snapshot()["total"]
     Orchestrator().run_cycle()
     assert Orchestrator().snapshot()["total"] == before
+
+
+def test_el_borrador_lleva_el_pie_legal(env: Path, block_network: None) -> None:
+    with session_scope() as session:
+        lead = _lead(
+            session,
+            contact_email="hola@cafe.test",
+            diagnosis={
+                "pitch_subject": "Propuesta comercial: landing para Café Andes",
+                "pitch_body": (
+                    "Hola. Te escribo de Agencia Andina. "
+                    "La landing queda en 350.000 CLP. "
+                    "Si no es de interés, responde BAJA."
+                ),
+            },
+        )
+        draft = ensure_draft(AgentContext(session, lead_id=lead.id))
+    assert draft is not None
+    assert "DEEP PRO BUSINESS SOLUTIONS SpA" in draft.body_text
+    assert f"obtuvimos su correo de {_FUENTE}, de acceso público, asociado a su negocio" in (
+        draft.body_text
+    )
+    assert "http://localhost/baja" in draft.body_text
 
 
 def test_pitcher_un_canal_y_email_simulado(env: Path, block_network: None) -> None:

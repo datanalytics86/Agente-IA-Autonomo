@@ -33,6 +33,7 @@ class PlaceHit:
     opportunity_score: int
     scenario: str
     unsafe_text: str = ""
+    email_source_url: str | None = None
 
 
 @dataclass(frozen=True)
