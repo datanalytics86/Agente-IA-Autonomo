@@ -112,6 +112,7 @@ def test_el_regex_de_correo_no_es_cuadratico() -> None:
     assert _EMAIL_RE.findall(texto) == []
     assert time.monotonic() - inicio < 1
     assert _EMAIL_RE.findall("otro@gmail.com") == ["otro@gmail.com"]
+    assert _EMAIL_RE.findall("escriban a _contacto@example.cl hoy") == ["_contacto@example.cl"]
 
 
 @pytest.mark.parametrize(

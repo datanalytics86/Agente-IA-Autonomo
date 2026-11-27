@@ -27,9 +27,10 @@ _PRICE_MARKED_RE = re.compile(
 )
 _PRICE_DOTTED_RE = re.compile(r"(?<!\d)(\d{1,3}(?:\.\d{3})+)(?![\d-])")
 _EMAIL_RE = re.compile(
-    r"\b[A-Za-z0-9](?:[A-Za-z0-9._%+\-]{0,63})@"
+    r"(?<![A-Za-z0-9._%+\-])"
+    r"[A-Za-z0-9_](?:[A-Za-z0-9._%+\-]{0,63})@"
     r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.){1,8}"
-    r"[A-Za-z]{2,24}\b"
+    r"[A-Za-z]{2,24}(?![A-Za-z0-9])"
 )
 _PHONE_RE = re.compile(
     r"(?<!\d)(?:\+?56[\s.\-]*)?(?:"
@@ -41,9 +42,9 @@ _PHONE_RE = re.compile(
 )
 _RUT_RE = re.compile(
     r"(?<![\d.])(?:"
-    r"\d{1,2}(?:\.\d{3}){2}\s*-\s*[\dkK]"
+    r"\d{1,2}(?:[.\s]\d{3}){2}\s*-\s*[\dkK]"
     r"|\d{7,8}\s*-\s*[\dkK]"
-    r"|\d{1,2}(?:\.\d{3}){2}\s*[kK]"
+    r"|\d{1,2}(?:[.\s]\d{3}){2}\s*[kK]"
     r"|\d{7,8}[kK]"
     r")(?!\d)"
 )

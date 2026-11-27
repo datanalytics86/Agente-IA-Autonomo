@@ -691,6 +691,10 @@ def test_el_extracto_enmascara_600_800_y_rut_sin_guion() -> None:
     assert "800" not in texto
     assert "12345678" not in texto
     assert "12.345.678" not in texto
+    espacios = clean_opt_out_text("Mi rut es 12 345 678-5.")
+    assert espacios is not None
+    assert "[rut]" in espacios
+    assert "678-5" not in espacios
 
 
 def test_baja_repetida_conserva_la_primera(session: Session) -> None:
