@@ -102,6 +102,18 @@ def test_opt_out_reconoce_mayusculas_y_tildes(text: str) -> None:
     assert is_opt_out(text) is True
 
 
+def test_el_regex_de_correo_no_es_cuadratico() -> None:
+    import time
+
+    from core.compliance import _EMAIL_RE
+
+    texto = ("a." * 80) + "@" + ("a." * 20_000)
+    inicio = time.monotonic()
+    assert _EMAIL_RE.findall(texto) == []
+    assert time.monotonic() - inicio < 1
+    assert _EMAIL_RE.findall("otro@gmail.com") == ["otro@gmail.com"]
+
+
 @pytest.mark.parametrize(
     "text",
     [
