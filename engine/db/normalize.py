@@ -22,7 +22,9 @@ def normalize_contact(kind: str, raw_value: str) -> str:
     if kind not in CONTACT_KINDS:
         raise ValueError(f"kind de supresión desconocido: {kind}")
     if kind == "email":
-        return raw_value.strip().lower()
+        from core.suppression import normalize_email
+
+        return normalize_email(raw_value)
     if kind == "domain":
         return _normalize_domain(raw_value)
     if kind == "instagram":
@@ -53,7 +55,9 @@ def _normalize_domain(raw_value: str) -> str:
         value = value.split("@", 1)[1]
     if value.startswith("www."):
         value = value[4:]
-    return value.rstrip(".")
+    from core.suppression import normalize_domain
+
+    return normalize_domain(value)
 
 
 def _normalize_phone(raw_value: str) -> str:

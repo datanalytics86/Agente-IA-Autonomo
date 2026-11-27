@@ -11,22 +11,38 @@ from db.repositories import SuppressionRepository
 
 _GENERIC_LOCAL = frozenset(
     {
+        "abogados",
         "admin",
+        "administracion",
+        "atencion",
         "comercial",
-        "contact",
+        "consultas",
+        "contabilidad",
         "contacto",
-        "hello",
+        "correo",
+        "estudio",
+        "gerencia",
         "hola",
         "info",
-        "office",
         "oficina",
         "recepcion",
-        "sales",
         "secretaria",
-        "soporte",
-        "support",
         "ventas",
     }
+)
+_PUBLIC_MAIL_NAMES = (
+    "gmail",
+    "googlemail",
+    "hotmail",
+    "icloud",
+    "live",
+    "msn",
+    "outlook",
+    "yahoo",
+)
+_PUBLIC_MAIL_SUFFIXES = ("com", "cl", "es", "com.cl", "com.es")
+PUBLIC_EMAIL_DOMAINS = frozenset(
+    f"{name}.{suffix}" for name in _PUBLIC_MAIL_NAMES for suffix in _PUBLIC_MAIL_SUFFIXES
 )
 
 
@@ -35,23 +51,45 @@ def _fold(value: str) -> str:
     return "".join(char for char in decomposed if not unicodedata.combining(char))
 
 
+def normalize_domain(value: str) -> str:
+    """Dominio en minúsculas, sin espacios ni punto final."""
+    text = value.strip().lower()
+    if "@" in text:
+        text = text.rsplit("@", 1)[1].strip()
+    return text.rstrip(".")
+
+
+def normalize_email(value: str) -> str:
+    """Correo en minúsculas. El dominio queda sin punto final."""
+    text = value.strip().lower()
+    if "@" not in text:
+        return text
+    local, domain = text.rsplit("@", 1)
+    return f"{local.strip()}@{normalize_domain(domain)}"
+
+
 def generic_local_part(email: str) -> bool:
     """True si el buzón es de la oficina, no de una persona."""
-    if "@" not in email:
+    normalized = normalize_email(email)
+    if "@" not in normalized:
         return False
-    return _fold(email.split("@", 1)[0]) in _GENERIC_LOCAL
+    return _fold(normalized.split("@", 1)[0]) in _GENERIC_LOCAL
+
+
+def public_email_domain(domain: str) -> bool:
+    """True si el dominio es un correo público (gmail, hotmail y variantes)."""
+    return normalize_domain(domain) in PUBLIC_EMAIL_DOMAINS
 
 
 def is_suppressed(session: Session, lead: object) -> bool:
     """True si el lead, su correo o su estudio ya están en la lista."""
     repo = SuppressionRepository(session)
-    email = str(getattr(lead, "contact_email", None) or "").strip()
+    email = normalize_email(str(getattr(lead, "contact_email", None) or ""))
     if email and repo.contains("email", email):
         return True
-    if "@" in email:
-        domain = email.split("@", 1)[1].strip()
-        if domain and repo.contains("domain", domain):
-            return True
+    domain = normalize_domain(email) if "@" in email else ""
+    if domain and repo.contains("domain", domain):
+        return True
     website = getattr(lead, "website_url", None)
     if website and repo.contains("domain", str(website)):
         return True
@@ -78,17 +116,16 @@ def record_opt_out(
     channel: str,
     reason: str,
 ) -> list[Suppression]:
-    """Guarda el correo. Un buzón genérico también cierra el estudio.
-
-    Una baja no crea kind=domain: persona@gmail.com no puede apagar Gmail.
-    """
+    """Cierra el correo y el estudio. El dominio también, salvo un correo público."""
     repo = SuppressionRepository(session)
     rows: list[Suppression] = []
-    email = (lead.contact_email or "").strip()
+    email = normalize_email(lead.contact_email or "")
     if email:
         rows.append(repo.add("email", email, reason=reason, source=channel))
-    if email and generic_local_part(email):
-        place_id = (lead.place_id or "").strip() or lead.id
-        if place_id:
-            rows.append(repo.add("lead", place_id, reason=reason, source=channel))
+    place_id = (lead.place_id or "").strip() or lead.id
+    if place_id:
+        rows.append(repo.add("lead", place_id, reason=reason, source=channel))
+    domain = normalize_domain(email) if "@" in email else ""
+    if domain and not public_email_domain(domain):
+        rows.append(repo.add("domain", domain, reason=reason, source=channel))
     return rows
