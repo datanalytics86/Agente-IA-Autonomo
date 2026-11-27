@@ -717,27 +717,28 @@ def test_baja_de_contacto_suprime_el_estudio(session: Session) -> None:
     repo = SuppressionRepository(session)
     assert repo.contains("email", "contacto@estudio.test")
     assert repo.contains("lead", "place-estudio")
-    assert repo.contains("domain", "estudio.test") is False
+    assert repo.contains("domain", "estudio.test") is True
 
 
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
         ("estudio.cl", "estudio.cl"),
-        ("abogados.estudio.cl", "estudio.cl"),
+        ("abogados.estudio.cl", "abogados.estudio.cl"),
         ("www.estudio.com.cl", "estudio.com.cl"),
-        ("abogados.estudio.com.cl", "estudio.com.cl"),
-        ("tramites.municipio.gob.cl", "municipio.gob.cl"),
+        ("abogados.estudio.com.cl", "abogados.estudio.com.cl"),
+        ("tramites.municipio.gob.cl", "tramites.municipio.gob.cl"),
         ("estudio.co.uk", "estudio.co.uk"),
         ("www.estudio.com.ar:8080", "estudio.com.ar"),
-        ("abogados.estudio.co", "estudio.co"),
+        ("abogados.estudio.co", "abogados.estudio.co"),
+        ("Estudio.CL.", "estudio.cl"),
+        ("http://[::1", ""),
     ],
 )
-def test_registrable_domain_cubre_tld_de_dos_niveles(raw: str, expected: str) -> None:
-    from core.suppression import normalize_domain, registrable_domain, website_domain
+def test_normalize_host_es_el_host_exacto(raw: str, expected: str) -> None:
+    from core.suppression import normalize_host
 
-    assert website_domain(raw) == expected
-    assert registrable_domain(normalize_domain(raw)) == expected
+    assert normalize_host(raw) == expected
 
 
 def test_el_hash_de_la_baja_web_no_se_enmascara(session: Session) -> None:
@@ -769,33 +770,48 @@ def test_baja_de_com_cl_cierra_el_dominio_registrable(session: Session) -> None:
     assert SuppressionRepository(session).contains("domain", "estudio.com.cl") is True
 
 
-def test_dominio_registrable_ignora_puerto_www_userinfo_e_idn() -> None:
-    from core.suppression import normalize_domain, registrable_domain, website_domain
+def test_normalize_host_ignora_puerto_www_userinfo_e_idn() -> None:
+    from core.suppression import normalize_host
 
-    assert normalize_domain("estudio.cl:8080") == "estudio.cl"
-    assert website_domain("www.estudio.cl:443") == "estudio.cl"
-    assert website_domain("http://user:pass@estudio.cl/ruta") == "estudio.cl"
-    assert website_domain("abogados.estudio.cl") == "estudio.cl"
-    assert registrable_domain(normalize_domain("persona@abogados.estudio.cl")) == "estudio.cl"
-    assert website_domain("foo.com.ar") == "foo.com.ar"
+    assert normalize_host("estudio.cl:8080") == "estudio.cl"
+    assert normalize_host("www.estudio.cl:443") == "estudio.cl"
+    assert normalize_host("http://user:pass@estudio.cl/ruta") == "estudio.cl"
+    assert normalize_host("abogados.estudio.cl") == "abogados.estudio.cl"
+    assert normalize_host("persona@abogados.estudio.cl") == "abogados.estudio.cl"
+    assert normalize_host("foo.com.ar") == "foo.com.ar"
     identico = "bücher.cl"
-    assert normalize_domain(identico) == identico.encode("idna").decode("ascii")
+    assert normalize_host(identico) == identico.encode("idna").decode("ascii")
+    assert normalize_host("http://[estudio.cl") == ""
 
 
-def test_subdominio_y_www_cuentan_como_el_mismo_sitio(session: Session) -> None:
-    from core.suppression import record_opt_out
+def test_el_host_cubre_subdominios_con_borde_de_label(session: Session) -> None:
+    from core.suppression import host_is_suppressed, is_suppressed, record_opt_out
 
     lead = _lead(
         session,
         business="Subdominio",
-        contact_email="persona@abogados.estudio.cl",
-        website_url="https://www.estudio.cl/inicio",
+        contact_email="persona@estudio.cl",
         place_id="place-sub",
     )
     rows = record_opt_out(session, lead, channel="email", reason="baja")
     assert {row.kind for row in rows} == {"email", "lead", "domain"}
-    assert SuppressionRepository(session).contains("domain", "www.estudio.cl") is True
-    assert SuppressionRepository(session).contains("domain", "abogados.estudio.cl") is True
+    assert host_is_suppressed(session, "www.estudio.cl") is True
+    assert host_is_suppressed(session, "abogados.estudio.cl") is True
+    assert host_is_suppressed(session, "miestudio.cl") is False
+    hijo = _lead(
+        session,
+        business="Hijo",
+        contact_email="ana@abogados.estudio.cl",
+        place_id="place-hijo",
+    )
+    otro = _lead(
+        session,
+        business="Otro",
+        contact_email="ana@miestudio.cl",
+        place_id="place-otro",
+    )
+    assert is_suppressed(session, hijo) is True
+    assert is_suppressed(session, otro) is False
 
 
 def test_el_extracto_oculta_cita_firma_y_datos(session: Session) -> None:
@@ -961,7 +977,7 @@ def test_el_dominio_solo_si_es_el_del_sitio(session: Session) -> None:
     assert next(row.detail for row in otra if row.kind == "email") == texto
     from core.suppression import normalize_email
 
-    assert normalize_email("persona@www.estudio.cl") == "persona@www.estudio.cl"
+    assert normalize_email("persona@www.estudio.cl") == "persona@estudio.cl"
     repo = SuppressionRepository(session)
     assert repo.contains("domain", "www.Estudio.CL.") is True
 
@@ -987,8 +1003,77 @@ def test_el_dominio_solo_si_es_el_del_sitio(session: Session) -> None:
     )
     assert {
         row.kind for row in record_opt_out(session, sin_sitio, channel="email", reason="baja")
-    } == {"email", "lead"}
-    assert repo.contains("domain", "negocio.cl") is False
+    } == {"email", "lead", "domain"}
+    assert repo.contains("domain", "negocio.cl") is True
+
+
+def test_dominio_compartido_cierra_el_otro_correo(session: Session) -> None:
+    from core.suppression import host_is_suppressed, is_shared_host, record_opt_out
+
+    assert is_shared_host("derecho.uchile.cl") is True
+    assert is_shared_host("x.blogspot.com.ar") is True
+    assert is_shared_host("alumnos.uc.cl") is True
+    assert is_shared_host("estudio.cl") is False
+    oficina = _lead(
+        session,
+        business="Oficina",
+        contact_email="contacto@estudio.cl",
+        place_id="place-compartido",
+    )
+    vtr = _lead(
+        session,
+        business="Persona VTR",
+        contact_email="persona@vtr.net",
+        place_id="place-vtr-mail",
+    )
+
+    class _Baja:
+        id = vtr.id
+        place_id = oficina.place_id
+        contact_email = "persona@vtr.net"
+
+    class _Filas:
+        def all(self) -> list[Lead]:
+            return [oficina, _Baja()]  # type: ignore[list-item]
+
+    reales = session.scalars
+
+    def scalars(statement: object) -> object:
+        text = str(statement)
+        if "leads" in text and "place_id" in text:
+            return _Filas()
+        return reales(statement)  # type: ignore[arg-type]
+
+    session.scalars = scalars  # type: ignore[method-assign]
+    rows = record_opt_out(session, _Baja(), channel="email", reason="baja")  # type: ignore[arg-type]
+    assert "domain" not in {row.kind for row in rows}
+    repo = SuppressionRepository(session)
+    assert repo.contains("email", "persona@vtr.net") is True
+    assert repo.contains("email", "contacto@estudio.cl") is True
+    assert host_is_suppressed(session, "vtr.net") is False
+    assert repo.contains("lead", "place-compartido") is True
+    session.scalars = reales  # type: ignore[method-assign]
+
+    uc = _lead(
+        session,
+        business="Alumno",
+        contact_email="alumno@alumnos.uc.cl",
+        place_id="place-uc",
+    )
+    assert "domain" not in {
+        row.kind for row in record_opt_out(session, uc, channel="email", reason="baja")
+    }
+    assert repo.contains("domain", "uc.cl") is False
+    gmail = _lead(
+        session,
+        business="Gmail",
+        contact_email="persona@gmail.com",
+        place_id="place-gmail",
+    )
+    assert "domain" not in {
+        row.kind for row in record_opt_out(session, gmail, channel="email", reason="baja")
+    }
+    assert repo.contains("domain", "gmail.com") is False
 
 
 def test_reimport_del_place_sigue_suprimido(session: Session) -> None:

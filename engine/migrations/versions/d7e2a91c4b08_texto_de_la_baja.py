@@ -22,6 +22,7 @@ def upgrade() -> None:
         batch.add_column(sa.Column("detail", sa.Text(), nullable=True))
         batch.add_column(sa.Column("last_at", sa.DateTime(timezone=True), nullable=True))
         batch.add_column(sa.Column("count", sa.Integer(), nullable=False, server_default="1"))
+    op.execute(sa.text("UPDATE suppression SET last_at = created_at WHERE last_at IS NULL"))
 
 
 def downgrade() -> None:

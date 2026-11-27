@@ -49,9 +49,9 @@ def _strip_scheme(value: str) -> str:
 
 
 def _normalize_domain(raw_value: str) -> str:
-    from core.suppression import website_domain
+    from core.suppression import normalize_host
 
-    return website_domain(raw_value)
+    return normalize_host(raw_value)
 
 
 def _normalize_phone(raw_value: str) -> str:

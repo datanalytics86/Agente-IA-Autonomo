@@ -463,6 +463,33 @@ def test_baja_de_dominio_propio_tambien_cierra_el_dominio(client: TestClient) ->
     assert kinds == {"email", "lead", "domain"}
 
 
+def test_admin_rechaza_un_dominio_compartido(client: TestClient) -> None:
+    from db.models import Suppression
+
+    headers = _login(client)
+    for value in ("gmail.com", "derecho.uchile.cl", "x.blogspot.com.ar"):
+        response = client.post(
+            "/api/compliance/suppression",
+            headers=headers,
+            json={"kind": "domain", "value": value, "reason": "manual"},
+        )
+        assert response.status_code == 422, response.text
+    propio = client.post(
+        "/api/compliance/suppression",
+        headers=headers,
+        json={"kind": "domain", "value": "estudio.cl", "reason": "manual"},
+    )
+    assert propio.status_code == 201, propio.text
+    borrado = client.delete(
+        "/api/compliance/suppression",
+        headers=headers,
+        params={"id": propio.json()["id"]},
+    )
+    assert borrado.status_code == 422, borrado.text
+    with session_scope() as session:
+        assert session.get(Suppression, propio.json()["id"]) is not None
+
+
 def test_action_scout_encola_job_run(client: TestClient) -> None:
     headers = _login(client)
     response = client.post("/api/actions/scout", headers=headers)

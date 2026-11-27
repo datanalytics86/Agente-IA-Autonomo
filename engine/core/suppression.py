@@ -56,11 +56,62 @@ def _fold(value: str) -> str:
     return "".join(char for char in decomposed if not unicodedata.combining(char))
 
 
-_SECOND_LEVEL = frozenset({"com", "co", "net", "org", "gob", "edu", "gov"})
+_MAIL_TLDS = ("com", "cl", "es", "com.ar", "co.uk", "com.mx")
+SHARED_DOMAINS = frozenset(
+    {
+        "gmail.com",
+        "googlemail.com",
+        "icloud.com",
+        "me.com",
+        "mac.com",
+        "yahoo.com",
+        "yahoo.es",
+        "ymail.com",
+        "rocketmail.com",
+        "aol.com",
+        "proton.me",
+        "protonmail.com",
+        "pm.me",
+        "tutanota.com",
+        "tuta.io",
+        "zoho.com",
+        "gmx.com",
+        "gmx.net",
+        "mail.com",
+        "yandex.com",
+        "fastmail.com",
+        "vtr.net",
+        "terra.cl",
+        "entelchile.net",
+        "movistar.cl",
+        "tie.cl",
+        "manquehue.net",
+        "ctcinternet.cl",
+        "123.cl",
+        "surnet.cl",
+        "telsur.cl",
+        "wixsite.com",
+        "blogspot.com",
+        "github.io",
+        "wordpress.com",
+        "netlify.app",
+        "vercel.app",
+        "sites.google.com",
+        "uchile.cl",
+        "uc.cl",
+        "udp.cl",
+        "usach.cl",
+        "udec.cl",
+        "uai.cl",
+        "unab.cl",
+        "udd.cl",
+        *(f"{name}.{tld}" for name in ("hotmail", "outlook", "live", "msn") for tld in _MAIL_TLDS),
+    }
+)
 
 
 def normalize_host(value: str) -> str:
-    """Host en minúsculas e IDNA, sin punto final. Nunca levanta."""
+    """Host en minúsculas, IDNA, sin punto final y sin www. Nunca levanta."""
     try:
         text = (value or "").strip()
         if not text:
@@ -70,6 +121,8 @@ def normalize_host(value: str) -> str:
         if "://" not in text and not text.startswith("//"):
             text = "//" + text
         host = (urlsplit(text).hostname or "").strip().lower().rstrip(".")
+        if host.startswith("www."):
+            host = host[4:]
         if not host:
             return ""
         return host.encode("idna").decode("ascii")
@@ -77,40 +130,42 @@ def normalize_host(value: str) -> str:
         return ""
 
 
-def _hostname(value: str) -> str:
-    return normalize_host(value)
-
-
-def normalize_domain(value: str) -> str:
-    """Host del correo, con puerto y userinfo fuera, en punycode."""
-    return _hostname(value)
-
-
-def registrable_domain(host: str) -> str:
-    """Últimos 2 labels, o 3 si el TLD es de dos niveles (com.ar, co.uk)."""
+def _suffixes(host: str) -> list[str]:
     labels = [part for part in host.split(".") if part]
-    if len(labels) >= 3 and len(labels[-1]) == 2 and labels[-2] in _SECOND_LEVEL:
-        return ".".join(labels[-3:])
-    if len(labels) >= 2:
-        return ".".join(labels[-2:])
-    return ".".join(labels)
+    return [".".join(labels[index:]) for index in range(max(len(labels) - 1, 0))]
 
 
-def website_domain(value: str) -> str:
-    """Dominio registrable del sitio, sin www, puerto ni userinfo."""
-    host = _hostname(value)
-    if host.startswith("www."):
-        host = host[4:]
-    return registrable_domain(host)
+def is_shared_host(value: str) -> bool:
+    """True si el host, o un sufijo con borde de label, es un dominio compartido."""
+    host = normalize_host(value)
+    if not host:
+        return False
+    labels = [part for part in host.split(".") if part]
+    for index, suffix in enumerate(_suffixes(host)):
+        if suffix in SHARED_DOMAINS or labels[index] == "blogspot":
+            return True
+    return False
+
+
+def host_is_suppressed(session: Session, value: str) -> bool:
+    """True si ese host o un dominio padre, con borde de label, está cerrado."""
+    host = normalize_host(value)
+    if not host:
+        return False
+    repo = SuppressionRepository(session)
+    return any(repo.contains("domain", suffix) for suffix in _suffixes(host))
 
 
 def normalize_email(value: str) -> str:
-    """Correo en minúsculas. El dominio queda sin punto final."""
+    """Correo en minúsculas. El dominio queda sin punto final ni www."""
     text = value.strip().lower()
     if "@" not in text:
         return text
     local, domain = text.rsplit("@", 1)
-    return f"{local.strip()}@{normalize_domain(domain)}"
+    host = normalize_host(domain)
+    if not host:
+        return f"{local.strip()}@{domain.strip().rstrip('.')}"
+    return f"{local.strip()}@{host}"
 
 
 def generic_local_part(email: str) -> bool:
@@ -127,11 +182,7 @@ def is_suppressed(session: Session, lead: object) -> bool:
     email = normalize_email(str(getattr(lead, "contact_email", None) or ""))
     if email and repo.contains("email", email):
         return True
-    domain = registrable_domain(normalize_domain(email)) if "@" in email else ""
-    if domain and repo.contains("domain", domain):
-        return True
-    website = getattr(lead, "website_url", None)
-    if website and repo.contains("domain", str(website)):
+    if "@" in email and host_is_suppressed(session, email.split("@", 1)[1]):
         return True
     instagram = getattr(lead, "instagram_handle", None)
     if instagram and repo.contains("instagram", str(instagram)):
@@ -224,7 +275,7 @@ def record_opt_out(
     text: str | None = None,
     verbatim: bool = False,
 ) -> list[Suppression]:
-    """Cierra el correo y el estudio. El dominio solo si es el del sitio."""
+    """Cierra el correo y el estudio. Un dominio compartido no se cierra."""
     repo = SuppressionRepository(session)
     if verbatim:
         detail = (text or "")[:_DETAIL_MAX] or None
@@ -257,14 +308,34 @@ def record_opt_out(
                 keep_text=False,
             )
         )
-    mail_domain = registrable_domain(normalize_domain(email)) if "@" in email else ""
-    site_domain = website_domain(lead.website_url or "")
-    if mail_domain and site_domain and mail_domain == site_domain:
+    host = normalize_host(email.split("@", 1)[1]) if "@" in email else ""
+    if host and is_shared_host(host):
+        place = (lead.place_id or "").strip()
+        seen = {email}
+        if place:
+            siblings = session.scalars(select(Lead).where(Lead.place_id == place)).all()
+            for other in siblings:
+                other_email = normalize_email(other.contact_email or "")
+                if not other_email or other_email in seen:
+                    continue
+                seen.add(other_email)
+                rows.append(
+                    _store(
+                        repo,
+                        "email",
+                        other_email,
+                        channel=channel,
+                        reason=reason,
+                        detail=None,
+                        keep_text=False,
+                    )
+                )
+    elif host:
         rows.append(
             _store(
                 repo,
                 "domain",
-                mail_domain,
+                host,
                 channel=channel,
                 reason=reason,
                 detail=None,
