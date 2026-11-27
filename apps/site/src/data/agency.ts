@@ -1,4 +1,5 @@
-export const IDENTITY_PLACEHOLDER = '[datos de la agencia]';
+export const AGENCY_NAME = 'Deeppro SpA';
+export const AGENCY_RUT = '77.923.111-9';
 
 function clean(value: string | undefined): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -13,7 +14,7 @@ function first(...values: Array<string | undefined>): string {
 }
 
 export function isConfigured(value: string): boolean {
-  return value.length > 0 && value !== IDENTITY_PLACEHOLDER;
+  return value.length > 0;
 }
 
 export function safeHttpUrl(value: string | undefined): string | null {
@@ -29,12 +30,13 @@ export function safeHttpUrl(value: string | undefined): string | null {
 }
 
 export const agency = {
-  name: first(process.env.PUBLIC_AGENCY_NAME, process.env.AGENCY_NAME) || IDENTITY_PLACEHOLDER,
+  name: first(process.env.PUBLIC_AGENCY_NAME, process.env.AGENCY_NAME) || AGENCY_NAME,
   legalName:
-    first(process.env.PUBLIC_AGENCY_LEGAL_NAME, process.env.AGENCY_LEGAL_NAME) ||
-    IDENTITY_PLACEHOLDER,
-  rut: first(process.env.PUBLIC_AGENCY_RUT, process.env.AGENCY_RUT) || IDENTITY_PLACEHOLDER,
-  email: first(process.env.PUBLIC_AGENCY_EMAIL, process.env.AGENCY_EMAIL) || IDENTITY_PLACEHOLDER,
+    first(process.env.PUBLIC_AGENCY_LEGAL_NAME, process.env.AGENCY_LEGAL_NAME) || AGENCY_NAME,
+  rut: first(process.env.PUBLIC_AGENCY_RUT, process.env.AGENCY_RUT) || AGENCY_RUT,
+  email:
+    first(process.env.PUBLIC_AGENCY_EMAIL, process.env.AGENCY_EMAIL) ||
+    'TODO(Deeppro): correo de contacto',
   address: first(process.env.PUBLIC_AGENCY_ADDRESS, process.env.AGENCY_ADDRESS),
 };
 

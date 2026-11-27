@@ -137,7 +137,10 @@ def _write(business: str, commune: str, proposal: ProposalOutput) -> Path:
         loader=FileSystemLoader(ROOT / "templates" / "proposals"),
         autoescape=select_autoescape(["html", "xml"]),
     )
+    settings = get_settings()
     html = env.get_template("propuesta.html").render(
+        agency_name=settings.agency_name,
+        agency_rut=settings.agency_rut,
         title=proposal.title,
         business=business,
         commune=commune,

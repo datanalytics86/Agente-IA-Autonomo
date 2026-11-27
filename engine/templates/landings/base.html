@@ -71,6 +71,7 @@
   </main>
   <footer>
     <div class="wrap">
+      <p>{{ agency_name }}{% if agency_rut %} · RUT {{ agency_rut }}{% endif %}</p>
       <p>{{ business }} · {{ commune }}</p>
       {% if demo %}<p>Vista previa válida hasta {{ expires }}.</p>{% endif %}
     </div>

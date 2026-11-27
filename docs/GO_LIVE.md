@@ -2,7 +2,7 @@
 
 Orden obligatorio. No marques un paso sin haberlo hecho. El sistema funciona en demo sin ninguno de estos datos.
 
-1. **Identidad.** Completar `AGENCY_NAME`, `AGENCY_LEGAL_NAME`, `AGENCY_RUT`, `AGENCY_EMAIL`, `AGENCY_ADDRESS`.
+1. **Identidad.** `AGENCY_NAME` y `AGENCY_LEGAL_NAME` salen como Deeppro SpA y `AGENCY_RUT` como 77.923.111-9. Falta completar `AGENCY_EMAIL` y `AGENCY_ADDRESS` (`TODO(Deeppro)`).
 2. **SII.** Inicio de actividades y método de boleta o factura electrónica. Cada pago abre una tarea HITL para emitir el documento. Integración automática: pendiente de decisión del contador.
 3. **Revisión legal.** Leer `docs/compliance/REVISION_LEGAL.md` con un abogado (privacidad, términos, consentimiento, baja).
 4. **Dominios.** Un `.cl` en NIC Chile para el sitio y un dominio secundario solo para outreach.

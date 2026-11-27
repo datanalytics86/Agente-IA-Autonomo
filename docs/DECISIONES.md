@@ -45,7 +45,7 @@ Quince slugs ASCII únicos, tabla en `docs/contracts/dominio.md`. Reemplazan los
 
 ## ADR-008 — Identidad de la agencia
 
-Nombre, razón social, RUT, email y dirección quedan vacíos. Textos legales usan el placeholder «[datos de la agencia]». No se inventan.
+Nombre y razón social: Deeppro SpA. RUT: 77.923.111-9. Correo y dirección no se inventan: quedan como `TODO(Deeppro)`.
 
 ## ADR-009 — Documento tributario
 

@@ -137,23 +137,13 @@ def _ctx(session: Session, moment: datetime, outreach: object | None = None) -> 
     )
 
 
-def test_sin_nombre_no_inventa_agencia(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_sin_nombre_usa_deeppro(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("AGENCY_NAME", raising=False)
     reset_settings()
-    assert agency_label() == ""
-    subject, text, body = outreach_parts(business="Café Andes", commune="Ñuñoa", step=1)
-    result = check_rules(
-        {
-            "body": text,
-            "body_html": body,
-            "channel": "email_outreach",
-            "subject": subject,
-            "direction": "out",
-        },
-        {"business": "Café Andes"},
-        checker_settings(),
-    )
-    assert result.approved is False
+    assert agency_label() == "Deeppro SpA"
+    _subject, text, body = outreach_parts(business="Café Andes", commune="Ñuñoa", step=1)
+    assert "Deeppro SpA" in text
+    assert "Deeppro SpA" in body
 
 
 def test_borrador_pasa_el_checker(monkeypatch: pytest.MonkeyPatch) -> None:

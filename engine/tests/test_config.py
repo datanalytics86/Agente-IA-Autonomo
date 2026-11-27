@@ -58,7 +58,9 @@ def test_defaults_sin_entorno(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.maintenance_price_clp is None
     assert settings.booking_provider == "calcom"
     assert settings.hosting_provider == "caddy"
-    assert settings.agency_name == ""
+    assert settings.agency_name == "Deeppro SpA"
+    assert settings.agency_legal_name == "Deeppro SpA"
+    assert settings.agency_rut == "77.923.111-9"
     assert settings.secret_key == ""
     assert settings.resolved_secret_key
     assert len(settings.scout_category_list) == 15

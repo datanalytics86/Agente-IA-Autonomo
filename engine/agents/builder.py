@@ -92,6 +92,8 @@ class BuilderAgent:
                 rating=lead.rating,
                 reviews=lead.reviews,
                 booking_link=settings.booking_link,
+                agency_name=settings.agency_name,
+                agency_rut=settings.agency_rut,
                 demo=demo,
                 token=token,
                 expires=expires.date().isoformat(),

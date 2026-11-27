@@ -42,11 +42,19 @@ async function html() {
   return source;
 }
 
-test('el build muestra el placeholder y no inventa un RUT', async () => {
-  const source = await html();
-  assert.match(source, /\[datos de la agencia\]/);
-  assert.doesNotMatch(source, /\d{1,2}\.\d{3}\.\d{3}-[\dkK]/);
-  assert.equal(source.includes('T14'), false);
+const legalPages = ['privacidad', 'terminos', 'baja', 'derechos'];
+
+test('el footer y cada página legal muestran Deeppro SpA y el RUT', async () => {
+  const home = await readFile(join(root, 'index.html'), 'utf8');
+  const footer = home.match(/<footer[\s\S]*<\/footer>/)?.[0] ?? '';
+  assert.match(footer, /Deeppro SpA/);
+  assert.match(footer, /77\.923\.111-9/);
+  for (const page of legalPages) {
+    const htmlPage = await readFile(join(root, page, 'index.html'), 'utf8');
+    assert.match(htmlPage, /Deeppro SpA/, page);
+    assert.match(htmlPage, /77\.923\.111-9/, page);
+  }
+  assert.equal(home.includes('T14'), false);
 });
 
 test('textos públicos obligatorios y precios', async () => {
@@ -79,6 +87,12 @@ test('JSON-LD ProfessionalService no inventa address', async () => {
   for (const block of blocks) {
     const data = JSON.parse(block[1]);
     assert.equal(data['@type'], 'ProfessionalService');
+    const configuredName = (
+      process.env.PUBLIC_AGENCY_NAME ||
+      process.env.AGENCY_NAME ||
+      'Deeppro SpA'
+    ).trim();
+    assert.equal(data.name, configuredName);
     if (!configuredAddress) assert.equal(Object.hasOwn(data, 'address'), false);
   }
 });

@@ -26,7 +26,7 @@ Fecha de revisión: 2026-10-04. Alcance: API, worker, sitio público, dashboard 
 | Amenaza | Qué puede pasar | Control |
 |---|---|---|
 | Tampering | Publicar un dominio que el cliente no aprobó | `domain_allowed` solo con dominio autorizado o proyecto `aprobado` / `publicado` |
-| Information disclosure | Inventar RUT, dirección o testimonios | Identidad vacía y placeholder «[datos de la agencia]». El build del sitio lo vigila |
+| Information disclosure | Inventar dirección, correo o testimonios | Nombre y RUT publicados: Deeppro SpA, 77.923.111-9. Dirección y correo quedan en `TODO(Deeppro)`. El build del sitio lo vigila |
 | Denial of service | Copiar un `project_id` con `..` | `project_slug` rechaza separadores y el destino tiene que quedar dentro del directorio de clientes |
 
 ## Dashboard

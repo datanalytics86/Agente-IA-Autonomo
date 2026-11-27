@@ -36,7 +36,7 @@ Todo umbral vive aquí y puede taparse en runtime con `settings_kv` (kill switch
 
 ### Agencia
 
-`AGENCY_NAME`, `AGENCY_LEGAL_NAME`, `AGENCY_RUT`, `AGENCY_EMAIL`, `AGENCY_ADDRESS`. Todas vacías. La UI muestra el placeholder «completa los datos de la agencia». Prohibido inventar nombre, RUT o dirección.
+`AGENCY_NAME` y `AGENCY_LEGAL_NAME` default Deeppro SpA. `AGENCY_RUT` default 77.923.111-9. `AGENCY_EMAIL` y `AGENCY_ADDRESS` vacías (`TODO(Deeppro): correo de contacto` y `TODO(Deeppro): dirección`). No se inventan.
 
 ### LLM
 

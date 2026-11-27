@@ -76,7 +76,7 @@ def run_simulation(
         raise ValueError("days debe ser >= 1")
     # La simulación no es un envío real. Sin nombre el checker rechaza todo el embudo.
     if not os.environ.get("AGENCY_NAME", "").strip():
-        os.environ["AGENCY_NAME"] = "Agencia Simulada"
+        os.environ["AGENCY_NAME"] = "Deeppro SpA"
     reset_settings()
     start = SIM_START_LOCAL.astimezone(UTC)
     end = (SIM_START_LOCAL + timedelta(days=days)).astimezone(UTC)

@@ -89,9 +89,9 @@ class Settings(BaseSettings):
     admin_base_url: str = "http://localhost:8080/admin"
     cors_origins: str = "http://localhost:8080,http://localhost:4321"
 
-    agency_name: str = ""
-    agency_legal_name: str = ""
-    agency_rut: str = ""
+    agency_name: str = "Deeppro SpA"
+    agency_legal_name: str = "Deeppro SpA"
+    agency_rut: str = "77.923.111-9"
     agency_email: str = ""
     agency_address: str = ""
 

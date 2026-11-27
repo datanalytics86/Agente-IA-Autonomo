@@ -8,7 +8,7 @@ Monorepo para vender landings a pymes en Chile. Tres piezas:
 
 `infra/` tiene Docker Compose y Caddy. Los contratos están en `docs/contracts/`. La operación está en `docs/RUNBOOK.md` y el checklist del dueño en `docs/GO_LIVE.md`.
 
-Sin credenciales el sistema queda en demo: no envía, no cobra y no manda mensajes directos de Instagram ni de LinkedIn. Esos dos canales quedan en una bandeja para envío manual. El nombre, el RUT y la dirección de la agencia no van en el código: el sitio muestra `[datos de la agencia]` hasta que el dueño los pone en el entorno.
+Sin credenciales el sistema queda en demo: no envía, no cobra y no manda mensajes directos de Instagram ni de LinkedIn. Esos dos canales quedan en una bandeja para envío manual. El nombre y el RUT por defecto son Deeppro SpA, 77.923.111-9. El correo y la dirección siguen vacíos (`TODO(Deeppro)`).
 
 ## Modos del motor
 

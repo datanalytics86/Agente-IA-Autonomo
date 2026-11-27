@@ -1,6 +1,6 @@
 # Preguntas para revisión legal
 
-Esto no es un dictamen. No habilita el outreach, no interpreta la ley en nombre de la agencia y no reemplaza a un abogado con inscripción vigente en Chile. Las respuestas tienen que venir por escrito, con la identidad real de la agencia (razón social, RUT, domicilio, correo). Hoy esos datos están vacíos a propósito.
+Esto no es un dictamen. No habilita el outreach, no interpreta la ley en nombre de la agencia y no reemplaza a un abogado con inscripción vigente en Chile. Las respuestas tienen que venir por escrito, con la identidad real de la agencia (razón social, RUT, domicilio, correo). El nombre y el RUT publicados son Deeppro SpA, 77.923.111-9. Domicilio y correo siguen sin cargar (`TODO(Deeppro)`).
 
 Fecha del borrador: 4 de octubre de 2026.
 

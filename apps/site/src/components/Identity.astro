@@ -1,7 +1,7 @@
 ---
-import { IDENTITY_PLACEHOLDER, agency, isConfigured } from '../data/agency';
+import { agency, isConfigured } from '../data/agency';
 
-const address = isConfigured(agency.address) ? agency.address : IDENTITY_PLACEHOLDER;
+const address = isConfigured(agency.address) ? agency.address : 'TODO(Deeppro): dirección';
 ---
 
 <dl class="grid gap-3 text-sm sm:grid-cols-2">
@@ -27,5 +27,5 @@ const address = isConfigured(agency.address) ? agency.address : IDENTITY_PLACEHO
   </div>
 </dl>
 <p class="mt-4 text-sm text-muted">
-  Lo que aparece como {IDENTITY_PLACEHOLDER} es un marcador. No es un nombre comercial, un RUT ni una dirección.
+  Lo marcado como TODO(Deeppro) todavía no está publicado. El nombre y el RUT no son marcadores.
 </p>
