@@ -1275,6 +1275,21 @@ def test_una_baja_en_la_linea_del_saludo_no_se_pierde() -> None:
         assert "no me escriban más" in texto
 
 
+def test_el_saludo_acepta_equipo_sres_y_guion() -> None:
+    from core.suppression import clean_opt_out_text
+
+    for saludo in (
+        "Hola equipo,",
+        "hola equipo,",
+        "Sres. X,",
+        "Hola O'Higgins,",
+        "Hola Jean-Pierre,",
+    ):
+        texto = clean_opt_out_text(f"{saludo}\n\nno me escriban más")
+        assert texto is not None
+        assert "no me escriban más" in texto
+
+
 def test_el_saludo_con_nombre_no_se_come_la_baja() -> None:
     from core.suppression import clean_opt_out_text
 
