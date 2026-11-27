@@ -51,7 +51,6 @@ const identity = [
   'Antonio Bellet 193, of. 1210, Providencia',
   'Nicolás Andrade Socías',
   'nicolas.andrade@deeppro.cl',
-  'TODO(Deeppro): correo de privacidad',
 ];
 
 test('el footer y cada página legal muestran la identidad de Deep Pro', async () => {
@@ -66,6 +65,34 @@ test('el footer y cada página legal muestran la identidad de Deep Pro', async (
     }
   }
   assert.equal(home.includes('T14'), false);
+});
+
+const ALLOWED_RUT = '77.923.111-9';
+const RUT_RE = /\d{1,2}\.\d{3}\.\d{3}-[\dkK]/g;
+const PHONE_RE = /\+56|\b9\s+\d{4}\s+\d{4}\b/g;
+
+function assertPublicContact(source) {
+  const ruts = source.match(RUT_RE) ?? [];
+  for (const rut of ruts) {
+    if (rut !== ALLOWED_RUT) {
+      throw new Error(`RUT no permitido: ${rut}`);
+    }
+  }
+  const phones = source.match(PHONE_RE) ?? [];
+  if (phones.length > 0) {
+    throw new Error(`teléfono chileno: ${phones.join(', ')}`);
+  }
+}
+
+test('el build solo publica el RUT de la agencia y ningún teléfono', async () => {
+  assertPublicContact(await html());
+});
+
+test('un RUT ajeno falla el guardrail', () => {
+  assert.throws(
+    () => assertPublicContact(`dato 12.345.678-5 y ${ALLOWED_RUT}`),
+    /RUT no permitido: 12\.345\.678-5/,
+  );
 });
 
 test('textos públicos obligatorios y precios', async () => {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 
+from core.compliance import legal_footer
 from core.config import get_settings
 
 MANUAL_CHANNELS = frozenset({"instagram", "linkedin", "whatsapp"})
@@ -21,6 +22,9 @@ def checker_settings() -> dict[str, object]:
         "price_max_clp": settings.price_max_clp,
         "public_base_url": settings.public_base_url,
         "agency_email": settings.agency_email,
+        "agency_legal_name": settings.agency_legal_name,
+        "agency_rut": settings.agency_rut,
+        "agency_address": settings.agency_address,
     }
 
 
@@ -46,19 +50,18 @@ def outreach_parts(
     settings = get_settings()
     agency = agency_label()
     price = _clp(offer_price_clp())
-    base = settings.public_base_url.rstrip("/") or "http://localhost"
     follow = {
         1: "Si le interesa, puedo enviarle una propuesta.",
         2: "Le dejo el mismo dato, por si no alcanzó a verlo.",
         3: "Cierro el tema por ahora; queda a su disposición.",
     }.get(step, "Si le interesa, puedo enviarle una propuesta.")
-    subject = f"Landing para {business}"
+    subject = f"Propuesta comercial: landing para {business}"
     text = (
         f"Hola. Te escribo de {agency}. "
         f"Vi {business} en {commune}. "
         f"La landing queda en {price} CLP. "
-        f"{follow} "
-        f"Si no quieres más correos responde BAJA: {base}/baja."
+        f"{follow}\n\n"
+        f"{legal_footer(settings)}"
     )
     body_html = f"<p>{html.escape(text)}</p>"
     return subject, text, body_html

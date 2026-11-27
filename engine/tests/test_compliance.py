@@ -12,6 +12,7 @@ from core.compliance import (
     Settings,
     check_rules,
     is_opt_out,
+    legal_footer,
     looks_like_injection,
     normalize_contact,
     suppression_hash,
@@ -544,4 +545,65 @@ def test_largo_maximo_por_canal(canal: str, tope: int) -> None:
 
 def test_canal_desconocido_no_aplica_tope_de_largo() -> None:
     result = check_rules(_message(_cuerpo(2000), channel="sms"), Lead(), _settings())
+    assert result.approved is True, result.reasons
+
+
+def _pie(**overrides: object) -> Settings:
+    data: dict[str, object] = {
+        "agency_legal_name": "DEEP PRO BUSINESS SOLUTIONS SpA",
+        "agency_rut": "77.923.111-9",
+        "agency_address": "Antonio Bellet 193, of. 1210, Providencia",
+        "agency_email": "nicolas.andrade@deeppro.cl",
+    }
+    data.update(overrides)
+    return _settings(**data)
+
+
+def _cuerpo_valido(settings: Settings) -> str:
+    return (
+        "Hola. Te escribo de Agencia Norte. "
+        "La landing queda en 350.000 CLP.\n"
+        f"{legal_footer(settings)}"
+    )
+
+
+def test_pie_incompleto_se_rechaza() -> None:
+    settings = _pie()
+    body = _cuerpo_valido(settings).replace(
+        "Antonio Bellet 193, of. 1210, Providencia\n",
+        "",
+    )
+    result = check_rules(
+        _message(body, subject="Propuesta comercial: landing para Café Andes"),
+        Lead(),
+        settings,
+    )
+    assert result.approved is False
+    assert "pie incompleto" in result.reasons
+
+
+def test_re_sin_hilo_previo_se_rechaza() -> None:
+    settings = _pie()
+    result = check_rules(
+        _message(
+            _cuerpo_valido(settings),
+            subject="Re: propuesta comercial",
+        ),
+        Lead(),
+        settings,
+    )
+    assert result.approved is False
+    assert "asunto con Re: o Fwd: sin hilo previo" in result.reasons
+
+
+def test_propuesta_con_pie_completo_pasa() -> None:
+    settings = _pie()
+    result = check_rules(
+        _message(
+            _cuerpo_valido(settings),
+            subject="Propuesta comercial: landing para Café Andes",
+        ),
+        Lead(),
+        settings,
+    )
     assert result.approved is True, result.reasons

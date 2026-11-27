@@ -4,7 +4,7 @@ export const AGENCY_RUT = '77.923.111-9';
 export const AGENCY_ADDRESS = 'Antonio Bellet 193, of. 1210, Providencia';
 export const AGENCY_EMAIL = 'nicolas.andrade@deeppro.cl';
 export const AGENCY_REPRESENTATIVE = 'Nicolás Andrade Socías';
-export const PRIVACY_EMAIL_TODO = 'TODO(Deeppro): correo de privacidad';
+export const AGENCY_PRIVACY_EMAIL = AGENCY_EMAIL;
 
 function clean(value: string | undefined): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -43,7 +43,7 @@ export const agency = {
   email: first(process.env.PUBLIC_AGENCY_EMAIL, process.env.AGENCY_EMAIL) || AGENCY_EMAIL,
   address: first(process.env.PUBLIC_AGENCY_ADDRESS, process.env.AGENCY_ADDRESS) || AGENCY_ADDRESS,
   representative: AGENCY_REPRESENTATIVE,
-  privacyEmail: PRIVACY_EMAIL_TODO,
+  privacyEmail: AGENCY_PRIVACY_EMAIL,
 };
 
 export const bookingLink = safeHttpUrl(process.env.PUBLIC_BOOKING_LINK);

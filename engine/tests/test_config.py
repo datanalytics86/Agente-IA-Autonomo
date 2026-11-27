@@ -63,6 +63,14 @@ def test_defaults_sin_entorno(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.agency_rut == "77.923.111-9"
     assert settings.agency_email == "nicolas.andrade@deeppro.cl"
     assert settings.agency_address == "Antonio Bellet 193, of. 1210, Providencia"
+    site = Path(__file__).resolve().parents[2] / "apps/site/src/data/agency.ts"
+    source = site.read_text(encoding="utf-8")
+    assert f"export const AGENCY_NAME = '{settings.agency_name}'" in source
+    assert f"export const AGENCY_LEGAL_NAME = '{settings.agency_legal_name}'" in source
+    assert f"export const AGENCY_RUT = '{settings.agency_rut}'" in source
+    assert f"export const AGENCY_EMAIL = '{settings.agency_email}'" in source
+    assert f"export const AGENCY_ADDRESS = '{settings.agency_address}'" in source
+    assert "export const AGENCY_PRIVACY_EMAIL = AGENCY_EMAIL" in source
     assert settings.secret_key == ""
     assert settings.resolved_secret_key
     assert len(settings.scout_category_list) == 15

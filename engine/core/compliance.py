@@ -25,7 +25,7 @@ _PRICE_MARKED_RE = re.compile(
     r"(?i)(?:\$\s*)(\d{1,3}(?:\.\d{3})+|\d{4,8})(?!\d)"
     r"|(\d{1,3}(?:\.\d{3})+|\d{4,8})(?!\d)\s*(?:clp|pesos)"
 )
-_PRICE_DOTTED_RE = re.compile(r"(?<!\d)(\d{1,3}(?:\.\d{3})+)(?!\d)")
+_PRICE_DOTTED_RE = re.compile(r"(?<!\d)(\d{1,3}(?:\.\d{3})+)(?![\d-])")
 _EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b")
 _PHONE_RE = re.compile(r"(?<!\d)(?:\+?56[\s.\-]*)?9[\s.\-]*\d{4}[\s.\-]*\d{4}(?!\d)")
 _URL_RE = re.compile(r"(?i)(?:https?://[^\s<>\"']+|//[^\s<>\"']+)")
@@ -36,6 +36,8 @@ _OPT_OUT_PHRASES = (
     "no me contacten",
 )
 _OPT_OUT_RE = re.compile(r"\b(?:stop|baja|unsubscribe[d]?|remove me)\b")
+_REPLY_RE = re.compile(r"(?i)^\s*(?:re|fwd|fw)\s*:")
+_EMAIL_SOURCE = "obtuvimos su correo del sitio web público de su estudio"
 _FORBIDDEN: tuple[tuple[str, str], ...] = (
     (r"\bgarantizad[oa]s?\b", "garantizado"),
     ("resultados asegurados", "resultados asegurados"),
@@ -104,6 +106,7 @@ class Message:
     recipient_suppressed: bool | None = None
     subject: str = ""
     body_html: str = ""
+    prior_thread: bool = False
 
 
 @dataclass
@@ -128,6 +131,9 @@ class Settings:
     public_base_url: str = ""
     agency_email: str = ""
     agency_phone: str = ""
+    agency_legal_name: str = ""
+    agency_rut: str = ""
+    agency_address: str = ""
 
 
 def _fold(text: str) -> str:
@@ -227,6 +233,7 @@ def _coerce_message(message: Message | Mapping[str, Any]) -> Message:
         recipient_suppressed=message.get("recipient_suppressed"),
         subject=str(message.get("subject") or ""),
         body_html=str(message.get("body_html") or ""),
+        prior_thread=bool(message.get("prior_thread") or False),
     )
 
 
@@ -266,6 +273,30 @@ def _coerce_settings(settings: Settings | Mapping[str, Any] | None) -> Settings:
         public_base_url=str(settings.get("public_base_url") or ""),
         agency_email=str(settings.get("agency_email") or ""),
         agency_phone=str(settings.get("agency_phone") or ""),
+        agency_legal_name=str(settings.get("agency_legal_name") or ""),
+        agency_rut=str(settings.get("agency_rut") or ""),
+        agency_address=str(settings.get("agency_address") or ""),
+    )
+
+
+def _setting(settings: object, name: str) -> str:
+    if isinstance(settings, Mapping):
+        return str(settings.get(name) or "").strip()
+    return str(getattr(settings, name, "") or "").strip()
+
+
+def legal_footer(settings: object) -> str:
+    """Pie legal del outreach. Los datos salen de la configuración, una sola vez."""
+    base = _setting(settings, "public_base_url").rstrip("/") or "http://localhost"
+    return "\n".join(
+        (
+            _setting(settings, "agency_legal_name"),
+            f"RUT {_setting(settings, 'agency_rut')}",
+            _setting(settings, "agency_address"),
+            _setting(settings, "agency_email"),
+            _EMAIL_SOURCE,
+            f"Para no recibir más correos: {base}/baja",
+        )
     )
 
 
@@ -357,6 +388,22 @@ def _has_whatsapp_consent(lead: Lead) -> bool:
     return kind in {"whatsapp", "whatsapp_opt_in", "opt_in_whatsapp"}
 
 
+def _footer_incomplete(body: str, settings: Settings) -> bool:
+    if not settings.agency_legal_name.strip():
+        return False
+    pieces = (
+        settings.agency_legal_name,
+        settings.agency_rut,
+        settings.agency_address,
+        settings.agency_email,
+    )
+    folded = _fold(body)
+    for part in pieces:
+        if part.strip() and _fold(part) not in folded:
+            return True
+    return _fold(_EMAIL_SOURCE) not in folded
+
+
 def _email_has_baja(text: str) -> bool:
     folded = _fold(text)
     if re.search(r"\bbaja\b", folded):
@@ -433,6 +480,17 @@ def check_rules(
 
     if "email" in msg.channel.lower() and not _email_has_baja(body_text):
         reasons.append("email sin indicación de baja")
+
+    if "email" in msg.channel.lower() and _footer_incomplete(body_text, current_settings):
+        reasons.append("pie incompleto")
+
+    if (
+        "email" in msg.channel.lower()
+        and _is_outbound(msg.direction)
+        and not msg.prior_thread
+        and _REPLY_RE.match(msg.subject or "")
+    ):
+        reasons.append("asunto con Re: o Fwd: sin hilo previo")
 
     if msg.suppressed is True or msg.recipient_suppressed is True:
         reasons.append("destinatario suprimido")

@@ -4,7 +4,7 @@ Documento de trabajo del responsable. No es un dictamen, no autoriza envíos y n
 
 Fecha: 4 de octubre de 2026. Ola 1 (reglas deterministas). Se actualiza si cambia un tratamiento, un proveedor o un plazo.
 
-Responsable: DEEP PRO BUSINESS SOLUTIONS SpA, RUT 77.923.111-9, Antonio Bellet 193, of. 1210, Providencia, correo nicolas.andrade@deeppro.cl. El correo de privacidad sigue en `TODO(Deeppro): correo de privacidad`.
+Responsable: DEEP PRO BUSINESS SOLUTIONS SpA, RUT 77.923.111-9, Antonio Bellet 193, of. 1210, Providencia, correo nicolas.andrade@deeppro.cl. El correo de privacidad es nicolas.andrade@deeppro.cl.
 
 Ámbito: Chile. Prospectos en las comunas configuradas (`SCOUT_COMMUNES`). Hasta el 1 de diciembre de 2026 el proyecto asume vigente la Ley 19.628 y, desde esa fecha, la Ley 21.719. Hay que cumplir las dos. La fecha de vigencia la confirma el abogado; aquí no se da por cerrada.
 

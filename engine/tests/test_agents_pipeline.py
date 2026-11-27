@@ -133,6 +133,36 @@ def test_temas_mapean_rubros_y_no_filtran_el_id() -> None:
         assert "Testimonio" not in html
 
 
+def test_la_final_no_lleva_rut_ni_razon_social() -> None:
+    common = {
+        "business": "Clínica Los Aromos",
+        "commune": "Ñuñoa",
+        "city": "Santiago",
+        "category": "clinica-dental",
+        "hero_title": "Clínica Los Aromos",
+        "hero_subtitle": "Atención en Ñuñoa.",
+        "services": [],
+        "faqs": [],
+        "about": "El local.",
+        "rating": 4.8,
+        "reviews": 20,
+        "booking_link": None,
+        "token": "preview-token",
+        "expires": "2026-11-01",
+        "agency_name": "DEEP PRO CONSULTORES SpA",
+        "agency_legal_name": "DEEP PRO BUSINESS SOLUTIONS SpA",
+        "agency_rut": "77.923.111-9",
+    }
+    demo = render_theme("servicios", demo=True, **common)
+    final = render_theme("servicios", demo=False, **common)
+    assert "DEEP PRO CONSULTORES SpA" in demo
+    assert "77.923.111-9" not in demo
+    assert "77.923.111-9" not in final
+    assert "DEEP PRO BUSINESS SOLUTIONS SpA" not in final
+    assert "DEEP PRO" not in final
+    assert "Clínica Los Aromos · Ñuñoa" in final
+
+
 def test_run_demo_deja_html_y_el_alto_valor_en_revision(
     env: Path,
     block_network: None,

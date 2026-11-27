@@ -14,7 +14,12 @@ from sqlalchemy.orm import Session
 from core.compliance import check_rules
 from core.config import reset_settings
 from db.models import Approval, Artifact, JobRun, Lead, LlmCall, Message, Project
-from db.repositories import LeadRepository, MessageRepository, SettingsRepository
+from db.repositories import (
+    LeadRepository,
+    MessageRepository,
+    SettingsRepository,
+    SuppressionRepository,
+)
 from db.session import create_all, reset_engine, session_scope
 from worker.clock import FakeClock
 from worker.copywriter import agency_label, checker_settings, outreach_parts
@@ -173,6 +178,23 @@ def test_kill_switch_no_envia(session: Session) -> None:
     assert ctx.ports.outreach.sent == []  # type: ignore[attr-defined]
     stored = MessageRepository(session).list(lead_id=lead.id)[0]
     assert stored.status == "queued"
+
+
+def test_email_suprimido_no_recibe_mas(session: Session) -> None:
+    lead = _lead(session)
+    SuppressionRepository(session).add(
+        "email",
+        lead.contact_email or "",
+        reason="baja",
+        source="baja",
+    )
+    _queued(session, lead)
+    box = MemoryOutreach()
+    ctx = _ctx(session, datetime(2026, 3, 3, 10, 0, tzinfo=TZ), box)
+    assert job_outreach(ctx) == 0
+    assert box.sent == []
+    stored = MessageRepository(session).list(lead_id=lead.id)[0]
+    assert stored.status == "blocked"
 
 
 def test_envio_dentro_de_ventana_marca_enviado(session: Session) -> None:

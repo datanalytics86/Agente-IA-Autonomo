@@ -8,7 +8,7 @@ Monorepo para vender landings a pymes en Chile. Tres piezas:
 
 `infra/` tiene Docker Compose y Caddy. Los contratos están en `docs/contracts/`. La operación está en `docs/RUNBOOK.md` y el checklist del dueño en `docs/GO_LIVE.md`.
 
-Sin credenciales el sistema queda en demo: no envía, no cobra y no manda mensajes directos de Instagram ni de LinkedIn. Esos dos canales quedan en una bandeja para envío manual. La marca es DEEP PRO CONSULTORES SpA y la razón social es DEEP PRO BUSINESS SOLUTIONS SpA, RUT 77.923.111-9. El correo de contacto es nicolas.andrade@deeppro.cl y el domicilio es Antonio Bellet 193, of. 1210, Providencia. El correo de privacidad sigue en `TODO(Deeppro): correo de privacidad`.
+Sin credenciales el sistema queda en demo: no envía, no cobra y no manda mensajes directos de Instagram ni de LinkedIn. Esos dos canales quedan en una bandeja para envío manual. La marca es DEEP PRO CONSULTORES SpA y la razón social es DEEP PRO BUSINESS SOLUTIONS SpA, RUT 77.923.111-9. El correo de contacto es nicolas.andrade@deeppro.cl y el domicilio es Antonio Bellet 193, of. 1210, Providencia. El correo de privacidad es el mismo: nicolas.andrade@deeppro.cl.
 
 ## Modos del motor
 
