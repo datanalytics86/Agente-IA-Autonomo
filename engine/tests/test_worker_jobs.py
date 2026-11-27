@@ -699,6 +699,35 @@ def test_baja_de_contacto_suprime_el_estudio(session: Session) -> None:
     assert repo.contains("domain", "estudio.test") is False
 
 
+def test_dominio_registrable_ignora_puerto_www_userinfo_e_idn() -> None:
+    from core.suppression import normalize_domain, registrable_domain, website_domain
+
+    assert normalize_domain("estudio.cl:8080") == "estudio.cl"
+    assert website_domain("www.estudio.cl:443") == "estudio.cl"
+    assert website_domain("http://user:pass@estudio.cl/ruta") == "estudio.cl"
+    assert website_domain("abogados.estudio.cl") == "estudio.cl"
+    assert registrable_domain(normalize_domain("persona@abogados.estudio.cl")) == "estudio.cl"
+    assert website_domain("foo.com.ar") == "foo.com.ar"
+    identico = "bücher.cl"
+    assert normalize_domain(identico) == identico.encode("idna").decode("ascii")
+
+
+def test_subdominio_y_www_cuentan_como_el_mismo_sitio(session: Session) -> None:
+    from core.suppression import record_opt_out
+
+    lead = _lead(
+        session,
+        business="Subdominio",
+        contact_email="persona@abogados.estudio.cl",
+        website_url="https://www.estudio.cl/inicio",
+        place_id="place-sub",
+    )
+    rows = record_opt_out(session, lead, channel="email", reason="baja")
+    assert {row.kind for row in rows} == {"email", "lead", "domain"}
+    assert SuppressionRepository(session).contains("domain", "www.estudio.cl") is True
+    assert SuppressionRepository(session).contains("domain", "abogados.estudio.cl") is True
+
+
 def test_el_extracto_oculta_cita_firma_y_datos(session: Session) -> None:
     from core.suppression import erase_personal_data, record_opt_out
 

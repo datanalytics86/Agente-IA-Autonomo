@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from datetime import UTC, datetime
+from urllib.parse import urlsplit
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -49,23 +50,47 @@ def _fold(value: str) -> str:
     return "".join(char for char in decomposed if not unicodedata.combining(char))
 
 
-def normalize_domain(value: str) -> str:
-    """Dominio del correo: minúsculas, sin espacios y sin punto final."""
-    text = value.strip().lower()
-    if "@" in text:
+_SECOND_LEVEL = frozenset({"com", "co", "net", "org", "gob", "edu", "gov"})
+
+
+def _hostname(value: str) -> str:
+    text = value.strip()
+    if not text:
+        return ""
+    if "@" in text and "://" not in text and not text.startswith("//"):
         text = text.rsplit("@", 1)[1].strip()
-    return text.rstrip(".")
+    if "://" not in text and not text.startswith("//"):
+        text = "//" + text
+    host = (urlsplit(text).hostname or "").strip().lower().rstrip(".")
+    if not host:
+        return ""
+    try:
+        return host.encode("idna").decode("ascii")
+    except UnicodeError:
+        return ""
+
+
+def normalize_domain(value: str) -> str:
+    """Host del correo, con puerto y userinfo fuera, en punycode."""
+    return _hostname(value)
+
+
+def registrable_domain(host: str) -> str:
+    """Últimos 2 labels, o 3 si el TLD es de dos niveles (com.ar, co.uk)."""
+    labels = [part for part in host.split(".") if part]
+    if len(labels) >= 3 and len(labels[-1]) == 2 and labels[-2] in _SECOND_LEVEL:
+        return ".".join(labels[-3:])
+    if len(labels) >= 2:
+        return ".".join(labels[-2:])
+    return ".".join(labels)
 
 
 def website_domain(value: str) -> str:
-    """Host del sitio: sin esquema, ruta ni www, y con normalize_domain."""
-    text = value.strip().lower()
-    if "://" in text:
-        text = text.split("://", 1)[1]
-    text = text.split("/")[0].split("?")[0].split("#")[0].strip()
-    if text.startswith("www."):
-        text = text[4:]
-    return normalize_domain(text)
+    """Dominio registrable del sitio, sin www, puerto ni userinfo."""
+    host = _hostname(value)
+    if host.startswith("www."):
+        host = host[4:]
+    return registrable_domain(host)
 
 
 def normalize_email(value: str) -> str:
@@ -91,7 +116,7 @@ def is_suppressed(session: Session, lead: object) -> bool:
     email = normalize_email(str(getattr(lead, "contact_email", None) or ""))
     if email and repo.contains("email", email):
         return True
-    domain = normalize_domain(email) if "@" in email else ""
+    domain = registrable_domain(normalize_domain(email)) if "@" in email else ""
     if domain and repo.contains("domain", domain):
         return True
     website = getattr(lead, "website_url", None)
@@ -182,7 +207,7 @@ def record_opt_out(
                 keep_text=False,
             )
         )
-    mail_domain = normalize_domain(email) if "@" in email else ""
+    mail_domain = registrable_domain(normalize_domain(email)) if "@" in email else ""
     site_domain = website_domain(lead.website_url or "")
     if mail_domain and site_domain and mail_domain == site_domain:
         rows.append(
