@@ -39,16 +39,22 @@ def _fold(value: str) -> str:
 
 
 def normalize_domain(value: str) -> str:
-    """Host en minúsculas, sin www, sin punto final y sin ruta."""
+    """Dominio del correo: minúsculas, sin espacios y sin punto final."""
     text = value.strip().lower()
     if "@" in text:
         text = text.rsplit("@", 1)[1].strip()
+    return text.rstrip(".")
+
+
+def website_domain(value: str) -> str:
+    """Host del sitio: sin esquema, ruta ni www, y con normalize_domain."""
+    text = value.strip().lower()
     if "://" in text:
         text = text.split("://", 1)[1]
     text = text.split("/")[0].split("?")[0].split("#")[0].strip()
     if text.startswith("www."):
         text = text[4:]
-    return text.rstrip(".")
+    return normalize_domain(text)
 
 
 def normalize_email(value: str) -> str:
@@ -104,7 +110,8 @@ def _detail(text: str | None) -> str | None:
 
 def _remember(row: Suppression, channel: str, detail: str | None) -> Suppression:
     row.source = channel
-    row.detail = detail
+    if detail is not None:
+        row.detail = detail
     return row
 
 
@@ -131,7 +138,7 @@ def record_opt_out(
             _remember(repo.add("lead", place_id, reason=reason, source=channel), channel, detail)
         )
     mail_domain = normalize_domain(email) if "@" in email else ""
-    site_domain = normalize_domain(lead.website_url or "")
+    site_domain = website_domain(lead.website_url or "")
     if mail_domain and site_domain and mail_domain == site_domain:
         rows.append(
             _remember(

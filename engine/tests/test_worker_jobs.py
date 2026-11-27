@@ -724,6 +724,11 @@ def test_el_dominio_solo_si_es_el_del_sitio(session: Session) -> None:
     )
     recorte = record_opt_out(session, largo, channel="email", reason="baja", text="y" * 2500)
     assert len(next(row.detail or "" for row in recorte if row.kind == "email")) == 2000
+    otra = record_opt_out(session, propio, channel="email", reason="baja")
+    assert next(row.detail for row in otra if row.kind == "email") == texto
+    from core.suppression import normalize_email
+
+    assert normalize_email("persona@www.estudio.cl") == "persona@www.estudio.cl"
     repo = SuppressionRepository(session)
     assert repo.contains("domain", "www.Estudio.CL.") is True
 
