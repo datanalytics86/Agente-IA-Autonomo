@@ -49,7 +49,12 @@ _GMAIL_WROTE = re.compile(r"(?i)\bescribi[oó]\s*:")
 _OUTLOOK_RULE = re.compile(r"^_{4,}$")
 _OUTLOOK_HEADER = re.compile(r"(?i)^(de|enviado|para|asunto)\s*:")
 _OUTLOOK_NEXT = re.compile(r"(?i)^(enviado|para|asunto)\s*:")
-_GREETING = re.compile(r"(?i)^(?:hola|estimad[oa]s?)\s*[,:]?\s*$")
+_GREETING = re.compile(
+    r"(?i)^(?:hola|estimad[oa]s?|"
+    r"buen[oa]s?\s+d[ií]as|buen[oa]s?\s+tardes|buen[oa]s?\s+noches|"
+    r"se[nñ]ores|se[nñ]oras|se[nñ]ora|se[nñ]or|sra\.|sr\.|do[nñ]a|don)"
+    r"(?:\s+.{1,40}?)?\s*[,:.]?\s*$"
+)
 _ORIGINAL = re.compile(r"(?i)^-{3,}\s*(?:mensaje original|original message)\s*-{3,}$")
 _PHONE_SIG = re.compile(r"(?i)^(?:enviado desde mi|sent from my)\b")
 _SIMPLE_CLOSE = re.compile(
@@ -322,6 +327,39 @@ def _store(
     return row
 
 
+_PUBLIC_SUFFIXES = (
+    "gob.cl",
+    "gov.cl",
+    "mil.cl",
+    "co.cl",
+    "com.cl",
+    "com.ar",
+    "gob.ar",
+    "com.mx",
+    "gob.mx",
+    "com.br",
+    "gov.br",
+    "co.uk",
+    "gov.uk",
+    "ac.uk",
+    "org.uk",
+    "com.au",
+    "co.nz",
+)
+
+
+def _sin_prefijo_de_correo(host: str) -> str:
+    """Quita mail. o correo. solo si queda un host, no un TLD ni un sufijo público."""
+    current = host
+    while current.startswith(("mail.", "correo.")):
+        rest = current.split(".", 1)[1]
+        labels = [part for part in rest.split(".") if part]
+        if len(labels) < 2 or rest in _PUBLIC_SUFFIXES:
+            break
+        current = rest
+    return current
+
+
 def record_opt_out(
     session: Session,
     lead: Lead,
@@ -387,8 +425,7 @@ def record_opt_out(
                     )
                 )
     elif host:
-        while host.startswith(("mail.", "correo.")):
-            host = host.split(".", 1)[1]
+        host = _sin_prefijo_de_correo(host)
         rows.append(
             _store(
                 repo,
@@ -424,7 +461,7 @@ def _unlink_artifact(stored: str) -> None:
             resolved = from_engine if _inside(from_engine, root) else (root / raw).resolve()
         if _inside(resolved, root):
             resolved.unlink()
-    except OSError:
+    except (OSError, RuntimeError, ValueError):
         logger.warning("no se pudo borrar el archivo de un artifact")
 
 

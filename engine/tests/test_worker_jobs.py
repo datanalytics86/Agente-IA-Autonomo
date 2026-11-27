@@ -938,6 +938,29 @@ def test_el_borrado_no_sale_del_directorio_de_artifacts(
     assert "fuera.txt" not in caplog.text
 
 
+def test_un_byte_nulo_no_corta_el_borrado(session: Session) -> None:
+    from core.suppression import erase_personal_data
+
+    lead = _lead(
+        session,
+        business="Nulo",
+        contact_email="persona@estudio.cl",
+        place_id="place-nulo",
+    )
+    session.add(
+        Artifact(
+            lead_id=lead.id,
+            kind="landing_demo",
+            path="output/\x00demo.html",
+            meta={},
+        )
+    )
+    session.flush()
+    erase_personal_data(session, lead)
+    assert lead.contact_email is None
+    assert lead.business == "anonimizado"
+
+
 def test_normalize_host_loguea_solo_el_largo(caplog: pytest.LogCaptureFixture) -> None:
     import logging
 
@@ -948,6 +971,26 @@ def test_normalize_host_loguea_solo_el_largo(caplog: pytest.LogCaptureFixture) -
         assert normalize_host(malo) == ""
     assert malo not in caplog.text
     assert str(len(malo)) in caplog.text
+
+
+def test_mail_no_recorta_un_sufijo_publico(session: Session) -> None:
+    from core.suppression import record_opt_out
+
+    casos = (
+        ("x@mail.cl", "mail.cl", "Mail Cl"),
+        ("x@correo.cl", "correo.cl", "Correo Cl"),
+        ("x@mail.gob.cl", "mail.gob.cl", "Mail Gob"),
+        ("x@mail.co.uk", "mail.co.uk", "Mail Uk"),
+        ("x@mail.estudio.cl", "estudio.cl", "Mail Estudio Cl"),
+    )
+    repo = SuppressionRepository(session)
+    for email, dominio, negocio in casos:
+        lead = _lead(session, business=negocio, contact_email=email, place_id=f"place-{negocio}")
+        record_opt_out(session, lead, channel="email", reason="baja")
+        assert repo.contains("domain", dominio) is True
+    assert repo.contains("domain", "cl") is False
+    assert repo.contains("domain", "gob.cl") is False
+    assert repo.contains("domain", "co.uk") is False
 
 
 def test_mail_y_correo_cierran_el_host(session: Session) -> None:
@@ -1111,6 +1154,15 @@ def test_otra_ficha_con_el_mismo_sitio_queda_suprimida(session: Session) -> None
         place_id="place-plataforma",
     )
     assert is_suppressed(session, plataforma) is False
+
+
+def test_el_saludo_con_nombre_no_se_come_la_baja() -> None:
+    from core.suppression import clean_opt_out_text
+
+    for saludo in ("Hola Nicolás,", "Buenas tardes,", "Buenos días.", "Estimado Sr. Andrade:"):
+        texto = clean_opt_out_text(f"{saludo}\n\nno me escriban más")
+        assert texto is not None
+        assert "no me escriban más" in texto
 
 
 def test_el_extracto_no_pierde_la_baja_tras_el_saludo() -> None:
