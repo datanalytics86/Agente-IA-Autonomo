@@ -93,10 +93,12 @@ def _lead(session: Session, **overrides: object) -> Lead:
 
 
 def _queued(session: Session, lead: Lead, **overrides: object) -> Message:
+    source = "https://andes-ejemplo.cl/contacto"
     subject, text, body = outreach_parts(
         business=lead.business,
         commune=lead.commune,
         step=1,
+        source=source,
     )
     result = check_rules(
         {
@@ -108,7 +110,11 @@ def _queued(session: Session, lead: Lead, **overrides: object) -> Message:
             "suppressed": False,
             "recipient_suppressed": False,
         },
-        {"contact_email": lead.contact_email, "business": lead.business},
+        {
+            "contact_email": lead.contact_email,
+            "business": lead.business,
+            "contact_email_source_url": source,
+        },
         checker_settings(),
     )
     assert result.approved, result.reasons
@@ -142,6 +148,29 @@ def _ctx(session: Session, moment: datetime, outreach: object | None = None) -> 
     )
 
 
+def test_html_conserva_los_saltos_del_pie(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("AGENCY_NAME", raising=False)
+    reset_settings()
+    _subject, text, body = outreach_parts(
+        business="Café Andes",
+        commune="Ñuñoa",
+        step=1,
+        source="https://cafe.cl/contacto",
+    )
+    assert "<br>" in body
+    assert body.startswith("<p>") and body.endswith("</p>")
+    for line in text.split("\n"):
+        assert html_escape_line(line) in body
+
+
+def html_escape_line(line: str) -> str:
+    return (
+        line.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
 def test_sin_nombre_usa_deeppro(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("AGENCY_NAME", raising=False)
     reset_settings()
@@ -154,7 +183,13 @@ def test_sin_nombre_usa_deeppro(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_borrador_pasa_el_checker(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AGENCY_NAME", "Agencia Andina")
     reset_settings()
-    subject, text, body = outreach_parts(business="Café Andes", commune="Ñuñoa", step=2)
+    source = "https://andes-ejemplo.cl/contacto"
+    subject, text, body = outreach_parts(
+        business="Café Andes",
+        commune="Ñuñoa",
+        step=2,
+        source=source,
+    )
     result = check_rules(
         {
             "body": text,
@@ -163,7 +198,7 @@ def test_borrador_pasa_el_checker(monkeypatch: pytest.MonkeyPatch) -> None:
             "subject": subject,
             "direction": "out",
         },
-        {"business": "Café Andes"},
+        {"business": "Café Andes", "contact_email_source_url": source},
         checker_settings(),
     )
     assert result.approved, result.reasons

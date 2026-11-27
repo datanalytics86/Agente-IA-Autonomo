@@ -68,13 +68,18 @@ test('el footer y cada página legal muestran la identidad de Deep Pro', async (
 });
 
 const ALLOWED_RUT = '77.923.111-9';
-const RUT_RE = /\d{1,2}\.\d{3}\.\d{3}-[\dkK]/g;
-const PHONE_RE = /\+56|\b9\s+\d{4}\s+\d{4}\b/g;
+const RUT_RE = /\b\d{1,2}[.\s]?\d{3}[.\s]?\d{3}\s*-\s*[\dkK]\b/g;
+const PHONE_RE = /(?:\+?56[\s.-]*)?\b9[\s.-]*\d{4}[\s.-]*\d{4}\b/g;
+
+function normalizeRut(value) {
+  return value.replace(/[.\s]/g, '');
+}
 
 function assertPublicContact(source) {
+  const allowed = normalizeRut(ALLOWED_RUT);
   const ruts = source.match(RUT_RE) ?? [];
   for (const rut of ruts) {
-    if (rut !== ALLOWED_RUT) {
+    if (normalizeRut(rut) !== allowed) {
       throw new Error(`RUT no permitido: ${rut}`);
     }
   }
@@ -93,6 +98,9 @@ test('un RUT ajeno falla el guardrail', () => {
     () => assertPublicContact(`dato 12.345.678-5 y ${ALLOWED_RUT}`),
     /RUT no permitido: 12\.345\.678-5/,
   );
+  for (const sample of ['912345678', '9-1234-5678', '12345678-5', '12 345 678-5']) {
+    assert.throws(() => assertPublicContact(sample), /RUT no permitido|teléfono chileno/, sample);
+  }
 });
 
 test('textos públicos obligatorios y precios', async () => {

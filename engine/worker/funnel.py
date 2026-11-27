@@ -333,6 +333,7 @@ def _queue_messages(ctx: JobContext, lead: Lead) -> None:
         business=lead.business,
         commune=lead.commune,
         step=1,
+        source=lead.contact_email_source_url,
     )
     if lead.contact_email:
         queue_outbound(

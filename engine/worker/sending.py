@@ -396,6 +396,7 @@ def job_followups(ctx: JobContext) -> int:
                 business=lead.business,
                 commune=lead.commune,
                 step=step,
+                source=lead.contact_email_source_url,
             )
             queue_outbound(
                 ctx,

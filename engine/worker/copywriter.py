@@ -45,6 +45,7 @@ def outreach_parts(
     business: str,
     commune: str,
     step: int,
+    source: str | None = None,
 ) -> tuple[str, str, str]:
     """Asunto, texto y HTML mínimo. El cuerpo trae identidad, precio y baja."""
     settings = get_settings()
@@ -61,7 +62,7 @@ def outreach_parts(
         f"Vi {business} en {commune}. "
         f"La landing queda en {price} CLP. "
         f"{follow}\n\n"
-        f"{legal_footer(settings)}"
+        f"{legal_footer(settings, source)}"
     )
-    body_html = f"<p>{html.escape(text)}</p>"
+    body_html = "<p>" + "<br>".join(html.escape(line) for line in text.split("\n")) + "</p>"
     return subject, text, body_html

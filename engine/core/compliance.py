@@ -37,7 +37,10 @@ _OPT_OUT_PHRASES = (
 )
 _OPT_OUT_RE = re.compile(r"\b(?:stop|baja|unsubscribe[d]?|remove me)\b")
 _REPLY_RE = re.compile(r"(?i)^\s*(?:re|fwd|fw)\s*:")
-_EMAIL_SOURCE = "obtuvimos su correo del sitio web público de su estudio"
+def email_source_line(source: str) -> str:
+    return (
+        f"obtuvimos su correo de {source.strip()}, de acceso público, asociado a su negocio"
+    )
 _FORBIDDEN: tuple[tuple[str, str], ...] = (
     (r"\bgarantizad[oa]s?\b", "garantizado"),
     ("resultados asegurados", "resultados asegurados"),
@@ -121,6 +124,7 @@ class Lead:
     whatsapp_consent: bool = False
     emails: tuple[str, ...] | list[str] = ()
     phones: tuple[str, ...] | list[str] = ()
+    contact_email_source_url: str | None = None
 
 
 @dataclass
@@ -253,6 +257,7 @@ def _coerce_lead(lead: Lead | Mapping[str, Any] | None) -> Lead:
         whatsapp_consent=bool(lead.get("whatsapp_consent") or False),
         emails=_as_str_tuple(lead.get("emails")),
         phones=_as_str_tuple(lead.get("phones")),
+        contact_email_source_url=lead.get("contact_email_source_url"),
     )
 
 
@@ -285,19 +290,20 @@ def _setting(settings: object, name: str) -> str:
     return str(getattr(settings, name, "") or "").strip()
 
 
-def legal_footer(settings: object) -> str:
+def legal_footer(settings: object, source: str | None = None) -> str:
     """Pie legal del outreach. Los datos salen de la configuración, una sola vez."""
     base = _setting(settings, "public_base_url").rstrip("/") or "http://localhost"
-    return "\n".join(
-        (
-            _setting(settings, "agency_legal_name"),
-            f"RUT {_setting(settings, 'agency_rut')}",
-            _setting(settings, "agency_address"),
-            _setting(settings, "agency_email"),
-            _EMAIL_SOURCE,
-            f"Para no recibir más correos: {base}/baja",
-        )
-    )
+    fuente = (source or "").strip()
+    lines = [
+        _setting(settings, "agency_legal_name"),
+        f"RUT {_setting(settings, 'agency_rut')}",
+        _setting(settings, "agency_address"),
+        _setting(settings, "agency_email"),
+    ]
+    if fuente:
+        lines.append(email_source_line(fuente))
+    lines.append(f"Para no recibir más correos: {base}/baja")
+    return "\n".join(lines)
 
 
 def _digits_to_int(text: str) -> int | None:
@@ -388,20 +394,31 @@ def _has_whatsapp_consent(lead: Lead) -> bool:
     return kind in {"whatsapp", "whatsapp_opt_in", "opt_in_whatsapp"}
 
 
-def _footer_incomplete(body: str, settings: Settings) -> bool:
-    if not settings.agency_legal_name.strip():
-        return False
-    pieces = (
+def _legal_identity_incomplete(settings: Settings) -> bool:
+    return any(
+        not part.strip()
+        for part in (
+            settings.agency_legal_name,
+            settings.agency_rut,
+            settings.agency_address,
+            settings.agency_email,
+        )
+    )
+
+
+def _footer_incomplete(body: str, settings: Settings, source: str) -> bool:
+    folded = _fold(body)
+    for part in (
         settings.agency_legal_name,
         settings.agency_rut,
         settings.agency_address,
         settings.agency_email,
-    )
-    folded = _fold(body)
-    for part in pieces:
+    ):
         if part.strip() and _fold(part) not in folded:
             return True
-    return _fold(_EMAIL_SOURCE) not in folded
+    if source and _fold(email_source_line(source)) not in folded:
+        return True
+    return False
 
 
 def _email_has_baja(text: str) -> bool:
@@ -481,8 +498,17 @@ def check_rules(
     if "email" in msg.channel.lower() and not _email_has_baja(body_text):
         reasons.append("email sin indicación de baja")
 
-    if "email" in msg.channel.lower() and _footer_incomplete(body_text, current_settings):
+    if "email" in msg.channel.lower() and _legal_identity_incomplete(current_settings):
+        reasons.append("identidad legal incompleta")
+    elif "email" in msg.channel.lower() and _footer_incomplete(
+        body_text,
+        current_settings,
+        (current_lead.contact_email_source_url or "").strip(),
+    ):
         reasons.append("pie incompleto")
+
+    if "email" in msg.channel.lower() and not (current_lead.contact_email_source_url or "").strip():
+        reasons.append("el lead no tiene fuente del correo")
 
     if (
         "email" in msg.channel.lower()
@@ -549,9 +575,14 @@ def check_rules(
     ):
         reasons.append("whatsapp en frío sin consentimiento")
 
+    source_url = (current_lead.contact_email_source_url or "").strip().rstrip("/")
     seen_urls: set[str] = set()
     for url in _iter_urls(scanned):
-        if url in seen_urls or _own_host(url, current_settings.public_base_url):
+        if (
+            url in seen_urls
+            or _own_host(url, current_settings.public_base_url)
+            or (source_url and url.rstrip("/") == source_url)
+        ):
             seen_urls.add(url)
             continue
         seen_urls.add(url)
