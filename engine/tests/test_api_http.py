@@ -372,6 +372,35 @@ def test_baja_suprime_el_email_y_no_el_dominio(client: TestClient) -> None:
     assert "domain" not in kinds
 
 
+def test_baja_web_guarda_canal_y_hash_del_token_sin_ip(client: TestClient) -> None:
+    from api.security import make_baja_token
+    from db.models import Suppression
+
+    with session_scope() as session:
+        lead = _lead(session, contact_email="persona@estudio.cl", status="enviado")
+        token = make_baja_token(lead.id)
+    response = client.post(
+        "/api/public/baja",
+        json={"token": token},
+        headers={
+            "X-Forwarded-For": "203.0.113.50",
+            "User-Agent": "AgentePrueba/9",
+        },
+    )
+    assert response.status_code == 200, response.text
+    digest = hashlib.sha256(token.encode()).hexdigest()[:16]
+    with session_scope() as session:
+        rows = list(session.scalars(select(Suppression)))
+    assert rows
+    email_row = next(row for row in rows if row.kind == "email")
+    assert email_row.source == "web"
+    assert email_row.created_at is not None
+    assert email_row.detail == f"baja web vía enlace; token_sha256={digest}"
+    blob = " ".join(f"{row.source} {row.reason} {row.detail or ''}" for row in rows)
+    assert "203.0.113.50" not in blob
+    assert "AgentePrueba/9" not in blob
+
+
 def test_baja_con_punto_final_matchea_el_correo_sin_punto(client: TestClient) -> None:
     from api.security import make_baja_token
     from db.models import Suppression
@@ -392,18 +421,83 @@ def test_baja_con_punto_final_matchea_el_correo_sin_punto(client: TestClient) ->
     assert "domain" not in kinds
 
 
+def test_baja_con_url_invalida_se_guarda(client: TestClient) -> None:
+    from api.security import make_baja_token
+    from core.suppression import is_suppressed, normalize_host
+    from db.repositories import SuppressionRepository
+
+    assert normalize_host("http://[::1") == ""
+    with session_scope() as session:
+        lead = _lead(
+            session,
+            contact_email="persona@estudio.cl",
+            website_url="http://[::1",
+        )
+        lead_id = lead.id
+        token = make_baja_token(lead.id)
+    response = client.post("/api/public/baja", json={"token": token})
+    assert response.status_code == 200, response.text
+    with session_scope() as session:
+        lead = session.get(Lead, lead_id)
+        assert lead is not None
+        assert is_suppressed(session, lead) is True
+        assert SuppressionRepository(session).contains("email", "persona@estudio.cl") is True
+
+
 def test_baja_de_dominio_propio_tambien_cierra_el_dominio(client: TestClient) -> None:
     from api.security import make_baja_token
     from db.models import Suppression
 
     with session_scope() as session:
-        lead = _lead(session, contact_email="persona@estudio.cl", status="enviado")
+        lead = _lead(
+            session,
+            contact_email="persona@estudio.cl",
+            website_url="www.Estudio.CL.",
+            status="enviado",
+        )
         token = make_baja_token(lead.id)
     response = client.post("/api/public/baja", json={"token": token})
     assert response.status_code == 200, response.text
     with session_scope() as session:
         kinds = {row.kind for row in session.scalars(select(Suppression))}
     assert kinds == {"email", "lead", "domain"}
+
+
+def test_admin_rechaza_un_dominio_compartido(client: TestClient) -> None:
+    from db.models import Suppression
+
+    headers = _login(client)
+    for value in ("gmail.com", "derecho.uchile.cl", "x.blogspot.com.ar"):
+        response = client.post(
+            "/api/compliance/suppression",
+            headers=headers,
+            json={"kind": "domain", "value": value, "reason": "manual"},
+        )
+        assert response.status_code == 422, response.text
+    propio = client.post(
+        "/api/compliance/suppression",
+        headers=headers,
+        json={"kind": "domain", "value": "estudio.cl", "reason": "manual"},
+    )
+    assert propio.status_code == 201, propio.text
+    borrado = client.delete(
+        "/api/compliance/suppression",
+        headers=headers,
+        params={"id": propio.json()["id"]},
+    )
+    assert borrado.status_code == 422, borrado.text
+    with session_scope() as session:
+        assert session.get(Suppression, propio.json()["id"]) is not None
+
+
+def test_admin_rechaza_dominio_que_normaliza_vacio(client: TestClient) -> None:
+    headers = _login(client)
+    response = client.post(
+        "/api/compliance/suppression",
+        headers=headers,
+        json={"kind": "domain", "value": "http://[::1", "reason": "manual"},
+    )
+    assert response.status_code == 422, response.text
 
 
 def test_action_scout_encola_job_run(client: TestClient) -> None:

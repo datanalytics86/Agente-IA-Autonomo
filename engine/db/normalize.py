@@ -49,15 +49,9 @@ def _strip_scheme(value: str) -> str:
 
 
 def _normalize_domain(raw_value: str) -> str:
-    value = _strip_scheme(raw_value)
-    value = value.split("/")[0].split("?")[0].split("#")[0]
-    if "@" in value:
-        value = value.split("@", 1)[1]
-    if value.startswith("www."):
-        value = value[4:]
-    from core.suppression import normalize_domain
+    from core.suppression import normalize_host
 
-    return normalize_domain(value)
+    return normalize_host(raw_value)
 
 
 def _normalize_phone(raw_value: str) -> str:

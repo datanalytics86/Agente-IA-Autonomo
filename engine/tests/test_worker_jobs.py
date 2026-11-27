@@ -684,6 +684,27 @@ def test_buzones_genericos_son_la_lista_fija() -> None:
     assert generic_local_part("hello@estudio.cl") is False
 
 
+def test_baja_repetida_conserva_la_primera(session: Session) -> None:
+    from core.suppression import record_opt_out
+
+    lead = _lead(
+        session,
+        business="Repetida",
+        contact_email="persona@estudio.cl",
+        place_id="place-repetida",
+    )
+    primera = record_opt_out(session, lead, channel="email", reason="baja", text="texto A")
+    email = next(row for row in primera if row.kind == "email")
+    creada = email.created_at
+    record_opt_out(session, lead, channel="web", reason="baja", text="texto B")
+    session.refresh(email)
+    assert email.detail == "texto A"
+    assert email.source == "email"
+    assert email.created_at == creada
+    assert email.count == 2
+    assert email.last_at is not None
+
+
 def test_baja_de_contacto_suprime_el_estudio(session: Session) -> None:
     from core.suppression import record_opt_out
 
@@ -696,7 +717,643 @@ def test_baja_de_contacto_suprime_el_estudio(session: Session) -> None:
     repo = SuppressionRepository(session)
     assert repo.contains("email", "contacto@estudio.test")
     assert repo.contains("lead", "place-estudio")
-    assert repo.contains("domain", "estudio.test")
+    assert repo.contains("domain", "estudio.test") is True
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("estudio.cl", "estudio.cl"),
+        ("abogados.estudio.cl", "abogados.estudio.cl"),
+        ("www.estudio.com.cl", "estudio.com.cl"),
+        ("abogados.estudio.com.cl", "abogados.estudio.com.cl"),
+        ("tramites.municipio.gob.cl", "tramites.municipio.gob.cl"),
+        ("estudio.co.uk", "estudio.co.uk"),
+        ("www.estudio.com.ar:8080", "estudio.com.ar"),
+        ("abogados.estudio.co", "abogados.estudio.co"),
+        ("Estudio.CL.", "estudio.cl"),
+        ("http://[::1", ""),
+    ],
+)
+def test_normalize_host_es_el_host_exacto(raw: str, expected: str) -> None:
+    from core.suppression import normalize_host
+
+    assert normalize_host(raw) == expected
+
+
+def test_el_hash_de_la_baja_web_no_se_enmascara(session: Session) -> None:
+    from core.suppression import record_opt_out
+
+    texto = "baja web vía enlace; token_sha256=213558609e07e03b"
+    lead = _lead(
+        session,
+        business="Hash Web",
+        contact_email="persona@estudio.cl",
+        place_id="place-hash-web",
+    )
+    rows = record_opt_out(session, lead, channel="web", reason="baja", text=texto, verbatim=True)
+    assert next(row.detail for row in rows if row.kind == "email") == texto
+
+
+def test_baja_de_com_cl_cierra_el_dominio_registrable(session: Session) -> None:
+    from core.suppression import record_opt_out
+
+    lead = _lead(
+        session,
+        business="Estudio Com Cl",
+        contact_email="persona@estudio.com.cl",
+        website_url="https://abogados.estudio.com.cl",
+        place_id="place-com-cl",
+    )
+    rows = record_opt_out(session, lead, channel="email", reason="baja")
+    assert {row.kind for row in rows} == {"email", "lead", "domain"}
+    assert SuppressionRepository(session).contains("domain", "estudio.com.cl") is True
+
+
+def test_normalize_host_ignora_puerto_www_userinfo_e_idn() -> None:
+    from core.suppression import normalize_host
+
+    assert normalize_host("estudio.cl:8080") == "estudio.cl"
+    assert normalize_host("www.estudio.cl:443") == "estudio.cl"
+    assert normalize_host("http://user:pass@estudio.cl/ruta") == "estudio.cl"
+    assert normalize_host("abogados.estudio.cl") == "abogados.estudio.cl"
+    assert normalize_host("persona@abogados.estudio.cl") == "abogados.estudio.cl"
+    assert normalize_host("foo.com.ar") == "foo.com.ar"
+    identico = "bücher.cl"
+    assert normalize_host(identico) == identico.encode("idna").decode("ascii")
+    assert normalize_host("http://[estudio.cl") == ""
+
+
+def test_el_host_cubre_subdominios_con_borde_de_label(session: Session) -> None:
+    from core.suppression import host_is_suppressed, is_suppressed, record_opt_out
+
+    lead = _lead(
+        session,
+        business="Subdominio",
+        contact_email="persona@estudio.cl",
+        place_id="place-sub",
+    )
+    rows = record_opt_out(session, lead, channel="email", reason="baja")
+    assert {row.kind for row in rows} == {"email", "lead", "domain"}
+    assert host_is_suppressed(session, "www.estudio.cl") is True
+    assert host_is_suppressed(session, "abogados.estudio.cl") is True
+    assert host_is_suppressed(session, "miestudio.cl") is False
+    hijo = _lead(
+        session,
+        business="Hijo",
+        contact_email="ana@abogados.estudio.cl",
+        place_id="place-hijo",
+    )
+    otro = _lead(
+        session,
+        business="Otro",
+        contact_email="ana@miestudio.cl",
+        place_id="place-otro",
+    )
+    assert is_suppressed(session, hijo) is True
+    assert is_suppressed(session, otro) is False
+
+
+def test_el_extracto_oculta_cita_firma_y_datos(session: Session) -> None:
+    from core.suppression import erase_personal_data, record_opt_out
+
+    texto = (
+        "Hola, mi fono es +56 9 1111 2222 y el rut 12.345.678-5.\n"
+        "Escriban a otro@gmail.com si quieren.\n"
+        "Saludos\n"
+        "Juan Pérez\n"
+        "El lun, 2 mar 2026, Ana escribió:\n"
+        "> no reenviar\n"
+    )
+    lead = _lead(
+        session,
+        business="Extracto",
+        contact_email="persona@estudio.cl",
+        phone_public="+56911112222",
+        place_id="place-extracto",
+    )
+    rows = record_opt_out(session, lead, channel="email", reason="baja", text=texto)
+    detail = next(row.detail for row in rows if row.kind == "email")
+    assert detail is not None
+    assert "[teléfono]" in detail
+    assert "[rut]" in detail
+    assert "[correo]" in detail
+    assert "Saludos" not in detail
+    assert "escribió" not in detail
+    assert ">" not in detail
+    assert len(detail) <= 500
+    erase_personal_data(session, lead)
+    assert lead.contact_email is None
+    assert lead.phone_public is None
+    assert next(row.detail for row in rows if row.kind == "email") is None
+    assert SuppressionRepository(session).contains("email", "persona@estudio.cl") is True
+    from core.suppression import is_suppressed
+
+    assert is_suppressed(session, lead) is True
+
+
+def test_el_borrado_elimina_el_archivo_de_la_landing(
+    session: Session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from core.suppression import erase_personal_data
+
+    root = tmp_path / "output"
+    root.mkdir()
+    monkeypatch.setenv("AGENCY_OUTPUT_DIR", str(root))
+    landing = root / "landing.html"
+    landing.write_text("persona@estudio.cl", encoding="utf-8")
+    lead = _lead(
+        session,
+        business="Landing",
+        contact_email="persona@estudio.cl",
+        place_id="place-archivo",
+    )
+    session.add(
+        Artifact(
+            lead_id=lead.id,
+            kind="landing_demo",
+            path=str(landing),
+            meta={"email": "persona@estudio.cl"},
+        )
+    )
+    session.flush()
+    erase_personal_data(session, lead)
+    assert landing.exists() is False
+    guardado = session.scalars(select(Artifact).where(Artifact.lead_id == lead.id)).one()
+    assert guardado.path == ""
+
+
+def test_el_borrado_no_sale_del_directorio_de_artifacts(
+    session: Session,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    import logging
+
+    from core.suppression import erase_personal_data
+
+    root = tmp_path / "output"
+    root.mkdir()
+    monkeypatch.setenv("AGENCY_OUTPUT_DIR", str(root))
+    dentro = root / "landing.html"
+    dentro.write_text("dentro", encoding="utf-8")
+    fuera = tmp_path / "fuera.txt"
+    fuera.write_text("fuera", encoding="utf-8")
+    absoluta = tmp_path / "absoluta.txt"
+    absoluta.write_text("absoluta", encoding="utf-8")
+    bloqueado = root / "bloqueado.html"
+    bloqueado.write_text("bloqueado", encoding="utf-8")
+    lead = _lead(
+        session,
+        business="Rutas",
+        contact_email="persona@estudio.cl",
+        place_id="place-rutas",
+    )
+    session.add_all(
+        [
+            Artifact(lead_id=lead.id, kind="landing_demo", path=str(dentro), meta={}),
+            Artifact(lead_id=lead.id, kind="nota", path="../fuera.txt", meta={}),
+            Artifact(lead_id=lead.id, kind="storyboard", path=str(absoluta), meta={}),
+            Artifact(lead_id=lead.id, kind="propuesta", path=str(bloqueado), meta={}),
+        ]
+    )
+    session.flush()
+    real = Path.unlink
+
+    def unlink(self: Path, *args: object, **kwargs: object) -> None:
+        if self.name == "bloqueado.html":
+            raise PermissionError("denegado")
+        real(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", unlink)
+    with caplog.at_level(logging.WARNING, logger="core.suppression"):
+        erase_personal_data(session, lead)
+    assert dentro.exists() is False
+    assert fuera.exists() is True
+    assert absoluta.exists() is True
+    assert bloqueado.exists() is True
+    assert lead.contact_email is None
+    assert str(bloqueado) not in caplog.text
+    assert "fuera.txt" not in caplog.text
+
+
+def test_un_byte_nulo_no_corta_el_borrado(session: Session) -> None:
+    from core.suppression import erase_personal_data
+
+    lead = _lead(
+        session,
+        business="Nulo",
+        contact_email="persona@estudio.cl",
+        place_id="place-nulo",
+    )
+    session.add(
+        Artifact(
+            lead_id=lead.id,
+            kind="landing_demo",
+            path="output/\x00demo.html",
+            meta={},
+        )
+    )
+    session.flush()
+    erase_personal_data(session, lead)
+    assert lead.contact_email is None
+    assert lead.business == "anonimizado"
+
+
+def test_normalize_host_loguea_solo_el_largo(caplog: pytest.LogCaptureFixture) -> None:
+    import logging
+
+    from core.suppression import normalize_host
+
+    malo = "http://[::1"
+    with caplog.at_level(logging.WARNING, logger="core.suppression"):
+        assert normalize_host(malo) == ""
+    assert malo not in caplog.text
+    assert str(len(malo)) in caplog.text
+
+
+def test_mail_no_recorta_un_sufijo_publico(session: Session) -> None:
+    from core.suppression import record_opt_out
+
+    casos = (
+        ("x@mail.cl", "mail.cl", "Mail Cl"),
+        ("x@correo.cl", "correo.cl", "Correo Cl"),
+        ("x@mail.gob.cl", "mail.gob.cl", "Mail Gob"),
+        ("x@mail.co.uk", "mail.co.uk", "Mail Uk"),
+        ("x@mail.estudio.cl", "estudio.cl", "Mail Estudio Cl"),
+    )
+    repo = SuppressionRepository(session)
+    for email, dominio, negocio in casos:
+        lead = _lead(session, business=negocio, contact_email=email, place_id=f"place-{negocio}")
+        record_opt_out(session, lead, channel="email", reason="baja")
+        assert repo.contains("domain", dominio) is True
+    assert repo.contains("domain", "cl") is False
+    assert repo.contains("domain", "gob.cl") is False
+    assert repo.contains("domain", "co.uk") is False
+
+
+def test_mail_y_correo_cierran_el_host(session: Session) -> None:
+    from core.suppression import host_is_suppressed, record_opt_out
+
+    mail = _lead(
+        session,
+        business="Mail Estudio",
+        contact_email="x@mail.estudio.cl",
+        place_id="place-mail",
+    )
+    record_opt_out(session, mail, channel="email", reason="baja")
+    assert SuppressionRepository(session).contains("domain", "estudio.cl") is True
+    assert host_is_suppressed(session, "abogados.estudio.cl") is True
+    correo = _lead(
+        session,
+        business="Correo Estudio",
+        contact_email="x@correo.bufete.cl",
+        place_id="place-correo",
+    )
+    record_opt_out(session, correo, channel="email", reason="baja")
+    assert SuppressionRepository(session).contains("domain", "bufete.cl") is True
+
+
+def test_los_dominios_nuevos_siguen_compartidos(session: Session) -> None:
+    from core.suppression import is_shared_host, record_opt_out
+
+    nuevos = (
+        "yahoo.com.ar",
+        "yahoo.cl",
+        "yahoo.com.mx",
+        "hotmail.com.br",
+        "chile.com",
+        "latinmail.com",
+        "gmx.de",
+        "uol.com.br",
+        "gtdinternet.com",
+        "terra.com.br",
+        "pjud.cl",
+        "pucv.cl",
+        "uv.cl",
+        "uandes.cl",
+        "ust.cl",
+        "uautonoma.cl",
+        "ucentral.cl",
+        "umayor.cl",
+        "uss.cl",
+        "udla.cl",
+        "ufrontera.cl",
+        "utalca.cl",
+        "ucn.cl",
+        "uach.cl",
+        "ubo.cl",
+    )
+    assert all(is_shared_host(host) for host in nuevos)
+    pjud = _lead(
+        session,
+        business="Tribunal",
+        contact_email="persona@pjud.cl",
+        place_id="place-pjud",
+    )
+    assert "domain" not in {
+        row.kind for row in record_opt_out(session, pjud, channel="email", reason="baja")
+    }
+
+
+def test_el_borrado_alcanza_mensajes_eventos_y_negocio(session: Session) -> None:
+    from core.suppression import erase_personal_data, record_opt_out
+    from db.models import Event, Suppression
+
+    correo = "persona@estudio.cl"
+    fono = "+56911112222"
+    lead = _lead(
+        session,
+        business=f"Estudio {correo}",
+        contact_email=correo,
+        phone_public=fono,
+        place_id="place-borrado",
+    )
+    record_opt_out(session, lead, channel="email", reason="baja", text="no más")
+    antes = len(list(session.scalars(select(Suppression))))
+    session.add_all(
+        [
+            Message(
+                lead_id=lead.id,
+                thread_id=lead.id,
+                direction="in",
+                channel="email",
+                status="received",
+                subject=correo,
+                body_text=f"llamen al {fono}",
+            ),
+            Event(
+                agent="test",
+                level="info",
+                message=f"baja de {correo}",
+                lead_id=lead.id,
+                meta={"extracto": fono},
+            ),
+            Approval(
+                lead_id=lead.id,
+                kind="outreach",
+                payload={"email": correo, "phone": fono},
+                status="pending",
+            ),
+            Artifact(
+                lead_id=lead.id,
+                kind="nota",
+                path=f"output/{correo}.html",
+                meta={"phone": fono},
+            ),
+        ]
+    )
+    session.flush()
+    erase_personal_data(session, lead)
+    assert len(list(session.scalars(select(Suppression)))) == antes
+    assert SuppressionRepository(session).contains("email", correo) is True
+    blob = " ".join(
+        [
+            lead.business or "",
+            lead.contact_email or "",
+            lead.phone_public or "",
+        ]
+    )
+    for row in session.scalars(select(Message).where(Message.lead_id == lead.id)):
+        blob += f" {row.subject or ''} {row.body_text}"
+    for row in session.scalars(select(Event).where(Event.lead_id == lead.id)):
+        blob += f" {row.message} {row.meta}"
+    for row in session.scalars(select(Approval).where(Approval.lead_id == lead.id)):
+        blob += f" {row.payload} {row.decision_note}"
+    for row in session.scalars(select(Artifact).where(Artifact.lead_id == lead.id)):
+        blob += f" {row.path} {row.meta}"
+    assert correo not in blob
+    assert fono not in blob
+    assert "1111" not in blob
+
+
+def test_otra_ficha_con_el_mismo_sitio_queda_suprimida(session: Session) -> None:
+    from core.suppression import is_suppressed, record_opt_out
+
+    baja = _lead(
+        session,
+        business="Estudio Baja",
+        contact_email="persona@estudio.cl",
+        place_id="place-baja-sitio",
+    )
+    record_opt_out(session, baja, channel="email", reason="baja")
+    otra = _lead(
+        session,
+        business="Otra Ficha",
+        contact_email="persona@gmail.com",
+        website_url="https://www.estudio.cl/inicio",
+        place_id="place-otra-ficha",
+    )
+    assert is_suppressed(session, otra) is True
+    plataforma = _lead(
+        session,
+        business="Plataforma",
+        contact_email="otro@gmail.com",
+        website_url="https://estudio.wixsite.com",
+        place_id="place-plataforma",
+    )
+    assert is_suppressed(session, plataforma) is False
+
+
+def test_un_saludo_largo_no_cuelga() -> None:
+    import time
+
+    from core.suppression import clean_opt_out_text
+
+    inicio = time.monotonic()
+    clean_opt_out_text("Hola" + (" " * 200_000) + "x")
+    assert time.monotonic() - inicio < 1
+
+
+def test_un_saludo_que_es_la_baja_no_queda_vacio() -> None:
+    from core.suppression import clean_opt_out_text
+
+    assert clean_opt_out_text("Hola No Me Escriban.")
+
+
+def test_una_baja_en_la_linea_del_saludo_no_se_pierde() -> None:
+    from core.suppression import clean_opt_out_text
+
+    for linea in ("Hola no me escriban más", "Buenas tardes no me escriban más."):
+        texto = clean_opt_out_text(f"{linea}\nJuan Pérez")
+        assert texto is not None
+        assert "no me escriban más" in texto
+
+
+def test_el_saludo_con_nombre_no_se_come_la_baja() -> None:
+    from core.suppression import clean_opt_out_text
+
+    for saludo in ("Hola Nicolás,", "Buenas tardes,", "Buenos días.", "Estimado Sr. Andrade:"):
+        texto = clean_opt_out_text(f"{saludo}\n\nno me escriban más")
+        assert texto is not None
+        assert "no me escriban más" in texto
+
+
+def test_el_extracto_no_pierde_la_baja_tras_el_saludo() -> None:
+    from core.suppression import clean_opt_out_text
+
+    assert clean_opt_out_text("Hola,\n\nno me escriban más") == "no me escriban más"
+    assert clean_opt_out_text("Estimados:\n\nno me escriban más") == "no me escriban más"
+    assert clean_opt_out_text("De: no me escriban más") == "De: no me escriban más"
+    para = clean_opt_out_text("Para: el estudio\nno más correos")
+    assert para == "Para: el estudio\nno más correos"
+    assert clean_opt_out_text("Enviado: basta de correos") == "Enviado: basta de correos"
+    bloque = clean_opt_out_text("Basta.\nDe: Ana <ana@estudio.cl>\nEnviado: lunes\n")
+    assert bloque == "Basta."
+
+
+def test_el_extracto_corta_outlook_gmail_e_iphone(session: Session) -> None:
+    from core.suppression import clean_opt_out_text
+
+    outlook = clean_opt_out_text(
+        "No me escriban más.\n"
+        "________________________________\n"
+        "De: Ana\nEnviado: lunes\nPara: estudio\nAsunto: Re: propuesta\n"
+    )
+    original = clean_opt_out_text("Basta.\n-----Mensaje original-----\n> cita\n")
+    ingles = clean_opt_out_text("Stop.\n-----Original Message-----\n> quote\n")
+    gmail = clean_opt_out_text(
+        "Paren.\nEl lun, 2 mar 2026, Ana Pérez,\n<ana@gmail.com> escribió:\n> hola"
+    )
+    iphone = clean_opt_out_text("No más correos.\nEnviado desde mi iPhone")
+    cierre = clean_opt_out_text("Gracias\nno me escriban")
+    assert outlook == "No me escriban más."
+    assert original == "Basta."
+    assert ingles == "Stop."
+    assert gmail == "Paren."
+    assert iphone == "No más correos."
+    assert cierre == "Gracias\nno me escriban"
+    assert clean_opt_out_text("Sent from my iPhone\nresto") is None
+
+
+def test_el_dominio_solo_si_es_el_del_sitio(session: Session) -> None:
+    from core.suppression import record_opt_out
+
+    texto = "BAJA. No me escriban más."
+    propio = _lead(
+        session,
+        business="Estudio Propio",
+        contact_email="persona@estudio.cl",
+        website_url="https://estudio.cl/contacto",
+        place_id="place-propio",
+    )
+    rows = record_opt_out(session, propio, channel="email", reason="baja", text=texto)
+    assert {row.kind for row in rows} == {"email", "lead", "domain"}
+    email_row = next(row for row in rows if row.kind == "email")
+    assert email_row.detail == texto
+    assert email_row.source == "email"
+    assert email_row.created_at is not None
+    assert all(row.detail is None for row in rows if row.kind != "email")
+    largo = _lead(
+        session,
+        business="Texto Largo",
+        contact_email="otro@estudio.cl",
+        place_id="place-largo",
+    )
+    recorte = record_opt_out(session, largo, channel="email", reason="baja", text="y" * 2500)
+    assert len(next(row.detail or "" for row in recorte if row.kind == "email")) == 500
+    otra = record_opt_out(session, propio, channel="email", reason="baja")
+    assert next(row.detail for row in otra if row.kind == "email") == texto
+    from core.suppression import normalize_email
+
+    assert normalize_email("persona@www.estudio.cl") == "persona@estudio.cl"
+    repo = SuppressionRepository(session)
+    assert repo.contains("domain", "www.Estudio.CL.") is True
+
+    vtr = _lead(
+        session,
+        business="Estudio VTR",
+        contact_email="persona@vtr.net",
+        website_url="https://estudio.cl",
+        place_id="place-vtr",
+    )
+    assert {row.kind for row in record_opt_out(session, vtr, channel="email", reason="baja")} == {
+        "email",
+        "lead",
+    }
+    assert repo.contains("domain", "vtr.net") is False
+
+    sin_sitio = _lead(
+        session,
+        business="Sin Sitio",
+        contact_email="persona@negocio.cl",
+        website_url=None,
+        place_id="place-sin-sitio",
+    )
+    assert {
+        row.kind for row in record_opt_out(session, sin_sitio, channel="email", reason="baja")
+    } == {"email", "lead", "domain"}
+    assert repo.contains("domain", "negocio.cl") is True
+
+
+def test_dominio_compartido_cierra_el_otro_correo(session: Session) -> None:
+    from core.suppression import host_is_suppressed, is_shared_host, record_opt_out
+
+    assert is_shared_host("derecho.uchile.cl") is True
+    assert is_shared_host("x.blogspot.com.ar") is True
+    assert is_shared_host("alumnos.uc.cl") is True
+    assert is_shared_host("estudio.cl") is False
+    oficina = _lead(
+        session,
+        business="Oficina",
+        contact_email="contacto@estudio.cl",
+        place_id="place-compartido",
+    )
+    vtr = _lead(
+        session,
+        business="Persona VTR",
+        contact_email="persona@vtr.net",
+        place_id="place-vtr-mail",
+    )
+
+    class _Baja:
+        id = vtr.id
+        place_id = oficina.place_id
+        contact_email = "persona@vtr.net"
+
+    class _Filas:
+        def all(self) -> list[Lead]:
+            return [oficina, _Baja()]  # type: ignore[list-item]
+
+    reales = session.scalars
+
+    def scalars(statement: object) -> object:
+        text = str(statement)
+        if "leads" in text and "place_id" in text:
+            return _Filas()
+        return reales(statement)  # type: ignore[arg-type]
+
+    session.scalars = scalars  # type: ignore[method-assign]
+    rows = record_opt_out(session, _Baja(), channel="email", reason="baja")  # type: ignore[arg-type]
+    assert "domain" not in {row.kind for row in rows}
+    repo = SuppressionRepository(session)
+    assert repo.contains("email", "persona@vtr.net") is True
+    assert repo.contains("email", "contacto@estudio.cl") is True
+    assert host_is_suppressed(session, "vtr.net") is False
+    assert repo.contains("lead", "place-compartido") is True
+    session.scalars = reales  # type: ignore[method-assign]
+
+    uc = _lead(
+        session,
+        business="Alumno",
+        contact_email="alumno@alumnos.uc.cl",
+        place_id="place-uc",
+    )
+    assert "domain" not in {
+        row.kind for row in record_opt_out(session, uc, channel="email", reason="baja")
+    }
+    assert repo.contains("domain", "uc.cl") is False
+    gmail = _lead(
+        session,
+        business="Gmail",
+        contact_email="persona@gmail.com",
+        place_id="place-gmail",
+    )
+    assert "domain" not in {
+        row.kind for row in record_opt_out(session, gmail, channel="email", reason="baja")
+    }
+    assert repo.contains("domain", "gmail.com") is False
 
 
 def test_reimport_del_place_sigue_suprimido(session: Session) -> None:

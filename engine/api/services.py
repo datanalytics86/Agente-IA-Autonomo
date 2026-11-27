@@ -431,7 +431,15 @@ def apply_baja(session: Session, token: str) -> dict[str, bool]:
     lead = session.get(Lead, read_baja_token(token))
     if lead is None:
         raise ApiError(404, "not_found", "token desconocido")
-    record_opt_out(session, lead, channel="email", reason="baja")
+    token_hash = hashlib.sha256(token.encode()).hexdigest()[:16]
+    record_opt_out(
+        session,
+        lead,
+        channel="web",
+        reason="baja",
+        text=f"baja web vía enlace; token_sha256={token_hash}",
+        verbatim=True,
+    )
     if "opt_out" in TRANSITIONS.get(lead.status, frozenset()):
         transition_lead(session, lead, "opt_out", actor="sistema", reason="baja solicitada")
     EventRepository(session).append(
@@ -1142,6 +1150,13 @@ def list_suppression(session: Session) -> list[dict[str, Any]]:
 def add_suppression(session: Session, kind: str, value: str, reason: str) -> dict[str, str]:
     if kind not in CONTACT_KINDS:
         raise ApiError(422, "validation_error", "kind de supresión desconocido")
+    if kind == "domain":
+        from core.suppression import is_shared_host, normalize_host
+
+        if not normalize_host(value):
+            raise ApiError(422, "validation_error", "dominio inválido")
+        if is_shared_host(value):
+            raise ApiError(422, "validation_error", "el dominio es compartido")
     row = SuppressionRepository(session).add(kind, value, reason=reason, source="admin")
     return {"id": row.id, "value_hash": row.value_hash}
 
@@ -1150,8 +1165,7 @@ def delete_suppression(session: Session, row_id: str) -> None:
     row = session.get(Suppression, row_id)
     if row is None:
         raise ApiError(404, "not_found", "supresión no encontrada")
-    session.delete(row)
-    session.flush()
+    raise ApiError(422, "validation_error", "la lista de supresión es permanente")
 
 
 def list_data_requests(session: Session) -> list[dict[str, Any]]:
