@@ -184,6 +184,9 @@ def is_suppressed(session: Session, lead: object) -> bool:
         return True
     if "@" in email and host_is_suppressed(session, email.split("@", 1)[1]):
         return True
+    website = getattr(lead, "website_url", None)
+    if website and host_is_suppressed(session, str(website)):
+        return True
     instagram = getattr(lead, "instagram_handle", None)
     if instagram and repo.contains("instagram", str(instagram)):
         return True

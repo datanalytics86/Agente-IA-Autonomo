@@ -923,6 +923,34 @@ def test_el_borrado_alcanza_mensajes_eventos_y_negocio(session: Session) -> None
     assert "1111" not in blob
 
 
+def test_otra_ficha_con_el_mismo_sitio_queda_suprimida(session: Session) -> None:
+    from core.suppression import is_suppressed, record_opt_out
+
+    baja = _lead(
+        session,
+        business="Estudio Baja",
+        contact_email="persona@estudio.cl",
+        place_id="place-baja-sitio",
+    )
+    record_opt_out(session, baja, channel="email", reason="baja")
+    otra = _lead(
+        session,
+        business="Otra Ficha",
+        contact_email="persona@gmail.com",
+        website_url="https://www.estudio.cl/inicio",
+        place_id="place-otra-ficha",
+    )
+    assert is_suppressed(session, otra) is True
+    plataforma = _lead(
+        session,
+        business="Plataforma",
+        contact_email="otro@gmail.com",
+        website_url="https://estudio.wixsite.com",
+        place_id="place-plataforma",
+    )
+    assert is_suppressed(session, plataforma) is False
+
+
 def test_el_extracto_corta_outlook_gmail_e_iphone(session: Session) -> None:
     from core.suppression import clean_opt_out_text
 
