@@ -372,6 +372,26 @@ def test_baja_suprime_el_email_y_no_el_dominio(client: TestClient) -> None:
     assert "domain" not in kinds
 
 
+def test_baja_con_punto_final_matchea_el_correo_sin_punto(client: TestClient) -> None:
+    from api.security import make_baja_token
+    from db.models import Suppression
+    from db.repositories import SuppressionRepository
+
+    with session_scope() as session:
+        lead = _lead(session, contact_email="Persona@Gmail.com.", status="enviado")
+        token = make_baja_token(lead.id)
+    response = client.post("/api/public/baja", json={"token": token})
+    assert response.status_code == 200, response.text
+    with session_scope() as session:
+        repo = SuppressionRepository(session)
+        assert repo.contains("email", "persona@gmail.com") is True
+        assert repo.contains("email", "Persona@Gmail.com.") is True
+        assert repo.contains("domain", "gmail.com") is False
+        assert repo.contains("domain", "Gmail.com.") is False
+        kinds = {row.kind for row in session.scalars(select(Suppression))}
+    assert "domain" not in kinds
+
+
 def test_baja_de_dominio_propio_tambien_cierra_el_dominio(client: TestClient) -> None:
     from api.security import make_baja_token
     from db.models import Suppression
