@@ -55,7 +55,7 @@ _GREETING = re.compile(
     r"buen[oa]s?\s+d[ií]as|buen[oa]s?\s+tardes|buen[oa]s?\s+noches|"
     r"se[nñ]ores|se[nñ]oras|se[nñ]ora|se[nñ]or|sra\.|sr\.|do[nñ]a|don)"
     r"(?-i:(?:\s+" + _NAME_WORD + r"){1,3})?"
-    r"\s*[,:.]?\s*$"
+    r"\s*(?:[,:.]\s*)?$"
 )
 _ORIGINAL = re.compile(r"(?i)^-{3,}\s*(?:mensaje original|original message)\s*-{3,}$")
 _PHONE_SIG = re.compile(r"(?i)^(?:enviado desde mi|sent from my)\b")
@@ -276,8 +276,10 @@ def clean_opt_out_text(text: str | None) -> str | None:
     """Primer párrafo de la baja, sin cita, firma, teléfono ni RUT."""
     if not text:
         return None
+    text = text[:20_000]
     lines = text.splitlines()
     kept: list[str] = []
+    saludo: str | None = None
     for index, line in enumerate(lines):
         stripped = line.strip()
         if not stripped:
@@ -291,11 +293,12 @@ def clean_opt_out_text(text: str | None) -> str | None:
         if _SIMPLE_CLOSE.match(stripped) and kept:
             break
         if _GREETING.match(stripped) and not kept:
+            saludo = saludo or line
             continue
         kept.append(line)
         if len(kept) >= 5:
             break
-    body = "\n".join(kept)
+    body = "\n".join(kept) or (saludo or "")
     body = _EMAIL_RE.sub("[correo]", body)
     body = _PHONE_RE.sub("[teléfono]", body)
     body = _RUT_RE.sub("[rut]", body)

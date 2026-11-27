@@ -1156,6 +1156,22 @@ def test_otra_ficha_con_el_mismo_sitio_queda_suprimida(session: Session) -> None
     assert is_suppressed(session, plataforma) is False
 
 
+def test_un_saludo_largo_no_cuelga() -> None:
+    import time
+
+    from core.suppression import clean_opt_out_text
+
+    inicio = time.monotonic()
+    clean_opt_out_text("Hola" + (" " * 200_000) + "x")
+    assert time.monotonic() - inicio < 1
+
+
+def test_un_saludo_que_es_la_baja_no_queda_vacio() -> None:
+    from core.suppression import clean_opt_out_text
+
+    assert clean_opt_out_text("Hola No Me Escriban.")
+
+
 def test_una_baja_en_la_linea_del_saludo_no_se_pierde() -> None:
     from core.suppression import clean_opt_out_text
 
