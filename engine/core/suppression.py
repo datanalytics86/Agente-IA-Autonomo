@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
 from datetime import UTC, datetime
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from sqlalchemy import select
@@ -14,6 +16,8 @@ from core.compliance import _EMAIL_RE, _PHONE_RE
 from db.models import Approval, Artifact, Event, Lead, Message, Suppression
 from db.normalize import contact_hash
 from db.repositories import SuppressionRepository
+
+logger = logging.getLogger("core.suppression")
 
 _GENERIC_LOCAL = frozenset(
     {
@@ -68,6 +72,9 @@ SHARED_DOMAINS = frozenset(
         "mac.com",
         "yahoo.com",
         "yahoo.es",
+        "yahoo.com.ar",
+        "yahoo.cl",
+        "yahoo.com.mx",
         "ymail.com",
         "rocketmail.com",
         "aol.com",
@@ -79,11 +86,17 @@ SHARED_DOMAINS = frozenset(
         "zoho.com",
         "gmx.com",
         "gmx.net",
+        "gmx.de",
         "mail.com",
         "yandex.com",
         "fastmail.com",
         "vtr.net",
+        "chile.com",
+        "latinmail.com",
+        "uol.com.br",
+        "gtdinternet.com",
         "terra.cl",
+        "terra.com.br",
         "entelchile.net",
         "movistar.cl",
         "tie.cl",
@@ -102,18 +115,34 @@ SHARED_DOMAINS = frozenset(
         "uchile.cl",
         "uc.cl",
         "udp.cl",
+        "pjud.cl",
+        "pucv.cl",
+        "uv.cl",
+        "uandes.cl",
+        "ust.cl",
+        "uautonoma.cl",
+        "ucentral.cl",
+        "umayor.cl",
+        "uss.cl",
+        "udla.cl",
+        "ufrontera.cl",
+        "utalca.cl",
+        "ucn.cl",
+        "uach.cl",
+        "ubo.cl",
         "usach.cl",
         "udec.cl",
         "uai.cl",
         "unab.cl",
         "udd.cl",
+        "hotmail.com.br",
         *(f"{name}.{tld}" for name in ("hotmail", "outlook", "live", "msn") for tld in _MAIL_TLDS),
     }
 )
 
 
 def normalize_host(value: str) -> str:
-    """Host en minúsculas, IDNA, sin punto final y sin www. Nunca levanta."""
+    """Host en minúsculas, IDNA, sin punto final y sin www. Un host ilegible da ""."""
     try:
         text = (value or "").strip()
         if not text:
@@ -128,7 +157,8 @@ def normalize_host(value: str) -> str:
         if not host:
             return ""
         return host.encode("idna").decode("ascii")
-    except Exception:
+    except (ValueError, UnicodeError):
+        logger.warning("host ilegible de %s caracteres", len(value or ""))
         return ""
 
 
@@ -355,6 +385,8 @@ def record_opt_out(
                     )
                 )
     elif host:
+        while host.startswith(("mail.", "correo.")):
+            host = host.split(".", 1)[1]
         rows.append(
             _store(
                 repo,
@@ -394,6 +426,8 @@ def erase_personal_data(session: Session, lead: Lead) -> None:
         approval.payload = {}
         approval.decision_note = None
     for artifact in session.scalars(select(Artifact).where(Artifact.lead_id == lead.id)):
+        if artifact.path:
+            Path(artifact.path).unlink(missing_ok=True)
         artifact.meta = None
         artifact.path = ""
     lead.business = "anonimizado"

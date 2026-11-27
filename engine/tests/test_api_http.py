@@ -490,6 +490,16 @@ def test_admin_rechaza_un_dominio_compartido(client: TestClient) -> None:
         assert session.get(Suppression, propio.json()["id"]) is not None
 
 
+def test_admin_rechaza_dominio_que_normaliza_vacio(client: TestClient) -> None:
+    headers = _login(client)
+    response = client.post(
+        "/api/compliance/suppression",
+        headers=headers,
+        json={"kind": "domain", "value": "http://[::1", "reason": "manual"},
+    )
+    assert response.status_code == 422, response.text
+
+
 def test_action_scout_encola_job_run(client: TestClient) -> None:
     headers = _login(client)
     response = client.post("/api/actions/scout", headers=headers)

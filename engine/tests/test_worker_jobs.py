@@ -852,6 +852,108 @@ def test_el_extracto_oculta_cita_firma_y_datos(session: Session) -> None:
     assert is_suppressed(session, lead) is True
 
 
+def test_el_borrado_elimina_el_archivo_de_la_landing(session: Session, tmp_path: Path) -> None:
+    from core.suppression import erase_personal_data
+
+    landing = tmp_path / "landing.html"
+    landing.write_text("persona@estudio.cl", encoding="utf-8")
+    lead = _lead(
+        session,
+        business="Landing",
+        contact_email="persona@estudio.cl",
+        place_id="place-archivo",
+    )
+    session.add(
+        Artifact(
+            lead_id=lead.id,
+            kind="landing_demo",
+            path=str(landing),
+            meta={"email": "persona@estudio.cl"},
+        )
+    )
+    session.flush()
+    erase_personal_data(session, lead)
+    assert landing.exists() is False
+    guardado = session.scalars(select(Artifact).where(Artifact.lead_id == lead.id)).one()
+    assert guardado.path == ""
+
+
+def test_normalize_host_loguea_solo_el_largo(caplog: pytest.LogCaptureFixture) -> None:
+    import logging
+
+    from core.suppression import normalize_host
+
+    malo = "http://[::1"
+    with caplog.at_level(logging.WARNING, logger="core.suppression"):
+        assert normalize_host(malo) == ""
+    assert malo not in caplog.text
+    assert str(len(malo)) in caplog.text
+
+
+def test_mail_y_correo_cierran_el_host(session: Session) -> None:
+    from core.suppression import host_is_suppressed, record_opt_out
+
+    mail = _lead(
+        session,
+        business="Mail Estudio",
+        contact_email="x@mail.estudio.cl",
+        place_id="place-mail",
+    )
+    record_opt_out(session, mail, channel="email", reason="baja")
+    assert SuppressionRepository(session).contains("domain", "estudio.cl") is True
+    assert host_is_suppressed(session, "abogados.estudio.cl") is True
+    correo = _lead(
+        session,
+        business="Correo Estudio",
+        contact_email="x@correo.bufete.cl",
+        place_id="place-correo",
+    )
+    record_opt_out(session, correo, channel="email", reason="baja")
+    assert SuppressionRepository(session).contains("domain", "bufete.cl") is True
+
+
+def test_los_dominios_nuevos_siguen_compartidos(session: Session) -> None:
+    from core.suppression import is_shared_host, record_opt_out
+
+    nuevos = (
+        "yahoo.com.ar",
+        "yahoo.cl",
+        "yahoo.com.mx",
+        "hotmail.com.br",
+        "chile.com",
+        "latinmail.com",
+        "gmx.de",
+        "uol.com.br",
+        "gtdinternet.com",
+        "terra.com.br",
+        "pjud.cl",
+        "pucv.cl",
+        "uv.cl",
+        "uandes.cl",
+        "ust.cl",
+        "uautonoma.cl",
+        "ucentral.cl",
+        "umayor.cl",
+        "uss.cl",
+        "udla.cl",
+        "ufrontera.cl",
+        "utalca.cl",
+        "ucn.cl",
+        "uach.cl",
+        "ubo.cl",
+    )
+    assert all(is_shared_host(host) for host in nuevos)
+    pjud = _lead(
+        session,
+        business="Tribunal",
+        contact_email="persona@pjud.cl",
+        place_id="place-pjud",
+    )
+    assert "domain" not in {
+        row.kind for row in record_opt_out(session, pjud, channel="email", reason="baja")
+    }
+
+
 def test_el_borrado_alcanza_mensajes_eventos_y_negocio(session: Session) -> None:
     from core.suppression import erase_personal_data, record_opt_out
     from db.models import Event, Suppression
