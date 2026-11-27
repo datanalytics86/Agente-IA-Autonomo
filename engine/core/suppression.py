@@ -30,20 +30,7 @@ _GENERIC_LOCAL = frozenset(
         "ventas",
     }
 )
-_PUBLIC_MAIL_NAMES = (
-    "gmail",
-    "googlemail",
-    "hotmail",
-    "icloud",
-    "live",
-    "msn",
-    "outlook",
-    "yahoo",
-)
-_PUBLIC_MAIL_SUFFIXES = ("com", "cl", "es", "com.cl", "com.es")
-PUBLIC_EMAIL_DOMAINS = frozenset(
-    f"{name}.{suffix}" for name in _PUBLIC_MAIL_NAMES for suffix in _PUBLIC_MAIL_SUFFIXES
-)
+_DETAIL_MAX = 2000
 
 
 def _fold(value: str) -> str:
@@ -52,10 +39,15 @@ def _fold(value: str) -> str:
 
 
 def normalize_domain(value: str) -> str:
-    """Dominio en minúsculas, sin espacios ni punto final."""
+    """Host en minúsculas, sin www, sin punto final y sin ruta."""
     text = value.strip().lower()
     if "@" in text:
         text = text.rsplit("@", 1)[1].strip()
+    if "://" in text:
+        text = text.split("://", 1)[1]
+    text = text.split("/")[0].split("?")[0].split("#")[0].strip()
+    if text.startswith("www."):
+        text = text[4:]
     return text.rstrip(".")
 
 
@@ -74,11 +66,6 @@ def generic_local_part(email: str) -> bool:
     if "@" not in normalized:
         return False
     return _fold(normalized.split("@", 1)[0]) in _GENERIC_LOCAL
-
-
-def public_email_domain(domain: str) -> bool:
-    """True si el dominio es un correo público (gmail, hotmail y variantes)."""
-    return normalize_domain(domain) in PUBLIC_EMAIL_DOMAINS
 
 
 def is_suppressed(session: Session, lead: object) -> bool:
@@ -109,23 +96,48 @@ def is_suppressed(session: Session, lead: object) -> bool:
     return False
 
 
+def _detail(text: str | None) -> str | None:
+    if not text:
+        return None
+    return text[:_DETAIL_MAX]
+
+
+def _remember(row: Suppression, channel: str, detail: str | None) -> Suppression:
+    row.source = channel
+    row.detail = detail
+    return row
+
+
 def record_opt_out(
     session: Session,
     lead: Lead,
     *,
     channel: str,
     reason: str,
+    text: str | None = None,
 ) -> list[Suppression]:
-    """Cierra el correo y el estudio. El dominio también, salvo un correo público."""
+    """Cierra el correo y el estudio. El dominio solo si es el del sitio."""
     repo = SuppressionRepository(session)
+    detail = _detail(text)
     rows: list[Suppression] = []
     email = normalize_email(lead.contact_email or "")
     if email:
-        rows.append(repo.add("email", email, reason=reason, source=channel))
+        rows.append(
+            _remember(repo.add("email", email, reason=reason, source=channel), channel, detail)
+        )
     place_id = (lead.place_id or "").strip() or lead.id
     if place_id:
-        rows.append(repo.add("lead", place_id, reason=reason, source=channel))
-    domain = normalize_domain(email) if "@" in email else ""
-    if domain and not public_email_domain(domain):
-        rows.append(repo.add("domain", domain, reason=reason, source=channel))
+        rows.append(
+            _remember(repo.add("lead", place_id, reason=reason, source=channel), channel, detail)
+        )
+    mail_domain = normalize_domain(email) if "@" in email else ""
+    site_domain = normalize_domain(lead.website_url or "")
+    if mail_domain and site_domain and mail_domain == site_domain:
+        rows.append(
+            _remember(
+                repo.add("domain", mail_domain, reason=reason, source=channel),
+                channel,
+                detail,
+            )
+        )
     return rows

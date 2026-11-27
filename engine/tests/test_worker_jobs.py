@@ -696,7 +696,61 @@ def test_baja_de_contacto_suprime_el_estudio(session: Session) -> None:
     repo = SuppressionRepository(session)
     assert repo.contains("email", "contacto@estudio.test")
     assert repo.contains("lead", "place-estudio")
-    assert repo.contains("domain", "estudio.test")
+    assert repo.contains("domain", "estudio.test") is False
+
+
+def test_el_dominio_solo_si_es_el_del_sitio(session: Session) -> None:
+    from core.suppression import record_opt_out
+
+    texto = "BAJA. No me escriban más."
+    propio = _lead(
+        session,
+        business="Estudio Propio",
+        contact_email="persona@estudio.cl",
+        website_url="https://estudio.cl/contacto",
+        place_id="place-propio",
+    )
+    rows = record_opt_out(session, propio, channel="email", reason="baja", text=texto)
+    assert {row.kind for row in rows} == {"email", "lead", "domain"}
+    email_row = next(row for row in rows if row.kind == "email")
+    assert email_row.detail == texto
+    assert email_row.source == "email"
+    assert email_row.created_at is not None
+    largo = _lead(
+        session,
+        business="Texto Largo",
+        contact_email="otro@estudio.cl",
+        place_id="place-largo",
+    )
+    recorte = record_opt_out(session, largo, channel="email", reason="baja", text="y" * 2500)
+    assert len(next(row.detail or "" for row in recorte if row.kind == "email")) == 2000
+    repo = SuppressionRepository(session)
+    assert repo.contains("domain", "www.Estudio.CL.") is True
+
+    vtr = _lead(
+        session,
+        business="Estudio VTR",
+        contact_email="persona@vtr.net",
+        website_url="https://estudio.cl",
+        place_id="place-vtr",
+    )
+    assert {row.kind for row in record_opt_out(session, vtr, channel="email", reason="baja")} == {
+        "email",
+        "lead",
+    }
+    assert repo.contains("domain", "vtr.net") is False
+
+    sin_sitio = _lead(
+        session,
+        business="Sin Sitio",
+        contact_email="persona@negocio.cl",
+        website_url=None,
+        place_id="place-sin-sitio",
+    )
+    assert {
+        row.kind for row in record_opt_out(session, sin_sitio, channel="email", reason="baja")
+    } == {"email", "lead"}
+    assert repo.contains("domain", "negocio.cl") is False
 
 
 def test_reimport_del_place_sigue_suprimido(session: Session) -> None:

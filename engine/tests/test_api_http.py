@@ -397,7 +397,12 @@ def test_baja_de_dominio_propio_tambien_cierra_el_dominio(client: TestClient) ->
     from db.models import Suppression
 
     with session_scope() as session:
-        lead = _lead(session, contact_email="persona@estudio.cl", status="enviado")
+        lead = _lead(
+            session,
+            contact_email="persona@estudio.cl",
+            website_url="www.Estudio.CL.",
+            status="enviado",
+        )
         token = make_baja_token(lead.id)
     response = client.post("/api/public/baja", json={"token": token})
     assert response.status_code == 200, response.text

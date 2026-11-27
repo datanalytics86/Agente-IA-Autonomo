@@ -244,6 +244,7 @@ class Suppression(Base):
     value_hash: Mapped[str] = mapped_column(String(64))
     reason: Mapped[str] = mapped_column(Text)
     source: Mapped[str] = mapped_column(String(64))
+    detail: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
 
 
