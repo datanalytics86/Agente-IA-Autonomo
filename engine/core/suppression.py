@@ -162,14 +162,25 @@ def clean_opt_out_text(text: str | None) -> str | None:
     return body[:_DETAIL_MAX]
 
 
-def _remember(
-    row: Suppression,
-    channel: str,
-    detail: str | None,
+def _store(
+    repo: SuppressionRepository,
+    kind: str,
+    value: str,
     *,
+    channel: str,
+    reason: str,
+    detail: str | None,
     keep_text: bool,
 ) -> Suppression:
-    row.source = channel
+    """La primera baja fija source, extracto y fecha. La siguiente solo cuenta."""
+    existed = repo.contains(kind, value)
+    row = repo.add(kind, value, reason=reason, source=channel)
+    if existed:
+        row.count = int(row.count or 1) + 1
+        row.last_at = datetime.now(UTC)
+        return row
+    row.count = 1
+    row.last_at = row.created_at
     if keep_text and detail is not None:
         row.detail = detail
     return row
@@ -190,20 +201,26 @@ def record_opt_out(
     email = normalize_email(lead.contact_email or "")
     if email:
         rows.append(
-            _remember(
-                repo.add("email", email, reason=reason, source=channel),
-                channel,
-                detail,
+            _store(
+                repo,
+                "email",
+                email,
+                channel=channel,
+                reason=reason,
+                detail=detail,
                 keep_text=True,
             )
         )
     place_id = (lead.place_id or "").strip() or lead.id
     if place_id:
         rows.append(
-            _remember(
-                repo.add("lead", place_id, reason=reason, source=channel),
-                channel,
-                None,
+            _store(
+                repo,
+                "lead",
+                place_id,
+                channel=channel,
+                reason=reason,
+                detail=None,
                 keep_text=False,
             )
         )
@@ -211,10 +228,13 @@ def record_opt_out(
     site_domain = website_domain(lead.website_url or "")
     if mail_domain and site_domain and mail_domain == site_domain:
         rows.append(
-            _remember(
-                repo.add("domain", mail_domain, reason=reason, source=channel),
-                channel,
-                None,
+            _store(
+                repo,
+                "domain",
+                mail_domain,
+                channel=channel,
+                reason=reason,
+                detail=None,
                 keep_text=False,
             )
         )

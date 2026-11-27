@@ -20,8 +20,12 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     with op.batch_alter_table("suppression") as batch:
         batch.add_column(sa.Column("detail", sa.Text(), nullable=True))
+        batch.add_column(sa.Column("last_at", sa.DateTime(timezone=True), nullable=True))
+        batch.add_column(sa.Column("count", sa.Integer(), nullable=False, server_default="1"))
 
 
 def downgrade() -> None:
     with op.batch_alter_table("suppression") as batch:
+        batch.drop_column("count")
+        batch.drop_column("last_at")
         batch.drop_column("detail")

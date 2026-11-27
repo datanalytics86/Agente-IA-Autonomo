@@ -684,6 +684,27 @@ def test_buzones_genericos_son_la_lista_fija() -> None:
     assert generic_local_part("hello@estudio.cl") is False
 
 
+def test_baja_repetida_conserva_la_primera(session: Session) -> None:
+    from core.suppression import record_opt_out
+
+    lead = _lead(
+        session,
+        business="Repetida",
+        contact_email="persona@estudio.cl",
+        place_id="place-repetida",
+    )
+    primera = record_opt_out(session, lead, channel="email", reason="baja", text="texto A")
+    email = next(row for row in primera if row.kind == "email")
+    creada = email.created_at
+    record_opt_out(session, lead, channel="web", reason="baja", text="texto B")
+    session.refresh(email)
+    assert email.detail == "texto A"
+    assert email.source == "email"
+    assert email.created_at == creada
+    assert email.count == 2
+    assert email.last_at is not None
+
+
 def test_baja_de_contacto_suprime_el_estudio(session: Session) -> None:
     from core.suppression import record_opt_out
 
