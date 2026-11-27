@@ -188,6 +188,16 @@ def is_shared_host(value: str) -> bool:
     return False
 
 
+_SHARED_HOSTING = ("wixsite.com", "github.io")
+
+
+def _shared_hosting(host: str) -> bool:
+    labels = [part for part in host.split(".") if part]
+    if "blogspot" in labels[:-1]:
+        return True
+    return any(host == base or host.endswith("." + base) for base in _SHARED_HOSTING)
+
+
 def host_is_suppressed(session: Session, value: str) -> bool:
     """True si ese host o un dominio padre, con borde de label, está cerrado."""
     host = normalize_host(value)
@@ -195,6 +205,18 @@ def host_is_suppressed(session: Session, value: str) -> bool:
         return False
     repo = SuppressionRepository(session)
     return any(repo.contains("domain", suffix) for suffix in _suffixes(host))
+
+
+def website_is_suppressed(session: Session, website: str) -> bool:
+    """El sitio cierra la ficha. Un host compartido no hereda al padre."""
+    host = normalize_host(website)
+    if not host:
+        return False
+    if _shared_hosting(host):
+        return SuppressionRepository(session).contains("domain", host)
+    if is_shared_host(host):
+        return False
+    return host_is_suppressed(session, host)
 
 
 def normalize_email(value: str) -> str:
@@ -226,7 +248,7 @@ def is_suppressed(session: Session, lead: object) -> bool:
     if "@" in email and host_is_suppressed(session, email.split("@", 1)[1]):
         return True
     website = getattr(lead, "website_url", None)
-    if website and host_is_suppressed(session, str(website)):
+    if website and website_is_suppressed(session, str(website)):
         return True
     instagram = getattr(lead, "instagram_handle", None)
     if instagram and repo.contains("instagram", str(instagram)):

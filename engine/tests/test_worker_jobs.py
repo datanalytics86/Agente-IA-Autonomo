@@ -1156,6 +1156,39 @@ def test_otra_ficha_con_el_mismo_sitio_queda_suprimida(session: Session) -> None
     assert is_suppressed(session, plataforma) is False
 
 
+def test_el_sitio_compartido_no_hereda_el_dominio_padre(session: Session) -> None:
+    from core.suppression import is_suppressed
+
+    SuppressionRepository(session).add("domain", "google.com", reason="baja", source="admin")
+    SuppressionRepository(session).add(
+        "domain", "estudio.wixsite.com", reason="baja", source="admin"
+    )
+    sites = _lead(
+        session,
+        business="Sites",
+        contact_email="persona@gmail.com",
+        website_url="https://sites.google.com/view/estudio",
+        place_id="place-sites",
+    )
+    propio = _lead(
+        session,
+        business="Wix Propio",
+        contact_email="persona@gmail.com",
+        website_url="https://estudio.wixsite.com/estudio",
+        place_id="place-wix-propio",
+    )
+    otro = _lead(
+        session,
+        business="Wix Otro",
+        contact_email="persona@gmail.com",
+        website_url="https://otro.wixsite.com/otro",
+        place_id="place-wix-otro",
+    )
+    assert is_suppressed(session, sites) is False
+    assert is_suppressed(session, propio) is True
+    assert is_suppressed(session, otro) is False
+
+
 def test_un_saludo_largo_no_cuelga() -> None:
     import time
 
