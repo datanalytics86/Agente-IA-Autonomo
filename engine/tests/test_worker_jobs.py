@@ -973,13 +973,31 @@ def test_normalize_host_loguea_solo_el_largo(caplog: pytest.LogCaptureFixture) -
     assert str(len(malo)) in caplog.text
 
 
+def test_email_y_webmail_no_recortan_un_sufijo_publico(session: Session) -> None:
+    from core.suppression import normalize_host, record_opt_out
+
+    assert normalize_host("mail.estudio.cl") == "mail.estudio.cl"
+    casos = (
+        ("x@email.estudio.cl", "estudio.cl", "Email Estudio"),
+        ("x@webmail.bufete.cl", "bufete.cl", "Webmail Bufete"),
+        ("x@mail.edu.pe", "mail.edu.pe", "Mail Edu"),
+        ("x@mail.org.ar", "mail.org.ar", "Mail Org"),
+    )
+    repo = SuppressionRepository(session)
+    for email, dominio, negocio in casos:
+        lead = _lead(session, business=negocio, contact_email=email, place_id=f"place-{negocio}")
+        record_opt_out(session, lead, channel="email", reason="baja")
+        assert repo.contains("domain", dominio) is True
+    assert repo.contains("domain", "edu.pe") is False
+    assert repo.contains("domain", "org.ar") is False
+
+
 def test_mail_no_recorta_un_sufijo_publico(session: Session) -> None:
     from core.suppression import record_opt_out
 
     casos = (
         ("x@mail.cl", "mail.cl", "Mail Cl"),
         ("x@correo.cl", "correo.cl", "Correo Cl"),
-        ("x@mail.gob.cl", "mail.gob.cl", "Mail Gob"),
         ("x@mail.co.uk", "mail.co.uk", "Mail Uk"),
         ("x@mail.estudio.cl", "estudio.cl", "Mail Estudio Cl"),
     )
@@ -988,6 +1006,15 @@ def test_mail_no_recorta_un_sufijo_publico(session: Session) -> None:
         lead = _lead(session, business=negocio, contact_email=email, place_id=f"place-{negocio}")
         record_opt_out(session, lead, channel="email", reason="baja")
         assert repo.contains("domain", dominio) is True
+    gob = _lead(
+        session,
+        business="Mail Gob",
+        contact_email="x@mail.gob.cl",
+        place_id="place-mail-gob",
+    )
+    assert "domain" not in {
+        row.kind for row in record_opt_out(session, gob, channel="email", reason="baja")
+    }
     assert repo.contains("domain", "cl") is False
     assert repo.contains("domain", "gob.cl") is False
     assert repo.contains("domain", "co.uk") is False

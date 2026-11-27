@@ -163,7 +163,10 @@ SHARED_DOMAINS = frozenset(
 
 
 def normalize_host(value: str) -> str:
-    """Host en minúsculas, IDNA, sin punto final y sin www. Un host ilegible da ""."""
+    """Host en minúsculas, IDNA, sin punto final y sin www. Un host ilegible da "".
+
+    No quita mail., correo., email. ni webmail. Ese recorte lo hace la baja.
+    """
     try:
         text = (value or "").strip()
         if not text:
@@ -387,13 +390,24 @@ _PUBLIC_SUFFIXES = (
 )
 
 
+_SECOND_LEVEL = frozenset(
+    {"com", "co", "net", "org", "gob", "gov", "edu", "ac", "mil", "nom", "or", "ne", "adv"}
+)
+_PREFIJOS_CORREO = ("mail.", "correo.", "email.", "webmail.")
+
+
 def _sin_prefijo_de_correo(host: str) -> str:
-    """Quita mail. o correo. solo si queda un host, no un TLD ni un sufijo público."""
+    """Quita el prefijo de buzón solo si queda un host, no un sufijo público."""
     current = host
-    while current.startswith(("mail.", "correo.")):
+    while current.startswith(_PREFIJOS_CORREO):
         rest = current.split(".", 1)[1]
         labels = [part for part in rest.split(".") if part]
-        if len(labels) < 2 or rest in _PUBLIC_SUFFIXES:
+        publico = (
+            len(labels) < 2
+            or rest in _PUBLIC_SUFFIXES
+            or (len(labels) == 2 and len(labels[-1]) == 2 and labels[-2] in _SECOND_LEVEL)
+        )
+        if publico:
             break
         current = rest
     return current
