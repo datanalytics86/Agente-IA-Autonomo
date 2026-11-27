@@ -77,20 +77,23 @@ def record_opt_out(
     *,
     channel: str,
     reason: str,
+    suppress_domain: bool = False,
 ) -> list[Suppression]:
-    """Guarda la baja. Un buzón genérico cierra el estudio, no el dominio."""
+    """Guarda la baja del correo y, si hay place_id, del estudio.
+
+    El dominio solo se cierra en el opt-out de inbound y nunca para un buzón
+    genérico: una baja de persona@gmail.com no puede apagar Gmail entero.
+    """
     repo = SuppressionRepository(session)
     rows: list[Suppression] = []
     email = (lead.contact_email or "").strip()
     if email:
         rows.append(repo.add("email", email, reason=reason, source=channel))
-        if "@" in email and not generic_local_part(email):
+        if suppress_domain and "@" in email and not generic_local_part(email):
             domain = email.split("@", 1)[1].strip()
             if domain:
                 rows.append(repo.add("domain", domain, reason=reason, source=channel))
     place_id = (lead.place_id or "").strip()
     if place_id:
         rows.append(repo.add("lead", place_id, reason=reason, source=channel))
-    elif lead.id:
-        rows.append(repo.add("lead", lead.id, reason=reason, source=channel))
     return rows

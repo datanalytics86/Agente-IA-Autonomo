@@ -325,7 +325,13 @@ def apply_inbound(ctx: JobContext, mails: list[InboundMail]) -> int:
 
 
 def _suppress(ctx: JobContext, lead: Lead, body: str) -> None:
-    rows = record_opt_out(ctx.session, lead, channel="email", reason="opt-out")
+    rows = record_opt_out(
+        ctx.session,
+        lead,
+        channel="email",
+        reason="opt-out",
+        suppress_domain=True,
+    )
     for row in rows:
         patch_fields(ctx.session, row, created_at=ctx.clock.now())
     EventRepository(ctx.session).append(

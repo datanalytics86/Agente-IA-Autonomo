@@ -16,13 +16,14 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+_KIND = "kind IN ('email', 'domain', 'phone', 'instagram', 'linkedin', 'lead')"
+
+
 def upgrade() -> None:
-    op.create_check_constraint(
-        "ck_suppression_kind",
-        "suppression",
-        "kind IN ('email', 'domain', 'phone', 'instagram', 'linkedin', 'lead')",
-    )
+    with op.batch_alter_table("suppression") as batch:
+        batch.create_check_constraint("ck_suppression_kind", _KIND)
 
 
 def downgrade() -> None:
-    op.drop_constraint("ck_suppression_kind", "suppression", type_="check")
+    with op.batch_alter_table("suppression") as batch:
+        batch.drop_constraint("ck_suppression_kind", type_="check")
