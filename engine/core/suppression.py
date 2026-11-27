@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import re
 import unicodedata
+from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from core.compliance import _EMAIL_RE, _PHONE_RE
 from db.models import Lead, Suppression
+from db.normalize import contact_hash
 from db.repositories import SuppressionRepository
 
 _GENERIC_LOCAL = frozenset(
@@ -30,7 +35,13 @@ _GENERIC_LOCAL = frozenset(
         "ventas",
     }
 )
-_DETAIL_MAX = 2000
+_DETAIL_MAX = 500
+_QUOTE_LINE = re.compile(r"(?i)(?:^el\b.+\bescribi[oó]\s*:|^on\b.+\bwrote\s*:)")
+_SIMPLE_CLOSE = re.compile(
+    r"(?i)^(?:saludos(?:\s+cordiales)?|atentamente|cordialmente|"
+    r"un saludo|muchas gracias|gracias)[.!]?$"
+)
+_RUT_RE = re.compile(r"\b\d{1,2}(?:[.\s]?\d{3}){2}\s*-\s*[\dkK]\b")
 
 
 def _fold(value: str) -> str:
@@ -102,15 +113,39 @@ def is_suppressed(session: Session, lead: object) -> bool:
     return False
 
 
-def _detail(text: str | None) -> str | None:
+def clean_opt_out_text(text: str | None) -> str | None:
+    """Extracto de la baja: sin cita, sin firma y sin teléfono ni RUT."""
     if not text:
         return None
-    return text[:_DETAIL_MAX]
+    kept: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(">") or _QUOTE_LINE.search(stripped):
+            break
+        if line.startswith("-- ") or stripped == "--":
+            break
+        if _SIMPLE_CLOSE.match(stripped):
+            break
+        kept.append(line)
+    body = "\n".join(kept)
+    body = _EMAIL_RE.sub("[correo]", body)
+    body = _PHONE_RE.sub("[teléfono]", body)
+    body = _RUT_RE.sub("[rut]", body)
+    body = body.strip()
+    if not body:
+        return None
+    return body[:_DETAIL_MAX]
 
 
-def _remember(row: Suppression, channel: str, detail: str | None) -> Suppression:
+def _remember(
+    row: Suppression,
+    channel: str,
+    detail: str | None,
+    *,
+    keep_text: bool,
+) -> Suppression:
     row.source = channel
-    if detail is not None:
+    if keep_text and detail is not None:
         row.detail = detail
     return row
 
@@ -125,17 +160,27 @@ def record_opt_out(
 ) -> list[Suppression]:
     """Cierra el correo y el estudio. El dominio solo si es el del sitio."""
     repo = SuppressionRepository(session)
-    detail = _detail(text)
+    detail = clean_opt_out_text(text)
     rows: list[Suppression] = []
     email = normalize_email(lead.contact_email or "")
     if email:
         rows.append(
-            _remember(repo.add("email", email, reason=reason, source=channel), channel, detail)
+            _remember(
+                repo.add("email", email, reason=reason, source=channel),
+                channel,
+                detail,
+                keep_text=True,
+            )
         )
     place_id = (lead.place_id or "").strip() or lead.id
     if place_id:
         rows.append(
-            _remember(repo.add("lead", place_id, reason=reason, source=channel), channel, detail)
+            _remember(
+                repo.add("lead", place_id, reason=reason, source=channel),
+                channel,
+                None,
+                keep_text=False,
+            )
         )
     mail_domain = normalize_domain(email) if "@" in email else ""
     site_domain = website_domain(lead.website_url or "")
@@ -144,7 +189,34 @@ def record_opt_out(
             _remember(
                 repo.add("domain", mail_domain, reason=reason, source=channel),
                 channel,
-                detail,
+                None,
+                keep_text=False,
             )
         )
     return rows
+
+
+def erase_personal_data(session: Session, lead: Lead) -> None:
+    """Borra el extracto y los datos personales. La supresión, por hash, queda."""
+    email = normalize_email(lead.contact_email or "")
+    if email:
+        digest = contact_hash("email", email)
+        row = session.scalar(
+            select(Suppression).where(
+                Suppression.kind == "email",
+                Suppression.value_hash == digest,
+            )
+        )
+        if row is not None:
+            row.detail = None
+    lead.contact_email = None
+    lead.contact_email_source_url = None
+    lead.instagram_handle = None
+    lead.linkedin_url = None
+    lead.phone_public = None
+    lead.address_public = None
+    lead.consent = None
+    lead.diagnosis = None
+    lead.website_audit = None
+    lead.anonymized_at = datetime.now(UTC)
+    session.flush()

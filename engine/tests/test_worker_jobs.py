@@ -699,6 +699,44 @@ def test_baja_de_contacto_suprime_el_estudio(session: Session) -> None:
     assert repo.contains("domain", "estudio.test") is False
 
 
+def test_el_extracto_oculta_cita_firma_y_datos(session: Session) -> None:
+    from core.suppression import erase_personal_data, record_opt_out
+
+    texto = (
+        "Hola, mi fono es +56 9 1111 2222 y el rut 12.345.678-5.\n"
+        "Escriban a otro@gmail.com si quieren.\n"
+        "Saludos\n"
+        "Juan Pérez\n"
+        "El lun, 2 mar 2026, Ana escribió:\n"
+        "> no reenviar\n"
+    )
+    lead = _lead(
+        session,
+        business="Extracto",
+        contact_email="persona@estudio.cl",
+        phone_public="+56911112222",
+        place_id="place-extracto",
+    )
+    rows = record_opt_out(session, lead, channel="email", reason="baja", text=texto)
+    detail = next(row.detail for row in rows if row.kind == "email")
+    assert detail is not None
+    assert "[teléfono]" in detail
+    assert "[rut]" in detail
+    assert "[correo]" in detail
+    assert "Saludos" not in detail
+    assert "escribió" not in detail
+    assert ">" not in detail
+    assert len(detail) <= 500
+    erase_personal_data(session, lead)
+    assert lead.contact_email is None
+    assert lead.phone_public is None
+    assert next(row.detail for row in rows if row.kind == "email") is None
+    assert SuppressionRepository(session).contains("email", "persona@estudio.cl") is True
+    from core.suppression import is_suppressed
+
+    assert is_suppressed(session, lead) is True
+
+
 def test_el_dominio_solo_si_es_el_del_sitio(session: Session) -> None:
     from core.suppression import record_opt_out
 
@@ -716,6 +754,7 @@ def test_el_dominio_solo_si_es_el_del_sitio(session: Session) -> None:
     assert email_row.detail == texto
     assert email_row.source == "email"
     assert email_row.created_at is not None
+    assert all(row.detail is None for row in rows if row.kind != "email")
     largo = _lead(
         session,
         business="Texto Largo",
@@ -723,7 +762,7 @@ def test_el_dominio_solo_si_es_el_del_sitio(session: Session) -> None:
         place_id="place-largo",
     )
     recorte = record_opt_out(session, largo, channel="email", reason="baja", text="y" * 2500)
-    assert len(next(row.detail or "" for row in recorte if row.kind == "email")) == 2000
+    assert len(next(row.detail or "" for row in recorte if row.kind == "email")) == 500
     otra = record_opt_out(session, propio, channel="email", reason="baja")
     assert next(row.detail for row in otra if row.kind == "email") == texto
     from core.suppression import normalize_email
