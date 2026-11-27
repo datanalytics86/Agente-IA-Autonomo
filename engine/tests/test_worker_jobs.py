@@ -836,6 +836,30 @@ def test_el_extracto_oculta_cita_firma_y_datos(session: Session) -> None:
     assert is_suppressed(session, lead) is True
 
 
+def test_el_extracto_corta_outlook_gmail_e_iphone(session: Session) -> None:
+    from core.suppression import clean_opt_out_text
+
+    outlook = clean_opt_out_text(
+        "No me escriban más.\n"
+        "________________________________\n"
+        "De: Ana\nEnviado: lunes\nPara: estudio\nAsunto: Re: propuesta\n"
+    )
+    original = clean_opt_out_text("Basta.\n-----Mensaje original-----\n> cita\n")
+    ingles = clean_opt_out_text("Stop.\n-----Original Message-----\n> quote\n")
+    gmail = clean_opt_out_text(
+        "Paren.\nEl lun, 2 mar 2026, Ana Pérez,\n<ana@gmail.com> escribió:\n> hola"
+    )
+    iphone = clean_opt_out_text("No más correos.\nEnviado desde mi iPhone")
+    cierre = clean_opt_out_text("Gracias\nno me escriban")
+    assert outlook == "No me escriban más."
+    assert original == "Basta."
+    assert ingles == "Stop."
+    assert gmail == "Paren."
+    assert iphone == "No más correos."
+    assert cierre == "Gracias\nno me escriban"
+    assert clean_opt_out_text("Sent from my iPhone\nresto") is None
+
+
 def test_el_dominio_solo_si_es_el_del_sitio(session: Session) -> None:
     from core.suppression import record_opt_out
 

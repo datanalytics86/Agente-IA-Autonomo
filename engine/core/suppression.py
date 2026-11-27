@@ -38,6 +38,12 @@ _GENERIC_LOCAL = frozenset(
 )
 _DETAIL_MAX = 500
 _QUOTE_LINE = re.compile(r"(?i)(?:^el\b.+\bescribi[oó]\s*:|^on\b.+\bwrote\s*:)")
+_GMAIL_OPEN = re.compile(r"(?i)^el\b")
+_GMAIL_WROTE = re.compile(r"(?i)\bescribi[oó]\s*:")
+_OUTLOOK_RULE = re.compile(r"^_{4,}$")
+_OUTLOOK_HEADER = re.compile(r"(?i)^(de|enviado|para|asunto)\s*:")
+_ORIGINAL = re.compile(r"(?i)^-{3,}\s*(?:mensaje original|original message)\s*-{3,}$")
+_PHONE_SIG = re.compile(r"(?i)^(?:enviado desde mi|sent from my)\b")
 _SIMPLE_CLOSE = re.compile(
     r"(?i)^(?:saludos(?:\s+cordiales)?|atentamente|cordialmente|"
     r"un saludo|muchas gracias|gracias)[.!]?$"
@@ -143,20 +149,38 @@ def is_suppressed(session: Session, lead: object) -> bool:
     return False
 
 
+def _cuts_quote(lines: list[str], index: int, stripped: str) -> bool:
+    if stripped.startswith(">") or _QUOTE_LINE.search(stripped):
+        return True
+    if _OUTLOOK_RULE.match(stripped) or _OUTLOOK_HEADER.match(stripped):
+        return True
+    if _ORIGINAL.match(stripped) or _PHONE_SIG.search(stripped):
+        return True
+    nxt = lines[index + 1].strip() if index + 1 < len(lines) else ""
+    return bool(_GMAIL_OPEN.match(stripped) and _GMAIL_WROTE.search(nxt))
+
+
 def clean_opt_out_text(text: str | None) -> str | None:
-    """Extracto de la baja: sin cita, sin firma y sin teléfono ni RUT."""
+    """Primer párrafo de la baja, sin cita, firma, teléfono ni RUT."""
     if not text:
         return None
+    lines = text.splitlines()
     kept: list[str] = []
-    for line in text.splitlines():
+    for index, line in enumerate(lines):
         stripped = line.strip()
-        if stripped.startswith(">") or _QUOTE_LINE.search(stripped):
-            break
+        if not stripped:
+            if kept:
+                break
+            continue
         if line.startswith("-- ") or stripped == "--":
             break
-        if _SIMPLE_CLOSE.match(stripped):
+        if _cuts_quote(lines, index, stripped):
+            break
+        if _SIMPLE_CLOSE.match(stripped) and kept:
             break
         kept.append(line)
+        if len(kept) >= 5:
+            break
     body = "\n".join(kept)
     body = _EMAIL_RE.sub("[correo]", body)
     body = _PHONE_RE.sub("[teléfono]", body)
