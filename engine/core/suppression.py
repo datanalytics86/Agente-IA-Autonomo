@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 import re
-import unicodedata
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -13,7 +12,7 @@ from urllib.parse import urlsplit
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from core.compliance import _EMAIL_RE, _PHONE_RE
+from core.compliance import _EMAIL_RE, _PHONE_RE, _RUT_RE
 from core.config import ENGINE_DIR
 from db.models import Approval, Artifact, Event, Lead, Message, Suppression
 from db.normalize import contact_hash
@@ -21,27 +20,6 @@ from db.repositories import SuppressionRepository
 
 logger = logging.getLogger("core.suppression")
 
-_GENERIC_LOCAL = frozenset(
-    {
-        "abogados",
-        "admin",
-        "administracion",
-        "atencion",
-        "comercial",
-        "consultas",
-        "contabilidad",
-        "contacto",
-        "correo",
-        "estudio",
-        "gerencia",
-        "hola",
-        "info",
-        "oficina",
-        "recepcion",
-        "secretaria",
-        "ventas",
-    }
-)
 _DETAIL_MAX = 500
 _QUOTE_LINE = re.compile(r"(?i)(?:^el\b.+\bescribi[oó]\s*:|^on\b.+\bwrote\s*:)")
 _GMAIL_OPEN = re.compile(r"(?i)^el\b")
@@ -66,14 +44,6 @@ _SIMPLE_CLOSE = re.compile(
     r"(?i)^(?:saludos(?:\s+cordiales)?|atentamente|cordialmente|"
     r"un saludo|muchas gracias|gracias)[.!]?$"
 )
-_RUT_RE = re.compile(r"\b\d{1,2}(?:[.\s]?\d{3}){2}\s*-\s*[\dkK]\b")
-
-
-def _fold(value: str) -> str:
-    decomposed = unicodedata.normalize("NFKD", value.strip().lower())
-    return "".join(char for char in decomposed if not unicodedata.combining(char))
-
-
 _MAIL_TLDS = ("com", "cl", "es", "com.ar", "co.uk", "com.mx")
 SHARED_DOMAINS = frozenset(
     {
@@ -247,14 +217,6 @@ def normalize_email(value: str) -> str:
     if not host:
         return f"{local.strip()}@{domain.strip().rstrip('.')}"
     return f"{local.strip()}@{host}"
-
-
-def generic_local_part(email: str) -> bool:
-    """True si el buzón es de la oficina, no de una persona."""
-    normalized = normalize_email(email)
-    if "@" not in normalized:
-        return False
-    return _fold(normalized.split("@", 1)[0]) in _GENERIC_LOCAL
 
 
 def is_suppressed(session: Session, lead: object) -> bool:

@@ -655,33 +655,20 @@ def test_pipeline_no_encola_correo_suprimido(session: Session) -> None:
     assert stored.status == "opt_out"
 
 
-def test_buzones_genericos_son_la_lista_fija() -> None:
-    from core.suppression import generic_local_part
+def test_el_extracto_enmascara_600_800_y_rut_sin_guion() -> None:
+    from core.suppression import clean_opt_out_text
 
-    generic = (
-        "contacto",
-        "info",
-        "consultas",
-        "atencion",
-        "administracion",
-        "gerencia",
-        "estudio",
-        "correo",
-        "oficina",
-        "secretaria",
-        "recepcion",
-        "hola",
-        "ventas",
-        "comercial",
-        "abogados",
-        "contabilidad",
-        "admin",
+    texto = clean_opt_out_text(
+        "Llamen al 600 123 4567 o al 800 123 4567. "
+        "Rut 12345678K y Peña12.345.678-5."
     )
-    for local in generic:
-        assert generic_local_part(f"{local}@estudio.cl")
-    assert generic_local_part("Atención@estudio.cl")
-    assert generic_local_part("persona@estudio.cl") is False
-    assert generic_local_part("hello@estudio.cl") is False
+    assert texto is not None
+    assert "[teléfono]" in texto
+    assert "[rut]" in texto
+    assert "600" not in texto
+    assert "800" not in texto
+    assert "12345678" not in texto
+    assert "12.345.678" not in texto
 
 
 def test_baja_repetida_conserva_la_primera(session: Session) -> None:
