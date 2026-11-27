@@ -15,7 +15,7 @@ RUN npm ci
 COPY apps/site/ ./
 RUN npm run build
 
-FROM caddy:2
+FROM caddy:2.10.2
 
 COPY infra/Caddyfile.prod /etc/caddy/Caddyfile
 COPY --from=site /src/dist /srv/site
