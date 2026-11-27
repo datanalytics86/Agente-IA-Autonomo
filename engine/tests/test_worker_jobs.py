@@ -1156,6 +1156,15 @@ def test_otra_ficha_con_el_mismo_sitio_queda_suprimida(session: Session) -> None
     assert is_suppressed(session, plataforma) is False
 
 
+def test_una_baja_en_la_linea_del_saludo_no_se_pierde() -> None:
+    from core.suppression import clean_opt_out_text
+
+    for linea in ("Hola no me escriban más", "Buenas tardes no me escriban más."):
+        texto = clean_opt_out_text(f"{linea}\nJuan Pérez")
+        assert texto is not None
+        assert "no me escriban más" in texto
+
+
 def test_el_saludo_con_nombre_no_se_come_la_baja() -> None:
     from core.suppression import clean_opt_out_text
 

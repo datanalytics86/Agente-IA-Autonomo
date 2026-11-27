@@ -49,11 +49,13 @@ _GMAIL_WROTE = re.compile(r"(?i)\bescribi[oó]\s*:")
 _OUTLOOK_RULE = re.compile(r"^_{4,}$")
 _OUTLOOK_HEADER = re.compile(r"(?i)^(de|enviado|para|asunto)\s*:")
 _OUTLOOK_NEXT = re.compile(r"(?i)^(enviado|para|asunto)\s*:")
+_NAME_WORD = r"(?:sra?\.|don|doña|[A-ZÁÉÍÓÚÜÑ][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]*\.?)"
 _GREETING = re.compile(
     r"(?i)^(?:hola|estimad[oa]s?|"
     r"buen[oa]s?\s+d[ií]as|buen[oa]s?\s+tardes|buen[oa]s?\s+noches|"
     r"se[nñ]ores|se[nñ]oras|se[nñ]ora|se[nñ]or|sra\.|sr\.|do[nñ]a|don)"
-    r"(?:\s+.{1,40}?)?\s*[,:.]?\s*$"
+    r"(?-i:(?:\s+" + _NAME_WORD + r"){1,3})?"
+    r"\s*[,:.]?\s*$"
 )
 _ORIGINAL = re.compile(r"(?i)^-{3,}\s*(?:mensaje original|original message)\s*-{3,}$")
 _PHONE_SIG = re.compile(r"(?i)^(?:enviado desde mi|sent from my)\b")
