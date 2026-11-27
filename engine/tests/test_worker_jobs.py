@@ -505,17 +505,19 @@ def _mensaje_del_hit(session: Session, **overrides: object) -> tuple[Lead, Messa
 
 
 def test_http_source_sin_host_es_none() -> None:
-    from worker.defaults import _http_source
+    from worker.defaults import http_source
 
-    assert _http_source("http://") is None
-    assert _http_source("https://") is None
+    assert http_source("http://") is None
+    assert http_source("https://") is None
 
 
-def test_http_source_con_control_es_none() -> None:
-    from worker.defaults import _http_source
+def test_http_source_con_control_o_espacio_es_none() -> None:
+    from worker.defaults import http_source
 
-    assert _http_source("https://negocio.cl/contacto\n") is None
-    assert _http_source("https://nego\x00cio.cl/") is None
+    assert http_source("https://negocio.cl/contacto\n") is None
+    assert http_source("https://nego\x00cio.cl/") is None
+    assert http_source("https://negocio.cl/contacto uno") is None
+    assert http_source("https://negocio.cl/contacto") == "https://negocio.cl/contacto"
 
 
 def test_hit_sin_fuente_se_rechaza(session: Session) -> None:

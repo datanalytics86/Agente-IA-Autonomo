@@ -280,6 +280,16 @@ def test_rechaza_destinatario_suprimido_y_contacto_inventado() -> None:
     assert "contacto inventado: teléfono 56911112222" in result.reasons
 
 
+def test_fijo_y_56_2_se_tratan_como_telefono() -> None:
+    body = (
+        "Hola. Te escribo de Agencia Norte. "
+        "El fijo es +56 2 2345 6789. "
+        "Si no quieres más correos responde BAJA."
+    )
+    result = check_rules(_message(body), _lead(), _settings())
+    assert "contacto inventado: teléfono 56223456789" in result.reasons
+
+
 def test_contacto_del_lead_no_se_trata_como_inventado() -> None:
     settings = _settings(agency_email="hola@agencia.cl")
     body = _con_pie(

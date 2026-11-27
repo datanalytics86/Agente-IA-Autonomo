@@ -309,6 +309,26 @@ def test_borrador_suprimido_no_crea_mensaje(env: Path, block_network: None) -> N
     assert stored is not None and stored.status == "opt_out"
 
 
+def test_el_borrador_no_repite_el_pie(env: Path, block_network: None) -> None:
+    from core.compliance import legal_footer
+    from core.config import get_settings
+
+    footer = legal_footer(get_settings(), _FUENTE)
+    with session_scope() as session:
+        lead = _lead(
+            session,
+            contact_email="hola@cafe.test",
+            diagnosis={
+                "pitch_subject": "Propuesta comercial: landing para Café Andes",
+                "pitch_body": f"Hola. Te escribo de Agencia Andina. Responde BAJA.\n\n{footer}",
+            },
+        )
+        draft = ensure_draft(AgentContext(session, lead_id=lead.id))
+    assert draft is not None
+    assert draft.body_text.count("Para no recibir más correos:") == 1
+    assert draft.body_text.count(footer) == 1
+
+
 def test_el_borrador_lleva_el_pie_legal(env: Path, block_network: None) -> None:
     with session_scope() as session:
         lead = _lead(

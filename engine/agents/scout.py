@@ -21,6 +21,7 @@ from db.repositories import LeadRepository, SettingsRepository
 from db.session import session_scope
 from integrations.pagespeed.base import WebAuditor, build_auditor
 from integrations.places.base import DemoSource, LeadSource, PlaceHit, build_places
+from worker.defaults import http_source
 
 
 def _multi_site(name: str) -> bool:
@@ -202,7 +203,8 @@ def _build_lead(
 ) -> DbLead:
     settings = get_settings()
     audit = auditor.audit(hit.website_uri)
-    email = audit.contact_email if audit.contact_email and audit.contact_email_source_url else None
+    source = http_source(audit.contact_email_source_url)
+    email = audit.contact_email if audit.contact_email and source else None
     multi = _multi_site(hit.name)
     high = bool(forced or multi)
     if high:
@@ -235,7 +237,7 @@ def _build_lead(
         rating=hit.rating,
         reviews=hit.user_rating_count,
         contact_email=email,
-        contact_email_source_url=audit.contact_email_source_url if email else None,
+        contact_email_source_url=source if email else None,
         instagram_handle=audit.instagram_handle,
         phone_public=hit.national_phone_number,
         status="nuevo",

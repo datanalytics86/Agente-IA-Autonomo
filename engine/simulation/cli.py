@@ -7,3 +7,7 @@ from simulation.loop import run_simulation
 
 def main(days: int = 14, seed: int = 42) -> int:
     return run_simulation(days=days, seed=seed)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -55,7 +55,9 @@ def ensure_draft(ctx: AgentContext) -> Message | None:
     channel, _manual = choose_channel(lead)
     if channel == "email_outreach":
         source = lead.contact_email_source_url
-        body = f"{body.rstrip()}\n\n{legal_footer(get_settings(), source)}"
+        footer = legal_footer(get_settings(), source)
+        if footer not in body:
+            body = f"{body.rstrip()}\n\n{footer}"
     body_html = "<p>" + "<br>".join(html.escape(line) for line in body.split("\n")) + "</p>"
     return repo.add(
         Message(

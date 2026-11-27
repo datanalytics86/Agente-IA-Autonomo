@@ -29,7 +29,7 @@ from db.repositories import (
 )
 from worker.approvals import ensure_approval
 from worker.copywriter import MANUAL_CHANNELS, checker_settings, offer_price_clp, outreach_parts
-from worker.defaults import _http_source
+from worker.defaults import http_source
 from worker.persist import patch_fields
 from worker.ports import JobContext, PlaceHit
 from worker.schedule import local_date, next_window_open
@@ -186,7 +186,7 @@ def _lead_from_hit(ctx: JobContext, hit: PlaceHit) -> Lead:
         rating=hit.rating,
         reviews=hit.user_rating_count,
         contact_email=hit.email,
-        contact_email_source_url=_http_source(hit.email_source_url),
+        contact_email_source_url=http_source(hit.email_source_url),
         instagram_handle=hit.instagram_handle,
         linkedin_url=hit.linkedin_url,
         phone_public=hit.phone_public,
