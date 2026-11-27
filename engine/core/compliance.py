@@ -37,10 +37,12 @@ _OPT_OUT_PHRASES = (
 )
 _OPT_OUT_RE = re.compile(r"\b(?:stop|baja|unsubscribe[d]?|remove me)\b")
 _REPLY_RE = re.compile(r"(?i)^\s*(?:re|fwd|fw)\s*:")
+
+
 def email_source_line(source: str) -> str:
-    return (
-        f"obtuvimos su correo de {source.strip()}, de acceso público, asociado a su negocio"
-    )
+    return f"obtuvimos su correo de {source.strip()}, de acceso público, asociado a su negocio"
+
+
 _FORBIDDEN: tuple[tuple[str, str], ...] = (
     (r"\bgarantizad[oa]s?\b", "garantizado"),
     ("resultados asegurados", "resultados asegurados"),

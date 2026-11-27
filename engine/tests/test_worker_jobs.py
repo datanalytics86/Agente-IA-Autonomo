@@ -164,11 +164,7 @@ def test_html_conserva_los_saltos_del_pie(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def html_escape_line(line: str) -> str:
-    return (
-        line.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def test_sin_nombre_usa_deeppro(monkeypatch: pytest.MonkeyPatch) -> None:

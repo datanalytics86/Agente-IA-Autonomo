@@ -25,6 +25,8 @@ def _lead(**overrides: object) -> Lead:
     data: dict[str, object] = {"contact_email_source_url": _FUENTE}
     data.update(overrides)
     return Lead(**data)  # type: ignore[arg-type]
+
+
 CLEAN_BODY = (
     "Hola. Te escribo de Agencia Norte. "
     "La landing queda en 350.000 CLP. "
