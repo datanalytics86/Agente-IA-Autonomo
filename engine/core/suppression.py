@@ -42,6 +42,8 @@ _GMAIL_OPEN = re.compile(r"(?i)^el\b")
 _GMAIL_WROTE = re.compile(r"(?i)\bescribi[oó]\s*:")
 _OUTLOOK_RULE = re.compile(r"^_{4,}$")
 _OUTLOOK_HEADER = re.compile(r"(?i)^(de|enviado|para|asunto)\s*:")
+_OUTLOOK_NEXT = re.compile(r"(?i)^(enviado|para|asunto)\s*:")
+_GREETING = re.compile(r"(?i)^(?:hola|estimad[oa]s?)\s*[,:]?\s*$")
 _ORIGINAL = re.compile(r"(?i)^-{3,}\s*(?:mensaje original|original message)\s*-{3,}$")
 _PHONE_SIG = re.compile(r"(?i)^(?:enviado desde mi|sent from my)\b")
 _SIMPLE_CLOSE = re.compile(
@@ -203,10 +205,27 @@ def is_suppressed(session: Session, lead: object) -> bool:
     return False
 
 
+def _outlook_header(lines: list[str], index: int, stripped: str) -> bool:
+    if _OUTLOOK_RULE.match(stripped):
+        return True
+    if not _OUTLOOK_HEADER.match(stripped):
+        return False
+    if "@" in stripped or "<" in stripped:
+        return True
+    if not stripped.lower().startswith("de"):
+        return False
+    for nxt in lines[index + 1 : index + 6]:
+        text = nxt.strip()
+        if not text:
+            continue
+        return _OUTLOOK_NEXT.match(text) is not None
+    return False
+
+
 def _cuts_quote(lines: list[str], index: int, stripped: str) -> bool:
     if stripped.startswith(">") or _QUOTE_LINE.search(stripped):
         return True
-    if _OUTLOOK_RULE.match(stripped) or _OUTLOOK_HEADER.match(stripped):
+    if _outlook_header(lines, index, stripped):
         return True
     if _ORIGINAL.match(stripped) or _PHONE_SIG.search(stripped):
         return True
@@ -232,6 +251,8 @@ def clean_opt_out_text(text: str | None) -> str | None:
             break
         if _SIMPLE_CLOSE.match(stripped) and kept:
             break
+        if _GREETING.match(stripped) and not kept:
+            continue
         kept.append(line)
         if len(kept) >= 5:
             break

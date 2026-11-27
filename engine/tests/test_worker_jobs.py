@@ -951,6 +951,19 @@ def test_otra_ficha_con_el_mismo_sitio_queda_suprimida(session: Session) -> None
     assert is_suppressed(session, plataforma) is False
 
 
+def test_el_extracto_no_pierde_la_baja_tras_el_saludo() -> None:
+    from core.suppression import clean_opt_out_text
+
+    assert clean_opt_out_text("Hola,\n\nno me escriban más") == "no me escriban más"
+    assert clean_opt_out_text("Estimados:\n\nno me escriban más") == "no me escriban más"
+    assert clean_opt_out_text("De: no me escriban más") == "De: no me escriban más"
+    para = clean_opt_out_text("Para: el estudio\nno más correos")
+    assert para == "Para: el estudio\nno más correos"
+    assert clean_opt_out_text("Enviado: basta de correos") == "Enviado: basta de correos"
+    bloque = clean_opt_out_text("Basta.\nDe: Ana <ana@estudio.cl>\nEnviado: lunes\n")
+    assert bloque == "Basta."
+
+
 def test_el_extracto_corta_outlook_gmail_e_iphone(session: Session) -> None:
     from core.suppression import clean_opt_out_text
 
