@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import unicodedata
 from datetime import UTC, datetime
@@ -13,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.compliance import _EMAIL_RE, _PHONE_RE
+from core.config import ENGINE_DIR
 from db.models import Approval, Artifact, Event, Lead, Message, Suppression
 from db.normalize import contact_hash
 from db.repositories import SuppressionRepository
@@ -401,6 +403,31 @@ def record_opt_out(
     return rows
 
 
+def _artifact_root() -> Path:
+    """El mismo directorio que output_dir: AGENCY_OUTPUT_DIR o engine/output."""
+    raw = os.environ.get("AGENCY_OUTPUT_DIR")
+    return (Path(raw) if raw else ENGINE_DIR / "output").resolve()
+
+
+def _inside(path: Path, root: Path) -> bool:
+    return path.is_file() and root in path.parents
+
+
+def _unlink_artifact(stored: str) -> None:
+    root = _artifact_root()
+    raw = Path(stored)
+    try:
+        if raw.is_absolute():
+            resolved = raw.resolve()
+        else:
+            from_engine = (ENGINE_DIR / raw).resolve()
+            resolved = from_engine if _inside(from_engine, root) else (root / raw).resolve()
+        if _inside(resolved, root):
+            resolved.unlink()
+    except OSError:
+        logger.warning("no se pudo borrar el archivo de un artifact")
+
+
 def erase_personal_data(session: Session, lead: Lead) -> None:
     """Borra el detalle personal. La fila de supresión, por hash, queda."""
     email = normalize_email(lead.contact_email or "")
@@ -427,7 +454,7 @@ def erase_personal_data(session: Session, lead: Lead) -> None:
         approval.decision_note = None
     for artifact in session.scalars(select(Artifact).where(Artifact.lead_id == lead.id)):
         if artifact.path:
-            Path(artifact.path).unlink(missing_ok=True)
+            _unlink_artifact(artifact.path)
         artifact.meta = None
         artifact.path = ""
     lead.business = "anonimizado"

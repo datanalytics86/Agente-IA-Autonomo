@@ -852,10 +852,15 @@ def test_el_extracto_oculta_cita_firma_y_datos(session: Session) -> None:
     assert is_suppressed(session, lead) is True
 
 
-def test_el_borrado_elimina_el_archivo_de_la_landing(session: Session, tmp_path: Path) -> None:
+def test_el_borrado_elimina_el_archivo_de_la_landing(
+    session: Session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from core.suppression import erase_personal_data
 
-    landing = tmp_path / "landing.html"
+    root = tmp_path / "output"
+    root.mkdir()
+    monkeypatch.setenv("AGENCY_OUTPUT_DIR", str(root))
+    landing = root / "landing.html"
     landing.write_text("persona@estudio.cl", encoding="utf-8")
     lead = _lead(
         session,
@@ -876,6 +881,61 @@ def test_el_borrado_elimina_el_archivo_de_la_landing(session: Session, tmp_path:
     assert landing.exists() is False
     guardado = session.scalars(select(Artifact).where(Artifact.lead_id == lead.id)).one()
     assert guardado.path == ""
+
+
+def test_el_borrado_no_sale_del_directorio_de_artifacts(
+    session: Session,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    import logging
+
+    from core.suppression import erase_personal_data
+
+    root = tmp_path / "output"
+    root.mkdir()
+    monkeypatch.setenv("AGENCY_OUTPUT_DIR", str(root))
+    dentro = root / "landing.html"
+    dentro.write_text("dentro", encoding="utf-8")
+    fuera = tmp_path / "fuera.txt"
+    fuera.write_text("fuera", encoding="utf-8")
+    absoluta = tmp_path / "absoluta.txt"
+    absoluta.write_text("absoluta", encoding="utf-8")
+    bloqueado = root / "bloqueado.html"
+    bloqueado.write_text("bloqueado", encoding="utf-8")
+    lead = _lead(
+        session,
+        business="Rutas",
+        contact_email="persona@estudio.cl",
+        place_id="place-rutas",
+    )
+    session.add_all(
+        [
+            Artifact(lead_id=lead.id, kind="landing_demo", path=str(dentro), meta={}),
+            Artifact(lead_id=lead.id, kind="nota", path="../fuera.txt", meta={}),
+            Artifact(lead_id=lead.id, kind="storyboard", path=str(absoluta), meta={}),
+            Artifact(lead_id=lead.id, kind="propuesta", path=str(bloqueado), meta={}),
+        ]
+    )
+    session.flush()
+    real = Path.unlink
+
+    def unlink(self: Path, *args: object, **kwargs: object) -> None:
+        if self.name == "bloqueado.html":
+            raise PermissionError("denegado")
+        real(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", unlink)
+    with caplog.at_level(logging.WARNING, logger="core.suppression"):
+        erase_personal_data(session, lead)
+    assert dentro.exists() is False
+    assert fuera.exists() is True
+    assert absoluta.exists() is True
+    assert bloqueado.exists() is True
+    assert lead.contact_email is None
+    assert str(bloqueado) not in caplog.text
+    assert "fuera.txt" not in caplog.text
 
 
 def test_normalize_host_loguea_solo_el_largo(caplog: pytest.LogCaptureFixture) -> None:
