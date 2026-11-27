@@ -372,6 +372,35 @@ def test_baja_suprime_el_email_y_no_el_dominio(client: TestClient) -> None:
     assert "domain" not in kinds
 
 
+def test_baja_web_guarda_canal_y_hash_del_token_sin_ip(client: TestClient) -> None:
+    from api.security import make_baja_token
+    from db.models import Suppression
+
+    with session_scope() as session:
+        lead = _lead(session, contact_email="persona@estudio.cl", status="enviado")
+        token = make_baja_token(lead.id)
+    response = client.post(
+        "/api/public/baja",
+        json={"token": token},
+        headers={
+            "X-Forwarded-For": "203.0.113.50",
+            "User-Agent": "AgentePrueba/9",
+        },
+    )
+    assert response.status_code == 200, response.text
+    digest = hashlib.sha256(token.encode()).hexdigest()[:16]
+    with session_scope() as session:
+        rows = list(session.scalars(select(Suppression)))
+    assert rows
+    email_row = next(row for row in rows if row.kind == "email")
+    assert email_row.source == "web"
+    assert email_row.created_at is not None
+    assert email_row.detail == f"baja web vía enlace; token_sha256={digest}"
+    blob = " ".join(f"{row.source} {row.reason} {row.detail or ''}" for row in rows)
+    assert "203.0.113.50" not in blob
+    assert "AgentePrueba/9" not in blob
+
+
 def test_baja_con_punto_final_matchea_el_correo_sin_punto(client: TestClient) -> None:
     from api.security import make_baja_token
     from db.models import Suppression

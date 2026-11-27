@@ -431,7 +431,14 @@ def apply_baja(session: Session, token: str) -> dict[str, bool]:
     lead = session.get(Lead, read_baja_token(token))
     if lead is None:
         raise ApiError(404, "not_found", "token desconocido")
-    record_opt_out(session, lead, channel="email", reason="baja")
+    token_hash = hashlib.sha256(token.encode()).hexdigest()[:16]
+    record_opt_out(
+        session,
+        lead,
+        channel="web",
+        reason="baja",
+        text=f"baja web vía enlace; token_sha256={token_hash}",
+    )
     if "opt_out" in TRANSITIONS.get(lead.status, frozenset()):
         transition_lead(session, lead, "opt_out", actor="sistema", reason="baja solicitada")
     EventRepository(session).append(
