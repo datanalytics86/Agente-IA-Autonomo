@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.compliance import _EMAIL_RE, _PHONE_RE
-from db.models import Lead, Suppression
+from db.models import Approval, Artifact, Event, Lead, Message, Suppression
 from db.normalize import contact_hash
 from db.repositories import SuppressionRepository
 
@@ -275,7 +275,7 @@ def record_opt_out(
 
 
 def erase_personal_data(session: Session, lead: Lead) -> None:
-    """Borra el extracto y los datos personales. La supresión, por hash, queda."""
+    """Borra el detalle personal. La fila de supresión, por hash, queda."""
     email = normalize_email(lead.contact_email or "")
     if email:
         digest = contact_hash("email", email)
@@ -287,6 +287,21 @@ def erase_personal_data(session: Session, lead: Lead) -> None:
         )
         if row is not None:
             row.detail = None
+    for message in session.scalars(select(Message).where(Message.lead_id == lead.id)):
+        message.body_text = ""
+        message.body_html = None
+        message.subject = None
+        message.check_result = None
+    for event in session.scalars(select(Event).where(Event.lead_id == lead.id)):
+        event.meta = None
+        event.message = ""
+    for approval in session.scalars(select(Approval).where(Approval.lead_id == lead.id)):
+        approval.payload = {}
+        approval.decision_note = None
+    for artifact in session.scalars(select(Artifact).where(Artifact.lead_id == lead.id)):
+        artifact.meta = None
+        artifact.path = ""
+    lead.business = "anonimizado"
     lead.contact_email = None
     lead.contact_email_source_url = None
     lead.instagram_handle = None

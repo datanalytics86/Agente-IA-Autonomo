@@ -836,6 +836,77 @@ def test_el_extracto_oculta_cita_firma_y_datos(session: Session) -> None:
     assert is_suppressed(session, lead) is True
 
 
+def test_el_borrado_alcanza_mensajes_eventos_y_negocio(session: Session) -> None:
+    from core.suppression import erase_personal_data, record_opt_out
+    from db.models import Event, Suppression
+
+    correo = "persona@estudio.cl"
+    fono = "+56911112222"
+    lead = _lead(
+        session,
+        business=f"Estudio {correo}",
+        contact_email=correo,
+        phone_public=fono,
+        place_id="place-borrado",
+    )
+    record_opt_out(session, lead, channel="email", reason="baja", text="no más")
+    antes = len(list(session.scalars(select(Suppression))))
+    session.add_all(
+        [
+            Message(
+                lead_id=lead.id,
+                thread_id=lead.id,
+                direction="in",
+                channel="email",
+                status="received",
+                subject=correo,
+                body_text=f"llamen al {fono}",
+            ),
+            Event(
+                agent="test",
+                level="info",
+                message=f"baja de {correo}",
+                lead_id=lead.id,
+                meta={"extracto": fono},
+            ),
+            Approval(
+                lead_id=lead.id,
+                kind="outreach",
+                payload={"email": correo, "phone": fono},
+                status="pending",
+            ),
+            Artifact(
+                lead_id=lead.id,
+                kind="nota",
+                path=f"output/{correo}.html",
+                meta={"phone": fono},
+            ),
+        ]
+    )
+    session.flush()
+    erase_personal_data(session, lead)
+    assert len(list(session.scalars(select(Suppression)))) == antes
+    assert SuppressionRepository(session).contains("email", correo) is True
+    blob = " ".join(
+        [
+            lead.business or "",
+            lead.contact_email or "",
+            lead.phone_public or "",
+        ]
+    )
+    for row in session.scalars(select(Message).where(Message.lead_id == lead.id)):
+        blob += f" {row.subject or ''} {row.body_text}"
+    for row in session.scalars(select(Event).where(Event.lead_id == lead.id)):
+        blob += f" {row.message} {row.meta}"
+    for row in session.scalars(select(Approval).where(Approval.lead_id == lead.id)):
+        blob += f" {row.payload} {row.decision_note}"
+    for row in session.scalars(select(Artifact).where(Artifact.lead_id == lead.id)):
+        blob += f" {row.path} {row.meta}"
+    assert correo not in blob
+    assert fono not in blob
+    assert "1111" not in blob
+
+
 def test_el_extracto_corta_outlook_gmail_e_iphone(session: Session) -> None:
     from core.suppression import clean_opt_out_text
 
