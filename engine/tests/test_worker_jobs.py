@@ -1389,6 +1389,27 @@ def test_el_saludo_que_pide_la_baja_no_se_salta() -> None:
     assert "No Me Escriban" in texto
 
 
+def test_una_fila_vieja_de_gob_cl_no_cierra_el_estado(session: Session) -> None:
+    from core.suppression import host_is_suppressed, is_suppressed
+
+    SuppressionRepository(session).add("domain", "gob.cl", reason="baja", source="admin")
+    otra = _lead(
+        session,
+        business="Otra Gob",
+        contact_email="x@otra.gob.cl",
+        website_url="https://municipalidad.gob.cl",
+        place_id="place-otra-gob",
+    )
+    assert is_suppressed(session, otra) is False
+    assert host_is_suppressed(session, "otra.gob.cl") is False
+    assert host_is_suppressed(session, "x@otra.gob.cl") is False
+    SuppressionRepository(session).add(
+        "domain", "municipalidad.gob.cl", reason="baja", source="admin"
+    )
+    assert host_is_suppressed(session, "depto.municipalidad.gob.cl") is True
+    assert host_is_suppressed(session, "otra.gob.cl") is False
+
+
 def test_municipalidad_gob_cl_no_cierra_gob(session: Session) -> None:
     from core.suppression import host_is_suppressed, is_shared_host, record_opt_out
 

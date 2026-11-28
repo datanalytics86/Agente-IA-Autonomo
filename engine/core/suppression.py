@@ -189,12 +189,18 @@ def _shared_hosting(host: str) -> bool:
 
 
 def host_is_suppressed(session: Session, value: str) -> bool:
-    """True si ese host o un dominio padre, con borde de label, está cerrado."""
+    """True si ese host o un dominio padre, con borde de label, está cerrado.
+
+    Una fila de sufijo público (gob.cl) se ignora al leer. No se borra.
+    """
     host = normalize_host(value)
-    if not host:
+    if not host or _es_sufijo_publico(host):
         return False
     repo = SuppressionRepository(session)
-    return any(repo.contains("domain", suffix) for suffix in _suffixes(host))
+    return any(
+        not _es_sufijo_publico(suffix) and repo.contains("domain", suffix)
+        for suffix in _suffixes(host)
+    )
 
 
 def website_is_suppressed(session: Session, website: str) -> bool:

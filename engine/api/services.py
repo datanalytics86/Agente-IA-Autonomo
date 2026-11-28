@@ -1154,8 +1154,10 @@ def add_suppression(session: Session, kind: str, value: str, reason: str) -> dic
         from core.suppression import _es_sufijo_publico, is_shared_host, normalize_host
 
         host = normalize_host(value)
-        if not host or _es_sufijo_publico(host):
+        if not host:
             raise ApiError(422, "validation_error", "dominio inválido")
+        if _es_sufijo_publico(host):
+            raise ApiError(422, "validation_error", "sufijo público")
         if is_shared_host(value):
             raise ApiError(422, "validation_error", "el dominio es compartido")
     row = SuppressionRepository(session).add(kind, value, reason=reason, source="admin")
