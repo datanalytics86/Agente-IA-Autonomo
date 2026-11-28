@@ -26,8 +26,28 @@ _PRICE_MARKED_RE = re.compile(
     r"|(\d{1,3}(?:\.\d{3})+|\d{4,8})(?!\d)\s*(?:clp|pesos)"
 )
 _PRICE_DOTTED_RE = re.compile(r"(?<!\d)(\d{1,3}(?:\.\d{3})+)(?![\d-])")
-_EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b")
-_PHONE_RE = re.compile(r"(?<!\d)(?:\+?56[\s.\-]*)?(?:9|2)[\s.\-]*\d{4}[\s.\-]*\d{4}(?!\d)")
+_EMAIL_RE = re.compile(
+    r"(?<![A-Za-z0-9._%+\-])"
+    r"[A-Za-z0-9_](?:[A-Za-z0-9._%+\-]{0,63})@"
+    r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.){1,8}"
+    r"[A-Za-z]{2,24}(?![A-Za-z0-9])"
+)
+_PHONE_RE = re.compile(
+    r"(?<!\d)(?:\+?56[\s.\-]*)?(?:"
+    r"9[\s.\-]*\d{4}[\s.\-]*\d{4}"
+    r"|2[\s.\-]*\d{4}[\s.\-]*\d{4}"
+    r"|[2-7]\d[\s.\-]*\d{3}[\s.\-]*\d{4}"
+    r"|(?:600|800)[\s.\-]*\d{3}[\s.\-]*\d{4}"
+    r")(?!\d)"
+)
+_RUT_RE = re.compile(
+    r"(?<![\d.])(?:"
+    r"\d{1,2}(?:[.\s]\d{3}){2}\s*-\s*[\dkK]"
+    r"|\d{7,8}\s*-\s*[\dkK]"
+    r"|\d{1,2}(?:[.\s]\d{3}){2}\s*[kK]"
+    r"|\d{7,8}[kK]"
+    r")(?!\d)"
+)
 _URL_RE = re.compile(r"(?i)(?:https?://[^\s<>\"']+|//[^\s<>\"']+)")
 _OPT_OUT_PHRASES = (
     "no me escriban",

@@ -329,7 +329,7 @@ jobs:
             -e SITE_DOMAIN=example.test \
             -e PUBLIC_ORIGIN=http://127.0.0.1:8088 \
             -v "$PWD/infra/Caddyfile.prod:/etc/caddy/Caddyfile:ro" \
-            caddy:2 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+            caddy:2.10.2 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
       - name: Validar Caddyfile.prod con basic auth de staging
         run: |

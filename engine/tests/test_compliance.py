@@ -102,6 +102,19 @@ def test_opt_out_reconoce_mayusculas_y_tildes(text: str) -> None:
     assert is_opt_out(text) is True
 
 
+def test_el_regex_de_correo_no_es_cuadratico() -> None:
+    import time
+
+    from core.compliance import _EMAIL_RE
+
+    texto = ("a." * 80) + "@" + ("a." * 20_000)
+    inicio = time.monotonic()
+    assert _EMAIL_RE.findall(texto) == []
+    assert time.monotonic() - inicio < 1
+    assert _EMAIL_RE.findall("otro@gmail.com") == ["otro@gmail.com"]
+    assert _EMAIL_RE.findall("escriban a _contacto@example.cl hoy") == ["_contacto@example.cl"]
+
+
 @pytest.mark.parametrize(
     "text",
     [
@@ -278,6 +291,16 @@ def test_rechaza_destinatario_suprimido_y_contacto_inventado() -> None:
     assert "destinatario suprimido" in result.reasons
     assert "contacto inventado: email otro@gmail.com" in result.reasons
     assert "contacto inventado: teléfono 56911112222" in result.reasons
+
+
+def test_fijo_regional_se_trata_como_telefono() -> None:
+    body = (
+        "Hola. Te escribo de Agencia Norte. "
+        "El fijo es 32 234 5678. "
+        "Si no quieres más correos responde BAJA."
+    )
+    result = check_rules(_message(body), _lead(), _settings())
+    assert "contacto inventado: teléfono 322345678" in result.reasons
 
 
 def test_fijo_y_56_2_se_tratan_como_telefono() -> None:

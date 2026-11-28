@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 import re
-import unicodedata
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -13,7 +12,7 @@ from urllib.parse import urlsplit
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from core.compliance import _EMAIL_RE, _PHONE_RE
+from core.compliance import _EMAIL_RE, _PHONE_RE, _RUT_RE, is_opt_out
 from core.config import ENGINE_DIR
 from db.models import Approval, Artifact, Event, Lead, Message, Suppression
 from db.normalize import contact_hash
@@ -21,27 +20,6 @@ from db.repositories import SuppressionRepository
 
 logger = logging.getLogger("core.suppression")
 
-_GENERIC_LOCAL = frozenset(
-    {
-        "abogados",
-        "admin",
-        "administracion",
-        "atencion",
-        "comercial",
-        "consultas",
-        "contabilidad",
-        "contacto",
-        "correo",
-        "estudio",
-        "gerencia",
-        "hola",
-        "info",
-        "oficina",
-        "recepcion",
-        "secretaria",
-        "ventas",
-    }
-)
 _DETAIL_MAX = 500
 _QUOTE_LINE = re.compile(r"(?i)(?:^el\b.+\bescribi[oó]\s*:|^on\b.+\bwrote\s*:)")
 _GMAIL_OPEN = re.compile(r"(?i)^el\b")
@@ -49,12 +27,15 @@ _GMAIL_WROTE = re.compile(r"(?i)\bescribi[oó]\s*:")
 _OUTLOOK_RULE = re.compile(r"^_{4,}$")
 _OUTLOOK_HEADER = re.compile(r"(?i)^(de|enviado|para|asunto)\s*:")
 _OUTLOOK_NEXT = re.compile(r"(?i)^(enviado|para|asunto)\s*:")
-_NAME_WORD = r"(?:sra?\.|don|doña|[A-ZÁÉÍÓÚÜÑ][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]*\.?)"
+_NAME_WORD = (
+    r"(?:sres\.|sra?\.|don|doña|equipo|"
+    r"[A-ZÁÉÍÓÚÜÑ][A-Za-zÁÉÍÓÚÜÑáéíóúüñ'’-]{0,40}\.?)"
+)
 _GREETING = re.compile(
     r"(?i)^(?:hola|estimad[oa]s?|"
     r"buen[oa]s?\s+d[ií]as|buen[oa]s?\s+tardes|buen[oa]s?\s+noches|"
-    r"se[nñ]ores|se[nñ]oras|se[nñ]ora|se[nñ]or|sra\.|sr\.|do[nñ]a|don)"
-    r"(?-i:(?:\s+" + _NAME_WORD + r"){1,3})?"
+    r"sres\.|se[nñ]ores|se[nñ]oras|se[nñ]ora|se[nñ]or|sra\.|sr\.|do[nñ]a|don)"
+    r"(?-i:(?:\s+" + _NAME_WORD + r"){1,4})?"
     r"\s*(?:[,:.]\s*)?$"
 )
 _ORIGINAL = re.compile(r"(?i)^-{3,}\s*(?:mensaje original|original message)\s*-{3,}$")
@@ -63,14 +44,6 @@ _SIMPLE_CLOSE = re.compile(
     r"(?i)^(?:saludos(?:\s+cordiales)?|atentamente|cordialmente|"
     r"un saludo|muchas gracias|gracias)[.!]?$"
 )
-_RUT_RE = re.compile(r"\b\d{1,2}(?:[.\s]?\d{3}){2}\s*-\s*[\dkK]\b")
-
-
-def _fold(value: str) -> str:
-    decomposed = unicodedata.normalize("NFKD", value.strip().lower())
-    return "".join(char for char in decomposed if not unicodedata.combining(char))
-
-
 _MAIL_TLDS = ("com", "cl", "es", "com.ar", "co.uk", "com.mx")
 SHARED_DOMAINS = frozenset(
     {
@@ -84,6 +57,7 @@ SHARED_DOMAINS = frozenset(
         "yahoo.com.ar",
         "yahoo.cl",
         "yahoo.com.mx",
+        "yahoo.com.br",
         "ymail.com",
         "rocketmail.com",
         "aol.com",
@@ -103,8 +77,14 @@ SHARED_DOMAINS = frozenset(
         "chile.com",
         "latinmail.com",
         "uol.com.br",
+        "bol.com.br",
+        "web.de",
+        "orange.fr",
+        "telefonica.net",
         "gtdinternet.com",
         "terra.cl",
+        "terra.com",
+        "terra.es",
         "terra.com.br",
         "entelchile.net",
         "movistar.cl",
@@ -125,6 +105,10 @@ SHARED_DOMAINS = frozenset(
         "uc.cl",
         "udp.cl",
         "pjud.cl",
+        "puc.cl",
+        "uahurtado.cl",
+        "uft.cl",
+        "ucsc.cl",
         "pucv.cl",
         "uv.cl",
         "uandes.cl",
@@ -151,7 +135,10 @@ SHARED_DOMAINS = frozenset(
 
 
 def normalize_host(value: str) -> str:
-    """Host en minúsculas, IDNA, sin punto final y sin www. Un host ilegible da ""."""
+    """Host en minúsculas, IDNA, sin punto final y sin www. Un host ilegible da "".
+
+    No quita mail., correo., email. ni webmail. Ese recorte lo hace la baja.
+    """
     try:
         text = (value or "").strip()
         if not text:
@@ -188,13 +175,44 @@ def is_shared_host(value: str) -> bool:
     return False
 
 
+_SHARED_HOSTING = ("wixsite.com", "github.io")
+
+
+def _shared_hosting(host: str) -> bool:
+    """wixsite, github.io, blogspot.com o blogspot más un ccTLD."""
+    labels = [part for part in host.split(".") if part]
+    if "blogspot" in labels:
+        rest = labels[labels.index("blogspot") + 1 :]
+        if rest == ["com"] or (len(rest) == 1 and len(rest[0]) == 2):
+            return True
+    return any(host == base or host.endswith("." + base) for base in _SHARED_HOSTING)
+
+
 def host_is_suppressed(session: Session, value: str) -> bool:
-    """True si ese host o un dominio padre, con borde de label, está cerrado."""
+    """True si ese host o un dominio padre, con borde de label, está cerrado.
+
+    Una fila de sufijo público (gob.cl) se ignora al leer. No se borra.
+    """
     host = normalize_host(value)
-    if not host:
+    if not host or _es_sufijo_publico(host):
         return False
     repo = SuppressionRepository(session)
-    return any(repo.contains("domain", suffix) for suffix in _suffixes(host))
+    return any(
+        not _es_sufijo_publico(suffix) and repo.contains("domain", suffix)
+        for suffix in _suffixes(host)
+    )
+
+
+def website_is_suppressed(session: Session, website: str) -> bool:
+    """El sitio cierra la ficha. Un host compartido no hereda al padre."""
+    host = normalize_host(website)
+    if not host:
+        return False
+    if _shared_hosting(host):
+        return SuppressionRepository(session).contains("domain", host)
+    if is_shared_host(host):
+        return False
+    return host_is_suppressed(session, host)
 
 
 def normalize_email(value: str) -> str:
@@ -209,14 +227,6 @@ def normalize_email(value: str) -> str:
     return f"{local.strip()}@{host}"
 
 
-def generic_local_part(email: str) -> bool:
-    """True si el buzón es de la oficina, no de una persona."""
-    normalized = normalize_email(email)
-    if "@" not in normalized:
-        return False
-    return _fold(normalized.split("@", 1)[0]) in _GENERIC_LOCAL
-
-
 def is_suppressed(session: Session, lead: object) -> bool:
     """True si el lead, su correo o su estudio ya están en la lista."""
     repo = SuppressionRepository(session)
@@ -226,7 +236,7 @@ def is_suppressed(session: Session, lead: object) -> bool:
     if "@" in email and host_is_suppressed(session, email.split("@", 1)[1]):
         return True
     website = getattr(lead, "website_url", None)
-    if website and host_is_suppressed(session, str(website)):
+    if website and website_is_suppressed(session, str(website)):
         return True
     instagram = getattr(lead, "instagram_handle", None)
     if instagram and repo.contains("instagram", str(instagram)):
@@ -292,7 +302,7 @@ def clean_opt_out_text(text: str | None) -> str | None:
             break
         if _SIMPLE_CLOSE.match(stripped) and kept:
             break
-        if _GREETING.match(stripped) and not kept:
+        if _GREETING.match(stripped) and not kept and not is_opt_out(stripped):
             saludo = saludo or line
             continue
         kept.append(line)
@@ -350,19 +360,47 @@ _PUBLIC_SUFFIXES = (
     "org.uk",
     "com.au",
     "co.nz",
+    "gob.pe",
+    "gub.uy",
+    "go.cr",
+    "sa.cr",
+    "law.pe",
 )
 
 
+_SECOND_LEVEL = frozenset(
+    {"com", "co", "net", "org", "gob", "gov", "edu", "ac", "mil", "nom", "or", "ne", "adv"}
+)
+_PREFIJOS_CORREO = ("mail.", "correo.", "email.", "webmail.")
+
+
+def _es_sufijo_publico(host: str) -> bool:
+    labels = [part for part in host.split(".") if part]
+    if len(labels) < 2 or host in _PUBLIC_SUFFIXES:
+        return True
+    return len(labels) == 2 and len(labels[-1]) == 2 and labels[-2] in _SECOND_LEVEL
+
+
 def _sin_prefijo_de_correo(host: str) -> str:
-    """Quita mail. o correo. solo si queda un host, no un TLD ni un sufijo público."""
+    """Quita el prefijo de buzón solo si queda un host, no un sufijo público."""
     current = host
-    while current.startswith(("mail.", "correo.")):
+    while current.startswith(_PREFIJOS_CORREO):
         rest = current.split(".", 1)[1]
-        labels = [part for part in rest.split(".") if part]
-        if len(labels) < 2 or rest in _PUBLIC_SUFFIXES:
+        if _es_sufijo_publico(rest):
             break
         current = rest
     return current
+
+
+def _dominio_de_sitio(site: str, mail_host: str) -> str:
+    """Host del sitio a cerrar. Vacío si no corresponde guardarlo."""
+    if not site or site == mail_host or site == _sin_prefijo_de_correo(mail_host):
+        return ""
+    if _shared_hosting(site):
+        return site
+    if is_shared_host(site) or _es_sufijo_publico(site):
+        return ""
+    return site
 
 
 def record_opt_out(
@@ -431,11 +469,25 @@ def record_opt_out(
                 )
     elif host:
         host = _sin_prefijo_de_correo(host)
+        if host and not _es_sufijo_publico(host):
+            rows.append(
+                _store(
+                    repo,
+                    "domain",
+                    host,
+                    channel=channel,
+                    reason=reason,
+                    detail=None,
+                    keep_text=False,
+                )
+            )
+    site = _dominio_de_sitio(normalize_host(getattr(lead, "website_url", None) or ""), host)
+    if site:
         rows.append(
             _store(
                 repo,
                 "domain",
-                host,
+                site,
                 channel=channel,
                 reason=reason,
                 detail=None,

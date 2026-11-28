@@ -37,6 +37,7 @@ ALLOW_LIVE=false bash "$guard" "$tmp/shadow.env"
 ALLOW_LIVE=true bash "$guard" "$tmp/live.env"
 
 python3 - "$root" <<'PY'
+import re
 import sys
 from pathlib import Path
 
@@ -68,6 +69,19 @@ if texts[1].count("scp -o BatchMode=yes") < 3:
 ci = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
 if "caddy hash-password" not in ci:
     raise SystemExit("el hash de staging tiene que salir de caddy hash-password")
+def _caddy_exacto(text: str) -> None:
+    for tag in re.findall(r"caddy:(\S+)", text):
+        if not re.fullmatch(r"\d+\.\d+\.\d+", tag):
+            raise SystemExit(f"caddy:{tag} no es X.Y.Z")
+
+
+_caddy_exacto(ci)
+for malo in ("caddy:latest", "caddy:2", "caddy:2.10"):
+    try:
+        _caddy_exacto(malo)
+    except SystemExit:
+        continue
+    raise SystemExit(f"el guard dejó pasar {malo}")
 if "N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy" in ci:
     raise SystemExit("el bcrypt de staging no debe ir fijo en el workflow")
 print("deploy guard ok")
