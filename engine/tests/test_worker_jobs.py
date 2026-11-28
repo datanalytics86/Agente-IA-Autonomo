@@ -1663,7 +1663,8 @@ def test_dominio_compartido_cierra_el_otro_correo(session: Session) -> None:
     from core.suppression import host_is_suppressed, is_shared_host, record_opt_out
 
     assert is_shared_host("derecho.uchile.cl") is True
-    assert is_shared_host("x.blogspot.com.ar") is False
+    assert is_shared_host("x.blogspot.com.ar") is True
+    assert is_shared_host("blogspot.com.br") is True
     assert is_shared_host("blogspot.estudio.cl") is False
     assert is_shared_host("estudio.blogspot.com") is True
     assert is_shared_host("alumnos.uc.cl") is True

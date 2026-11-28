@@ -309,6 +309,14 @@ def test_un_folio_de_nueve_digitos_no_es_telefono() -> None:
     lead = Lead(phone_public="(32) 223-4567")
     result = check_rules(_message(body), lead, _settings())
     assert not any(reason.startswith("contacto inventado: teléfono") for reason in result.reasons)
+    compacto = (
+        "Hola. Te escribo de Agencia Norte. "
+        "El fijo es +56322345678 o +56223456789. "
+        "Si no quieres más correos responde BAJA."
+    )
+    marcado = check_rules(_message(compacto), _lead(), _settings())
+    assert "contacto inventado: teléfono 56322345678" in marcado.reasons
+    assert "contacto inventado: teléfono 56223456789" in marcado.reasons
 
 
 def test_fijo_regional_se_trata_como_telefono() -> None:

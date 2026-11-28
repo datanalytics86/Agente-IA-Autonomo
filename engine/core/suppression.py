@@ -163,11 +163,24 @@ def _suffixes(host: str) -> list[str]:
     return [".".join(labels[index:]) for index in range(max(len(labels) - 1, 0))]
 
 
+def _blogspot_plataforma(host: str) -> bool:
+    """blogspot.com, blogspot.<ccTLD> o blogspot.com.<cc> / blogspot.co.<cc>."""
+    labels = [part for part in host.split(".") if part]
+    if "blogspot" not in labels:
+        return False
+    rest = labels[labels.index("blogspot") + 1 :]
+    if rest == ["com"] or (len(rest) == 1 and len(rest[0]) == 2):
+        return True
+    return len(rest) == 2 and rest[0] in {"com", "co"} and len(rest[1]) == 2
+
+
 def is_shared_host(value: str) -> bool:
     """True si el host, o un sufijo con borde de label, es un dominio compartido."""
     host = normalize_host(value)
     if not host:
         return False
+    if _blogspot_plataforma(host):
+        return True
     return any(suffix in SHARED_DOMAINS for suffix in _suffixes(host))
 
 
@@ -175,14 +188,9 @@ _SHARED_HOSTING = ("wixsite.com", "github.io")
 
 
 def _shared_hosting(host: str) -> bool:
-    """wixsite, github.io, blogspot.com o blogspot más un ccTLD."""
-    labels = [part for part in host.split(".") if part]
-    if "blogspot" in labels:
-        rest = labels[labels.index("blogspot") + 1 :]
-        cc = len(rest) == 1 and len(rest[0]) == 2
-        compuesto = len(rest) == 2 and rest[0] in {"com", "co"} and len(rest[1]) == 2
-        if rest == ["com"] or cc or compuesto:
-            return True
+    """wixsite, github.io o un Blogspot regional de verdad."""
+    if _blogspot_plataforma(host):
+        return True
     return any(host == base or host.endswith("." + base) for base in _SHARED_HOSTING)
 
 
