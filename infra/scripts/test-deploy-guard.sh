@@ -75,7 +75,21 @@ def _caddy_exacto(text: str) -> None:
             raise SystemExit(f"caddy:{tag} no es X.Y.Z")
 
 
+def _postgres_xy(text: str) -> None:
+    for tag in re.findall(r"postgres:(\S+)", text):
+        if not re.fullmatch(r"\d+\.\d+", tag):
+            raise SystemExit(f"postgres:{tag} no es X.Y")
+
+
 _caddy_exacto(ci)
+prod = (root / "infra/docker-compose.prod.yml").read_text(encoding="utf-8")
+_postgres_xy(prod)
+for malo in ("postgres:16", "postgres:latest", "postgres:16.16.1"):
+    try:
+        _postgres_xy(malo)
+    except SystemExit:
+        continue
+    raise SystemExit(f"el guard dejó pasar {malo}")
 for malo in ("caddy:latest", "caddy:2", "caddy:2.10"):
     try:
         _caddy_exacto(malo)
