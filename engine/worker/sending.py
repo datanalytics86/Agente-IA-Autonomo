@@ -11,7 +11,7 @@ from core.compliance import is_opt_out, looks_like_injection
 from core.config import get_settings
 from core.hitl import channel_should_pause, needs_value_review
 from core.states import TRANSITIONS, transition
-from core.suppression import is_suppressed, record_opt_out
+from core.suppression import es_organismo_publico, is_suppressed, record_opt_out
 from db.models import Lead, Message
 from db.repositories import (
     EventRepository,
@@ -161,6 +161,16 @@ def job_outreach(ctx: JobContext) -> int:
             patch_fields(ctx.session, message, status="blocked")
             continue
         if _blocked_lead(ctx, lead, message):
+            continue
+        if es_organismo_publico(lead.contact_email, lead.website_url):
+            patch_fields(ctx.session, message, status="blocked")
+            EventRepository(ctx.session).append(
+                agent="outreach_send",
+                level="info",
+                message="organismo público, no se envía",
+                lead_id=lead.id,
+                ts=ctx.clock.now(),
+            )
             continue
         domain = _domain(lead.contact_email)
         if domain and domain in used_domains:
