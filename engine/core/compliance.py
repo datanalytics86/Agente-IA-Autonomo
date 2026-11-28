@@ -33,11 +33,14 @@ _EMAIL_RE = re.compile(
     r"[A-Za-z]{2,24}(?![A-Za-z0-9])"
 )
 _PHONE_RE = re.compile(
-    r"(?<!\d)(?:\+?56[\s.\-]*)?(?:"
+    r"(?<!\d)(?:"
+    r"\+56[\s.\-]*(?:9\d{8}|[2-7]\d{8}|(?:600|800)\d{7})"
+    r"|(?:\+?56[\s.\-]*)?(?:"
     r"9[\s.\-]*\d{4}[\s.\-]*\d{4}"
-    r"|2[\s.\-]*\d{4}[\s.\-]*\d{4}"
-    r"|[2-7]\d[\s.\-]*\d{3}[\s.\-]*\d{4}"
+    r"|2[\s.\-]+\d{4}[\s.\-]*\d{4}"
+    r"|(?:\(\s*[2-7]\d\s*\)|[2-7]\d)[\s.\-]+\d{3}[\s.\-]*\d{4}"
     r"|(?:600|800)[\s.\-]*\d{3}[\s.\-]*\d{4}"
+    r")"
     r")(?!\d)"
 )
 _RUT_RE = re.compile(
@@ -197,7 +200,7 @@ def normalize_contact(kind: str, value: str) -> str:
         return _domain_host(raw)
     if selected == "phone":
         digits = re.sub(r"\D", "", raw)
-        if digits.startswith("9") and len(digits) == 9:
+        if len(digits) == 9 and digits[0] in "23456789":
             digits = "56" + digits
         return digits
     if selected == "instagram":

@@ -293,6 +293,32 @@ def test_rechaza_destinatario_suprimido_y_contacto_inventado() -> None:
     assert "contacto inventado: teléfono 56911112222" in result.reasons
 
 
+def test_el_regex_de_correo_no_cubre_idn_ni_punto_inicial() -> None:
+    from core.compliance import _EMAIL_RE
+
+    assert "bücher@estudio.cl" not in _EMAIL_RE.findall("bücher@estudio.cl")
+    assert _EMAIL_RE.findall(".contacto@estudio.cl") == []
+
+
+def test_un_folio_de_nueve_digitos_no_es_telefono() -> None:
+    body = (
+        "Hola. Te escribo de Agencia Norte. "
+        "El folio es 322345678 y el fijo (32) 223-4567. "
+        "Si no quieres más correos responde BAJA."
+    )
+    lead = Lead(phone_public="(32) 223-4567")
+    result = check_rules(_message(body), lead, _settings())
+    assert not any(reason.startswith("contacto inventado: teléfono") for reason in result.reasons)
+    compacto = (
+        "Hola. Te escribo de Agencia Norte. "
+        "El fijo es +56322345678 o +56223456789. "
+        "Si no quieres más correos responde BAJA."
+    )
+    marcado = check_rules(_message(compacto), _lead(), _settings())
+    assert "contacto inventado: teléfono 56322345678" in marcado.reasons
+    assert "contacto inventado: teléfono 56223456789" in marcado.reasons
+
+
 def test_fijo_regional_se_trata_como_telefono() -> None:
     body = (
         "Hola. Te escribo de Agencia Norte. "
@@ -300,7 +326,7 @@ def test_fijo_regional_se_trata_como_telefono() -> None:
         "Si no quieres más correos responde BAJA."
     )
     result = check_rules(_message(body), _lead(), _settings())
-    assert "contacto inventado: teléfono 322345678" in result.reasons
+    assert "contacto inventado: teléfono 56322345678" in result.reasons
 
 
 def test_fijo_y_56_2_se_tratan_como_telefono() -> None:

@@ -630,6 +630,82 @@ def test_scout_no_crea_lead_suprimido(session: Session) -> None:
     assert LeadRepository(session).list(limit=20) == []
 
 
+def test_scout_no_prospecta_organismos_publicos(session: Session) -> None:
+    from db.models import Suppression
+
+    class Source:
+        def search(self, commune: str, category_slug: str, limit: int) -> list[PlaceHit]:
+            return [
+                PlaceHit(
+                    place_id="place-muni",
+                    name="Municipalidad",
+                    formatted_address="Av 1",
+                    commune="Providencia",
+                    city="Santiago",
+                    category="taller-mecanico",
+                    website_uri="https://www.muni.gob.cl",
+                    rating=4.8,
+                    user_rating_count=40,
+                    business_status="OPERATIONAL",
+                    email="contacto@muni.gob.cl",
+                    instagram_handle=None,
+                    linkedin_url=None,
+                    phone_public=None,
+                    estimated_value_clp=350_000,
+                    opportunity_score=80,
+                    scenario="test",
+                    email_source_url="https://muni.gob.cl/contacto",
+                ),
+                PlaceHit(
+                    place_id="place-pjud",
+                    name="Juzgado",
+                    formatted_address="Av 2",
+                    commune="Providencia",
+                    city="Santiago",
+                    category="taller-mecanico",
+                    website_uri="https://www.pjud.cl",
+                    rating=4.8,
+                    user_rating_count=40,
+                    business_status="OPERATIONAL",
+                    email="contacto@estudio.cl",
+                    instagram_handle=None,
+                    linkedin_url=None,
+                    phone_public=None,
+                    estimated_value_clp=350_000,
+                    opportunity_score=80,
+                    scenario="test",
+                    email_source_url="https://estudio.cl/contacto",
+                ),
+                PlaceHit(
+                    place_id="place-privado",
+                    name="Estudio Norte",
+                    formatted_address="Av 3",
+                    commune="Providencia",
+                    city="Santiago",
+                    category="taller-mecanico",
+                    website_uri="https://estudio.cl",
+                    rating=4.8,
+                    user_rating_count=40,
+                    business_status="OPERATIONAL",
+                    email="persona@estudio.cl",
+                    instagram_handle=None,
+                    linkedin_url=None,
+                    phone_public=None,
+                    estimated_value_clp=350_000,
+                    opportunity_score=80,
+                    scenario="test",
+                    email_source_url="https://estudio.cl/contacto",
+                ),
+            ]
+
+    ctx = _ctx(session, datetime(2026, 3, 20, 11, 0, tzinfo=TZ))
+    ctx.ports.places = Source()  # type: ignore[assignment]
+    assert job_scout(ctx) == 1
+    nombres = [lead.business for lead in LeadRepository(session).list(limit=20)]
+    assert nombres == ["Estudio Norte"]
+    assert list(session.scalars(select(Suppression))) == []
+
+
 def test_pipeline_no_encola_correo_suprimido(session: Session) -> None:
     SuppressionRepository(session).add(
         "email",
@@ -1030,6 +1106,25 @@ def test_mail_no_recorta_un_sufijo_publico(session: Session) -> None:
     assert repo.contains("domain", "cl") is False
     assert repo.contains("domain", "gob.cl") is False
     assert repo.contains("domain", "co.uk") is False
+
+
+def test_mail_con_el_sitio_no_deja_el_host_del_buzon(session: Session) -> None:
+    from core.suppression import record_opt_out
+
+    lead = _lead(
+        session,
+        business="Mail Y Sitio",
+        contact_email="x@mail.estudio.cl",
+        website_url="https://estudio.cl",
+        place_id="place-mail-sitio",
+    )
+    filas = record_opt_out(session, lead, channel="email", reason="baja")
+    dominios = [row for row in filas if row.kind == "domain"]
+    assert len(dominios) == 1
+    assert dominios[0].count == 1
+    repo = SuppressionRepository(session)
+    assert repo.contains("domain", "estudio.cl") is True
+    assert repo.contains("domain", "mail.estudio.cl") is False
 
 
 def test_mail_y_correo_cierran_el_host(session: Session) -> None:
@@ -1439,6 +1534,8 @@ def test_blogspot_solo_si_es_el_plataforma(session: Session) -> None:
 
     assert _shared_hosting("estudio.blogspot.com") is True
     assert _shared_hosting("estudio.blogspot.cl") is True
+    assert _shared_hosting("foo.blogspot.com.br") is True
+    assert _shared_hosting("foo.blogspot.co.uk") is True
     assert _shared_hosting("blogspot.estudio.cl") is False
 
 
@@ -1567,6 +1664,9 @@ def test_dominio_compartido_cierra_el_otro_correo(session: Session) -> None:
 
     assert is_shared_host("derecho.uchile.cl") is True
     assert is_shared_host("x.blogspot.com.ar") is True
+    assert is_shared_host("blogspot.com.br") is True
+    assert is_shared_host("blogspot.estudio.cl") is False
+    assert is_shared_host("estudio.blogspot.com") is True
     assert is_shared_host("alumnos.uc.cl") is True
     assert is_shared_host("estudio.cl") is False
     oficina = _lead(

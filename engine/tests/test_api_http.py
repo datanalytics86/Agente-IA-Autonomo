@@ -467,7 +467,7 @@ def test_admin_rechaza_un_dominio_compartido(client: TestClient) -> None:
     from db.models import Suppression
 
     headers = _login(client)
-    for value in ("gmail.com", "derecho.uchile.cl", "x.blogspot.com.ar"):
+    for value in ("gmail.com", "derecho.uchile.cl", "estudio.blogspot.com"):
         response = client.post(
             "/api/compliance/suppression",
             headers=headers,
