@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from core.compliance import _EMAIL_RE, _PHONE_RE, _RUT_RE
+from core.compliance import _EMAIL_RE, _PHONE_RE, _RUT_RE, is_opt_out
 from core.config import ENGINE_DIR
 from db.models import Approval, Artifact, Event, Lead, Message, Suppression
 from db.normalize import contact_hash
@@ -105,7 +105,6 @@ SHARED_DOMAINS = frozenset(
         "uc.cl",
         "udp.cl",
         "pjud.cl",
-        "gob.cl",
         "puc.cl",
         "uahurtado.cl",
         "uft.cl",
@@ -180,9 +179,12 @@ _SHARED_HOSTING = ("wixsite.com", "github.io")
 
 
 def _shared_hosting(host: str) -> bool:
+    """wixsite, github.io, blogspot.com o blogspot más un ccTLD."""
     labels = [part for part in host.split(".") if part]
-    if "blogspot" in labels[:-1]:
-        return True
+    if "blogspot" in labels:
+        rest = labels[labels.index("blogspot") + 1 :]
+        if rest == ["com"] or (len(rest) == 1 and len(rest[0]) == 2):
+            return True
     return any(host == base or host.endswith("." + base) for base in _SHARED_HOSTING)
 
 
@@ -294,7 +296,7 @@ def clean_opt_out_text(text: str | None) -> str | None:
             break
         if _SIMPLE_CLOSE.match(stripped) and kept:
             break
-        if _GREETING.match(stripped) and not kept:
+        if _GREETING.match(stripped) and not kept and not is_opt_out(stripped):
             saludo = saludo or line
             continue
         kept.append(line)
@@ -352,6 +354,11 @@ _PUBLIC_SUFFIXES = (
     "org.uk",
     "com.au",
     "co.nz",
+    "gob.pe",
+    "gub.uy",
+    "go.cr",
+    "sa.cr",
+    "law.pe",
 )
 
 
@@ -361,21 +368,33 @@ _SECOND_LEVEL = frozenset(
 _PREFIJOS_CORREO = ("mail.", "correo.", "email.", "webmail.")
 
 
+def _es_sufijo_publico(host: str) -> bool:
+    labels = [part for part in host.split(".") if part]
+    if len(labels) < 2 or host in _PUBLIC_SUFFIXES:
+        return True
+    return len(labels) == 2 and len(labels[-1]) == 2 and labels[-2] in _SECOND_LEVEL
+
+
 def _sin_prefijo_de_correo(host: str) -> str:
     """Quita el prefijo de buzón solo si queda un host, no un sufijo público."""
     current = host
     while current.startswith(_PREFIJOS_CORREO):
         rest = current.split(".", 1)[1]
-        labels = [part for part in rest.split(".") if part]
-        publico = (
-            len(labels) < 2
-            or rest in _PUBLIC_SUFFIXES
-            or (len(labels) == 2 and len(labels[-1]) == 2 and labels[-2] in _SECOND_LEVEL)
-        )
-        if publico:
+        if _es_sufijo_publico(rest):
             break
         current = rest
     return current
+
+
+def _dominio_de_sitio(site: str, mail_host: str) -> str:
+    """Host del sitio a cerrar. Vacío si no corresponde guardarlo."""
+    if not site or site == mail_host or site == _sin_prefijo_de_correo(mail_host):
+        return ""
+    if _shared_hosting(site):
+        return site
+    if is_shared_host(site) or _es_sufijo_publico(site):
+        return ""
+    return site
 
 
 def record_opt_out(
@@ -444,11 +463,25 @@ def record_opt_out(
                 )
     elif host:
         host = _sin_prefijo_de_correo(host)
+        if host and not _es_sufijo_publico(host):
+            rows.append(
+                _store(
+                    repo,
+                    "domain",
+                    host,
+                    channel=channel,
+                    reason=reason,
+                    detail=None,
+                    keep_text=False,
+                )
+            )
+    site = _dominio_de_sitio(normalize_host(getattr(lead, "website_url", None) or ""), host)
+    if site:
         rows.append(
             _store(
                 repo,
                 "domain",
-                host,
+                site,
                 channel=channel,
                 reason=reason,
                 detail=None,

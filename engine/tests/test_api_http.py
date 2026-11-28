@@ -490,6 +490,22 @@ def test_admin_rechaza_un_dominio_compartido(client: TestClient) -> None:
         assert session.get(Suppression, propio.json()["id"]) is not None
 
 
+def test_admin_rechaza_el_sufijo_publico_gob_cl(client: TestClient) -> None:
+    headers = _login(client)
+    gob = client.post(
+        "/api/compliance/suppression",
+        headers=headers,
+        json={"kind": "domain", "value": "gob.cl", "reason": "manual"},
+    )
+    assert gob.status_code == 422, gob.text
+    muni = client.post(
+        "/api/compliance/suppression",
+        headers=headers,
+        json={"kind": "domain", "value": "municipalidad.gob.cl", "reason": "manual"},
+    )
+    assert muni.status_code == 201, muni.text
+
+
 def test_admin_rechaza_dominio_que_normaliza_vacio(client: TestClient) -> None:
     headers = _login(client)
     response = client.post(

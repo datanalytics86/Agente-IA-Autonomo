@@ -1151,9 +1151,10 @@ def add_suppression(session: Session, kind: str, value: str, reason: str) -> dic
     if kind not in CONTACT_KINDS:
         raise ApiError(422, "validation_error", "kind de supresión desconocido")
     if kind == "domain":
-        from core.suppression import is_shared_host, normalize_host
+        from core.suppression import _es_sufijo_publico, is_shared_host, normalize_host
 
-        if not normalize_host(value):
+        host = normalize_host(value)
+        if not host or _es_sufijo_publico(host):
             raise ApiError(422, "validation_error", "dominio inválido")
         if is_shared_host(value):
             raise ApiError(422, "validation_error", "el dominio es compartido")
