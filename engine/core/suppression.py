@@ -168,11 +168,7 @@ def is_shared_host(value: str) -> bool:
     host = normalize_host(value)
     if not host:
         return False
-    labels = [part for part in host.split(".") if part]
-    for index, suffix in enumerate(_suffixes(host)):
-        if suffix in SHARED_DOMAINS or labels[index] == "blogspot":
-            return True
-    return False
+    return any(suffix in SHARED_DOMAINS for suffix in _suffixes(host))
 
 
 _SHARED_HOSTING = ("wixsite.com", "github.io")
@@ -183,7 +179,9 @@ def _shared_hosting(host: str) -> bool:
     labels = [part for part in host.split(".") if part]
     if "blogspot" in labels:
         rest = labels[labels.index("blogspot") + 1 :]
-        if rest == ["com"] or (len(rest) == 1 and len(rest[0]) == 2):
+        cc = len(rest) == 1 and len(rest[0]) == 2
+        compuesto = len(rest) == 2 and rest[0] in {"com", "co"} and len(rest[1]) == 2
+        if rest == ["com"] or cc or compuesto:
             return True
     return any(host == base or host.endswith("." + base) for base in _SHARED_HOSTING)
 
@@ -194,11 +192,11 @@ def host_is_suppressed(session: Session, value: str) -> bool:
     Una fila de sufijo público (gob.cl) se ignora al leer. No se borra.
     """
     host = normalize_host(value)
-    if not host or _es_sufijo_publico(host):
+    if not host or es_sufijo_publico(host):
         return False
     repo = SuppressionRepository(session)
     return any(
-        not _es_sufijo_publico(suffix) and repo.contains("domain", suffix)
+        not es_sufijo_publico(suffix) and repo.contains("domain", suffix)
         for suffix in _suffixes(host)
     )
 
@@ -374,7 +372,38 @@ _SECOND_LEVEL = frozenset(
 _PREFIJOS_CORREO = ("mail.", "correo.", "email.", "webmail.")
 
 
-def _es_sufijo_publico(host: str) -> bool:
+_ORGANISMOS = (
+    "gob.cl",
+    "gov.cl",
+    "mil.cl",
+    "gob.ar",
+    "gob.mx",
+    "gov.br",
+    "gob.pe",
+    "gub.uy",
+    "go.cr",
+    "sa.cr",
+    "pjud.cl",
+)
+
+
+def es_organismo_publico(email: str | None = "", website: str | None = "") -> bool:
+    """True si el sitio o el correo es de un organismo público. No es una baja."""
+    hosts: list[str] = []
+    if email and "@" in str(email):
+        hosts.append(normalize_host(str(email)))
+    if website:
+        hosts.append(normalize_host(str(website)))
+    for host in hosts:
+        if not host:
+            continue
+        for suffix in _ORGANISMOS:
+            if host == suffix or host.endswith("." + suffix):
+                return True
+    return False
+
+
+def es_sufijo_publico(host: str) -> bool:
     labels = [part for part in host.split(".") if part]
     if len(labels) < 2 or host in _PUBLIC_SUFFIXES:
         return True
@@ -386,7 +415,7 @@ def _sin_prefijo_de_correo(host: str) -> str:
     current = host
     while current.startswith(_PREFIJOS_CORREO):
         rest = current.split(".", 1)[1]
-        if _es_sufijo_publico(rest):
+        if es_sufijo_publico(rest):
             break
         current = rest
     return current
@@ -398,7 +427,7 @@ def _dominio_de_sitio(site: str, mail_host: str) -> str:
         return ""
     if _shared_hosting(site):
         return site
-    if is_shared_host(site) or _es_sufijo_publico(site):
+    if is_shared_host(site) or es_sufijo_publico(site):
         return ""
     return site
 
@@ -469,7 +498,7 @@ def record_opt_out(
                 )
     elif host:
         host = _sin_prefijo_de_correo(host)
-        if host and not _es_sufijo_publico(host):
+        if host and not es_sufijo_publico(host):
             rows.append(
                 _store(
                     repo,

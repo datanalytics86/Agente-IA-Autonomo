@@ -14,7 +14,7 @@ from core.config import ENGINE_DIR, get_settings
 from core.errors import DuplicateLeadError
 from core.hitl import needs_value_review
 from core.states import TRANSITIONS, transition
-from core.suppression import is_suppressed
+from core.suppression import es_organismo_publico, is_suppressed
 from db.models import Artifact, Lead, Message, Order, Payment, Project
 from db.repositories import (
     ArtifactRepository,
@@ -124,6 +124,8 @@ def job_scout(ctx: JobContext) -> int:
         if hit.place_id in known:
             continue
         lead = _lead_from_hit(ctx, hit)
+        if es_organismo_publico(lead.contact_email, lead.website_url):
+            continue
         if is_suppressed(ctx.session, lead):
             continue
         try:
