@@ -431,13 +431,20 @@ def _sin_prefijo_de_correo(host: str) -> str:
 
 def _dominio_de_sitio(site: str, mail_host: str) -> str:
     """Host del sitio a cerrar. Vacío si no corresponde guardarlo."""
-    if not site or site == mail_host or site == _sin_prefijo_de_correo(mail_host):
+    if not site:
         return ""
     if _shared_hosting(site):
+        bare_mail = _sin_prefijo_de_correo(mail_host) if mail_host else ""
+        if site in {mail_host, bare_mail}:
+            return ""
         return site
-    if is_shared_host(site) or es_sufijo_publico(site):
+    bare_mail = _sin_prefijo_de_correo(mail_host) if mail_host else ""
+    bare_site = _sin_prefijo_de_correo(site)
+    if not bare_site or bare_site in {mail_host, bare_mail}:
         return ""
-    return site
+    if is_shared_host(bare_site) or es_sufijo_publico(bare_site):
+        return ""
+    return bare_site
 
 
 def record_opt_out(

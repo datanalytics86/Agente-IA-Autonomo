@@ -270,7 +270,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16.16
         env:
           POSTGRES_USER: agencia
           POSTGRES_PASSWORD: agencia
@@ -312,7 +312,7 @@ jobs:
             -e PGDATABASE=agencia \
             -v "$PWD:/work" \
             -w /work \
-            postgres:16 \
+            postgres:16.16 \
             infra/scripts/ci-restore-probe.sh
 
   edge:

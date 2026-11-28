@@ -211,6 +211,60 @@ def test_kill_switch_no_envia(session: Session) -> None:
     assert stored.status == "queued"
 
 
+def test_organismo_publico_en_cola_no_se_envia(session: Session) -> None:
+    from db.models import Suppression
+
+    SettingsRepository(session).put("kill_switch", True, updated_by="test")
+    gob = _lead(
+        session,
+        business="Municipalidad",
+        contact_email="alcalde@muni.gob.cl",
+        website_url="https://www.muni.gob.cl",
+        place_id="place-envio-gob",
+    )
+    pjud = _lead(
+        session,
+        business="Juzgado",
+        contact_email="mesa@pjud.cl",
+        website_url="https://www.pjud.cl",
+        place_id="place-envio-pjud",
+    )
+    normal = _lead(
+        session,
+        business="Estudio Envio",
+        contact_email="persona@estudio-envio.cl",
+        website_url="https://estudio-envio.cl",
+        place_id="place-envio-normal",
+    )
+    _queued(session, gob, scheduled_at=datetime(2026, 3, 3, 12, 0, tzinfo=UTC))
+    _queued(session, pjud, scheduled_at=datetime(2026, 3, 3, 12, 5, tzinfo=UTC))
+    _queued(session, normal, scheduled_at=datetime(2026, 3, 3, 12, 10, tzinfo=UTC))
+    box = MemoryOutreach()
+    ctx = _ctx(session, datetime(2026, 3, 3, 10, 0, tzinfo=TZ), box)
+    assert job_outreach(ctx) == 1
+    assert box.sent == ["persona@estudio-envio.cl"]
+    assert MessageRepository(session).list(lead_id=gob.id)[0].status == "blocked"
+    assert MessageRepository(session).list(lead_id=pjud.id)[0].status == "blocked"
+    assert LeadRepository(session).get(gob.id).status == "pitch_listo"  # type: ignore[union-attr]
+    assert list(session.scalars(select(Suppression))) == []
+
+
+def test_el_sitio_mail_no_deja_fila_con_prefijo(session: Session) -> None:
+    from core.suppression import record_opt_out
+
+    lead = _lead(
+        session,
+        business="Sitio Mail",
+        contact_email="persona@estudio.cl",
+        website_url="https://mail.estudio.cl",
+        place_id="place-sitio-mail",
+    )
+    record_opt_out(session, lead, channel="email", reason="baja")
+    repo = SuppressionRepository(session)
+    assert repo.contains("domain", "estudio.cl") is True
+    assert repo.contains("domain", "mail.estudio.cl") is False
+
+
 def test_email_suprimido_no_recibe_mas(session: Session) -> None:
     lead = _lead(session)
     SuppressionRepository(session).add(
